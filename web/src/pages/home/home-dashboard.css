@@ -1,0 +1,627 @@
+/* ============================================================================
+   hfp-tv Home Screening Room — Ready Library (藏书阁) Art Direction & 12-Col Grid
+   ============================================================================ */
+
+.beeftv-home.hfp-home {
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    color: var(--ink);
+    background: transparent;
+    padding: 24px var(--grid-margin, 40px) 64px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--fill-3) transparent;
+}
+
+.hfp-home-container {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: var(--grid-max-width, 1320px);
+    margin: 0 auto;
+}
+
+/* ---- Editorial Masthead (12-Column Split: 7 cols copy / 5 cols continue card) ---- */
+.hfp-hero-masthead {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--grid-gutter, 20px);
+    align-items: end;
+    padding: 0 0 18px;
+}
+
+.hfp-hero-copy {
+    grid-column: span 7;
+    min-width: 0;
+}
+
+.hfp-hero-caption {
+    margin-bottom: 10px;
+}
+
+.hfp-hero-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(44px, 5.4vw, 72px);
+    line-height: 0.96;
+    letter-spacing: -0.045em;
+    color: var(--ink);
+}
+
+.hfp-hero-title em {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: var(--rl-accent);
+    margin-left: 0.04em;
+}
+
+.hfp-hero-subtitle {
+    margin-top: 14px;
+    max-width: 56ch;
+    font-family: var(--font-cloth);
+    font-size: 15.5px;
+    line-height: 1.6;
+    color: var(--ink-2);
+}
+
+.hfp-hero-actions {
+    grid-column: span 5;
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.hfp-continue-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    max-width: 390px;
+    padding: 12px 18px 12px 12px;
+    border-radius: var(--r-xl);
+    text-decoration: none;
+    color: var(--ink);
+    min-width: 0;
+}
+
+.hfp-continue-card:hover {
+    transform: translateY(-2px);
+}
+
+.hfp-continue-preview {
+    width: 72px;
+    height: 54px;
+    border-radius: var(--r-sm);
+    overflow: hidden;
+    flex: none;
+    background: var(--fill-2);
+    box-shadow: var(--book-shadow);
+}
+
+.continue-txt {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 6px;
+    column-gap: 10px;
+    align-items: center;
+    flex: 1 1 0%;
+    min-width: 0;
+}
+
+.continue-txt .lbl {
+    grid-column: 1 / -1;
+    color: var(--rl-accent);
+}
+
+.continue-txt b {
+    grid-column: 1 / -1;
+    font-family: var(--font-cloth);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 2px;
+}
+
+.continue-bar {
+    height: 3px;
+    border-radius: 3px;
+    background: var(--fill-3);
+    overflow: hidden;
+}
+
+.continue-bar i {
+    display: block;
+    height: 100%;
+    background: var(--rl-accent);
+    border-radius: inherit;
+}
+
+.continue-pct {
+    font-size: 10.5px;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+
+/* ---- Projection Stage Hero Card ---- */
+.beeftv-home-hero.hfp-projection-stage {
+    position: relative;
+    min-height: 168px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 28px 24px 22px;
+    overflow: hidden;
+    border-radius: var(--r-2xl);
+    border: 1px solid var(--hair-2);
+    background:
+        radial-gradient(80% 100% at 50% 0%, rgb(255 90 31 / 0.11), transparent 70%),
+        rgb(var(--glass-tint) / 0.56);
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        var(--shadow-3);
+}
+
+.beeftv-home-dot-base,
+.beeftv-home-dot-flow {
+    position: absolute;
+    inset: 8px 2px;
+    pointer-events: none;
+    background-size: 20px 20px;
+}
+
+.beeftv-home-dot-base {
+    background-image: radial-gradient(circle, var(--ink-4) 0.7px, transparent 1.4px);
+}
+
+.beeftv-home-dot-flow {
+    background-image: radial-gradient(circle, color-mix(in oklab, var(--rl-accent) 65%, var(--ink)) 0.8px, transparent 1.5px);
+    -webkit-mask-image: radial-gradient(circle, transparent 18%, rgba(0, 0, 0, 0.2) 32%, rgba(0, 0, 0, 0.85) 50%, rgba(0, 0, 0, 0.2) 68%, transparent 82%);
+    mask-image: radial-gradient(circle, transparent 18%, rgba(0, 0, 0, 0.2) 32%, rgba(0, 0, 0, 0.85) 50%, rgba(0, 0, 0, 0.2) 68%, transparent 82%);
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    opacity: 0;
+    animation: beeftv-dot-ripple 4.4s cubic-bezier(0.33, 0, 0.2, 1) infinite;
+}
+
+.beeftv-home-dot-flow-delay {
+    animation-delay: -2.2s;
+}
+
+.hfp-stage-frame-marks {
+    position: absolute;
+    top: 14px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    pointer-events: none;
+}
+
+.beeftv-home-create.hfp-hero-draw-btn {
+    position: relative;
+    z-index: 2;
+    flex-direction: row;
+    height: 56px;
+    padding: 0 22px 0 20px;
+    border-radius: var(--r-pill);
+    gap: 11px;
+    cursor: pointer;
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        0 18px 40px -14px rgba(10, 10, 30, 0.55);
+}
+
+.beeftv-home-create.hfp-hero-draw-btn .hfp-draw-plus {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.14);
+    color: currentColor;
+    box-shadow: none;
+}
+.dark .beeftv-home-create.hfp-hero-draw-btn .hfp-draw-plus,
+[data-theme="dark"] .beeftv-home-create.hfp-hero-draw-btn .hfp-draw-plus {
+    background: rgb(0 0 0 / 0.1);
+}
+
+.beeftv-home-create.hfp-hero-draw-btn .hfp-draw-plus svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.2;
+}
+
+.beeftv-home-create.hfp-hero-draw-btn .beeftv-home-create-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.beeftv-home-create.hfp-hero-draw-btn:hover {
+    transform: translateY(-2px);
+}
+
+.hfp-stage-hint {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    font-size: 11.5px;
+    color: var(--ink-3);
+    text-align: center;
+}
+
+/* ---- Section Headings ---- */
+.hfp-shelf-section {
+    margin-top: 22px;
+}
+
+.beeftv-section-heading.hfp-section-head {
+    display: flex;
+    height: auto;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding: 0 2px;
+}
+
+.hfp-section-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.beeftv-section-heading.hfp-section-head h2 {
+    margin: 0;
+    font-family: var(--font-cloth);
+    font-size: 22px;
+    line-height: 1.15;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.hfp-section-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: var(--r-pill);
+    background: var(--fill);
+    box-shadow: inset 0 0 0 0.5px var(--hair);
+    color: var(--ink-2);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background var(--d-2), color var(--d-2), transform var(--d-2);
+}
+
+.hfp-section-link:hover {
+    background: var(--fill-2);
+    color: var(--ink);
+    transform: translateX(2px);
+}
+
+.hfp-section-link svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ---- Capabilities Grid (7 cards aligned to responsive grid) ---- */
+.beeftv-capabilities.hfp-capabilities-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+}
+
+.beeftv-capability.hfp-capability-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    min-height: 126px;
+    padding: 14px;
+    border-radius: var(--r-xl);
+    text-align: left;
+    text-decoration: none;
+    color: var(--ink);
+    min-width: 0;
+}
+
+.hfp-capability-index {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    font-size: 10px;
+    line-height: 1;
+    color: var(--ink-3);
+}
+
+.beeftv-capability.hfp-capability-card .beeftv-capability-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    background: var(--fill-2);
+    box-shadow: inset 0 0 0 0.5px var(--hair-2);
+    color: var(--ink);
+    margin-bottom: auto;
+    transition: background var(--d-2), color var(--d-2), transform var(--d-2);
+}
+
+.beeftv-capability.hfp-capability-card .beeftv-capability-icon svg {
+    width: 19px;
+    height: 19px;
+    stroke-width: 1.65;
+}
+
+.beeftv-capability.hfp-capability-card strong {
+    width: 100%;
+    margin-top: 14px;
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.beeftv-capability.hfp-capability-card small {
+    margin-top: 5px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--ink-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.beeftv-capability.hfp-capability-card:hover {
+    transform: translateY(-4px);
+}
+
+.beeftv-capability.hfp-capability-card:hover .beeftv-capability-icon {
+    background: var(--rl-accent);
+    color: #fff;
+    box-shadow: 0 6px 16px -6px rgb(255 90 31 / 0.65);
+}
+
+/* ---- Recent Projects Grid (12-Col: 4 cards × 3 cols on desktop, Horizontal Reel Cards with Clean Hierarchy) ---- */
+.beeftv-recent-grid.hfp-recent-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 14px var(--grid-gutter, 20px);
+}
+
+.beeftv-recent-card.hfp-recent-card {
+    grid-column: span 6;
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    min-width: 0;
+    height: 100px;
+    gap: 16px;
+    padding: 12px 40px 12px 14px;
+    border-radius: var(--r-xl);
+    text-align: left;
+    text-decoration: none;
+    color: var(--ink);
+}
+
+.beeftv-recent-card.hfp-recent-empty {
+    grid-column: span 6;
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    min-width: 0;
+    height: 100px;
+    gap: 16px;
+    padding: 12px 40px 12px 14px;
+    border-radius: var(--r-xl);
+    text-align: left;
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.beeftv-recent-card .hfp-spine-accent {
+    width: 4px;
+    height: 64px;
+    border-radius: 3px;
+    flex: none;
+    background: linear-gradient(180deg, var(--rl-accent), color-mix(in oklab, var(--rl-accent) 55%, #000));
+    box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.25);
+}
+
+.beeftv-recent-card .beeftv-recent-preview {
+    width: 96px;
+    height: 68px;
+    flex: 0 0 96px;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    background: var(--fill-2);
+    box-shadow: inset 0 0 0 0.5px var(--hair-2);
+    color: var(--ink-2);
+    display: grid;
+    place-items: center;
+}
+
+.beeftv-recent-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    flex: 1 1 0%;
+    min-width: 0;
+    padding: 0;
+}
+
+.hfp-recent-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+    width: 100%;
+}
+
+.beeftv-recent-copy strong {
+    display: block;
+    flex: 1 1 0%;
+    min-width: 0;
+    font-family: var(--font-cloth);
+    font-size: 16.5px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hfp-recent-kicker {
+    display: inline-flex;
+    flex: 0 0 auto;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    font-size: 10px;
+    line-height: 1.1;
+    letter-spacing: 0.08em;
+    color: var(--rl-accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.hfp-recent-rule {
+    display: block;
+    width: 100%;
+    height: 1px;
+    background: var(--hair-2);
+}
+
+.beeftv-recent-copy small.hfp-recent-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.3;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hfp-meta-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--ink-3);
+    flex: 0 0 3px;
+}
+
+.beeftv-recent-card .beeftv-recent-arrow {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 15px;
+    height: 15px;
+    color: var(--ink-3);
+    opacity: 0.65;
+    transition: opacity var(--d-2), transform var(--d-2), color var(--d-2);
+}
+
+.beeftv-recent-card:hover .beeftv-recent-arrow {
+    opacity: 1;
+    color: var(--rl-accent);
+    transform: translate(2px, -50%);
+}
+
+.beeftv-recent-card:hover {
+    transform: translateY(-3px);
+}
+
+@keyframes beeftv-dot-ripple {
+    0% {
+        opacity: 0;
+        -webkit-mask-size: 72px 72px;
+        mask-size: 72px 72px;
+    }
+    18% {
+        opacity: 0.36;
+    }
+    72% {
+        opacity: 0.14;
+    }
+    100% {
+        opacity: 0;
+        -webkit-mask-size: 1120px 1120px;
+        mask-size: 1120px 1120px;
+    }
+}
+
+/* ---- Responsive Grid Breakpoints ---- */
+@media (max-width: 1280px) {
+    .beeftv-capabilities.hfp-capabilities-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .beeftv-recent-card.hfp-recent-card {
+        grid-column: span 6;
+    }
+}
+
+@media (max-width: 900px) {
+    .beeftv-home.hfp-home {
+        padding: 64px 18px 64px;
+    }
+    .hfp-hero-masthead {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .hfp-hero-copy,
+    .hfp-hero-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+    }
+    .hfp-continue-card {
+        max-width: none;
+    }
+    .beeftv-capabilities.hfp-capabilities-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .beeftv-recent-card.hfp-recent-card,
+    .beeftv-recent-card.hfp-recent-empty {
+        grid-column: 1 / -1;
+    }
+    .hfp-stage-frame-marks {
+        display: none;
+    }
+}

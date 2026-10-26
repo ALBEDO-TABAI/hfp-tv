@@ -1,0 +1,1274 @@
+/* ============================================================================
+   hfp-tv Design System — Adapted from 「藏书阁」(Ready Library)
+   Typography · Palette · Liquid Glass · 12-Column Grid · Motion · TV Focus
+   ============================================================================ */
+
+@font-face {
+    font-family: "RL Sans";
+    src: url("/ui-fonts/Inter.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+}
+@font-face {
+    font-family: "RL Display";
+    src: url("/ui-fonts/InterTight.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+}
+@font-face {
+    font-family: "RL Mono";
+    src: url("/ui-fonts/GeistMono.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+}
+@font-face {
+    font-family: "RL Serif";
+    src: url("/ui-fonts/InstrumentSerif.woff2") format("woff2");
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "RL Serif";
+    src: url("/ui-fonts/InstrumentSerifItalic.woff2") format("woff2");
+    font-style: italic;
+    font-display: swap;
+}
+@font-face {
+    font-family: "RL CJK";
+    src: url("/fonts/noto-sans-sc-0.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+}
+@font-face {
+    font-family: "RL Serif SC";
+    src: url("/fonts/noto-serif-sc-0.woff2") format("woff2");
+    font-weight: 200 900;
+    font-display: swap;
+}
+
+:root {
+    /* ---- Typography Pairing (Ready Library) ---- */
+    --font-ui: "RL Sans", "PingFang SC", "RL CJK", "Microsoft YaHei", system-ui, sans-serif;
+    --font-display: "RL Display", "PingFang SC", "RL CJK", system-ui, sans-serif;
+    --font-mono: "RL Mono", ui-monospace, "PingFang SC", "RL CJK", monospace;
+    --font-serif: "RL Serif", "RL Serif SC", "Songti SC", Georgia, serif;
+    --font-cloth: "RL Serif", "RL Serif SC", "Songti SC", "STSong", serif;
+
+    /* Override workspace font primitives */
+    --font-sans: var(--font-ui);
+    --font-heading: var(--font-display);
+
+    /* ---- Type Scale ---- */
+    --fs-2xs: 10px;
+    --fs-xs: 11px;
+    --fs-sm: 12px;
+    --fs-md: 13px;
+    --fs-lg: 15px;
+    --fs-xl: 17px;
+    --fs-2xl: 22px;
+    --fs-3xl: 28px;
+    --fs-4xl: 40px;
+    --lh-tight: 1.15;
+    --lh: 1.48;
+
+    /* ---- 4pt Baseline & Spacing Scale ---- */
+    --s1: 4px;
+    --s2: 8px;
+    --s3: 12px;
+    --s4: 16px;
+    --s5: 20px;
+    --s6: 24px;
+    --s8: 32px;
+    --s10: 40px;
+    --s14: 56px;
+
+    /* ---- Rigorous Grid System Tokens ---- */
+    --grid-cols: 12;
+    --grid-gutter: 20px;
+    --grid-row-gap: 24px;
+    --grid-margin: 40px;
+    --grid-max-width: 1320px;
+    --sidebar-width: 244px;
+    --sidebar-collapsed-width: 68px;
+
+    /* ---- Corner Radii ---- */
+    --r-xs: 6px;
+    --r-sm: 9px;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-xl: 22px;
+    --r-2xl: 28px;
+    --r-pill: 999px;
+
+    /* ---- Motion & Easing ---- */
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-liquid: cubic-bezier(0.3, 0.7, 0.2, 1);
+    --ease-shelf: cubic-bezier(0.77, 0, 0.175, 1);
+    --d-1: 120ms;
+    --d-2: 200ms;
+    --d-3: 320ms;
+    --d-4: 480ms;
+    --d-5: 640ms;
+
+    /* ---- Palette: Light (Warm Gallery Desk) ---- */
+    --stage: #ebebee;
+    --stage-2: #e3e3e8;
+    --ink: #0b0b0e;
+    --ink-2: rgba(11, 11, 14, 0.66);
+    --ink-3: rgba(11, 11, 14, 0.44);
+    --ink-4: rgba(11, 11, 14, 0.22);
+    --hair: rgba(11, 11, 14, 0.08);
+    --hair-2: rgba(11, 11, 14, 0.14);
+    --fill: rgba(11, 11, 14, 0.045);
+    --fill-2: rgba(11, 11, 14, 0.08);
+    --fill-3: rgba(11, 11, 14, 0.13);
+    --rl-accent: #ff5a1f; /* Print / Broadcast Signal Orange */
+    --accent-ink: #ffffff;
+    --accent-soft: rgba(255, 90, 31, 0.14);
+    --ok: #1fae6b;
+    --warn: #e2a400;
+    --bad: #e5484d;
+    --inverse: #0b0b0e;
+    --on-inverse: #fafafa;
+    --logo-ink: #ebebee;
+
+    /* ---- Archival Paper & Ribbon ---- */
+    --paper: #f7f4ee;
+    --paper-2: #efeae0;
+    --paper-ink: #1d1b18;
+    --paper-ink-2: #5a544a;
+    --paper-ink-3: #8f877a;
+    --ribbon: #ff5a1f;
+
+    /* ---- Liquid Glass Material ---- */
+    --glass-tint: 252 252 253;
+    --glass-alpha: 0.62;
+    --glass-alpha-strong: 0.76;
+    --glass-alpha-clear: 0.34;
+    --glass-blur: 22px;
+    --glass-sat: 185%;
+    --glass-rim-hi: rgba(255, 255, 255, 0.95);
+    --glass-rim-lo: rgba(255, 255, 255, 0.18);
+    --glass-edge: rgba(11, 11, 14, 0.08);
+    --glass-inner-hi: rgba(255, 255, 255, 0.78);
+    --glass-inner-lo: rgba(11, 11, 14, 0.04);
+    --glass-caustic: rgba(255, 255, 255, 0.55);
+
+    --shadow-1: 0 1px 2px rgba(10, 10, 20, 0.06), 0 2px 8px -2px rgba(10, 10, 20, 0.06);
+    --shadow-2: 0 2px 6px rgba(10, 10, 20, 0.05), 0 12px 32px -12px rgba(10, 10, 30, 0.18);
+    --shadow-3: 0 4px 12px rgba(10, 10, 20, 0.06), 0 24px 64px -20px rgba(10, 10, 30, 0.28);
+    --shadow-4: 0 8px 24px rgba(10, 10, 20, 0.08), 0 48px 120px -32px rgba(10, 10, 30, 0.38);
+    --book-shadow: 0 1px 1px rgba(0, 0, 0, 0.08), 0 20px 32px -18px rgba(20, 20, 40, 0.5), 0 4px 10px -4px rgba(20, 20, 40, 0.18);
+
+    /* ---- Glass Shelf Pane ---- */
+    --shelf-top: rgb(255 255 255 / 0.78);
+    --shelf-face: rgb(255 255 255 / 0.44);
+    --shelf-edge: rgb(11 11 14 / 0.1);
+    --shelf-cast: rgb(20 20 40 / 0.16);
+    --bracket: #c9c9cf;
+
+    --amb: 255 110 60;
+    --amb-alpha: 0.06;
+    --la: 135deg;
+}
+
+.dark,
+[data-theme="dark"] {
+    --stage: #0b0b0d;
+    --stage-2: #111114;
+    --ink: #f4f4f6;
+    --ink-2: rgba(244, 244, 246, 0.68);
+    --ink-3: rgba(244, 244, 246, 0.44);
+    --ink-4: rgba(244, 244, 246, 0.2);
+    --hair: rgba(255, 255, 255, 0.08);
+    --hair-2: rgba(255, 255, 255, 0.14);
+    --fill: rgba(255, 255, 255, 0.05);
+    --fill-2: rgba(255, 255, 255, 0.085);
+    --fill-3: rgba(255, 255, 255, 0.13);
+    --rl-accent: #ff6a2c;
+    --accent-soft: rgba(255, 106, 44, 0.18);
+    --inverse: #f4f4f6;
+    --on-inverse: #0b0b0e;
+    --logo-ink: #0b0b0e;
+    --paper: #e9e4da;
+    --paper-2: #ddd6c9;
+
+    --glass-tint: 24 24 28;
+    --glass-alpha: 0.58;
+    --glass-alpha-strong: 0.74;
+    --glass-alpha-clear: 0.32;
+    --glass-sat: 170%;
+    --glass-rim-hi: rgba(255, 255, 255, 0.38);
+    --glass-rim-lo: rgba(255, 255, 255, 0.04);
+    --glass-edge: rgba(0, 0, 0, 0.55);
+    --glass-inner-hi: rgba(255, 255, 255, 0.14);
+    --glass-inner-lo: rgba(0, 0, 0, 0.28);
+    --glass-caustic: rgba(255, 255, 255, 0.12);
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+    --shadow-3: 0 4px 12px rgba(0, 0, 0, 0.4), 0 24px 64px -20px rgba(0, 0, 0, 0.7);
+    --shadow-4: 0 8px 24px rgba(0, 0, 0, 0.45), 0 48px 120px -32px rgba(0, 0, 0, 0.8);
+    --book-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 20px 34px -16px rgba(0, 0, 0, 0.8), 0 4px 10px -4px rgba(0, 0, 0, 0.5);
+
+    --shelf-top: rgb(255 255 255 / 0.16);
+    --shelf-face: rgb(255 255 255 / 0.07);
+    --shelf-edge: rgb(255 255 255 / 0.1);
+    --shelf-cast: rgb(0 0 0 / 0.5);
+    --bracket: #3a3a40;
+    --amb-alpha: 0.08;
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+    :root {
+        --ease-spring: linear(
+            0,
+            0.009,
+            0.035 2.1%,
+            0.141 4.4%,
+            0.723 12.9%,
+            0.938 16.7%,
+            1.017 19.4%,
+            1.067,
+            1.099 24.3%,
+            1.103 25.9%,
+            1.096,
+            1.077 30.4%,
+            1.002 39%,
+            0.979 43.5%,
+            0.975 47.6%,
+            0.998 59.6%,
+            1.002 66.6%,
+            1
+        );
+    }
+}
+
+/* ---- Bridge Product Workspace Tokens to Ready Library Tokens ---- */
+.app-user-workspace,
+body.app-user-overlays,
+body.app-product-overlays {
+    --user-page-bg: var(--stage) !important;
+    --user-surface: rgb(var(--glass-tint) / var(--glass-alpha)) !important;
+    --user-surface-raised: rgb(var(--glass-tint) / var(--glass-alpha-strong)) !important;
+    --user-surface-muted: var(--fill) !important;
+    --user-surface-hover: var(--fill-2) !important;
+    --user-control-pressed: var(--fill-3) !important;
+    --user-ink: var(--ink) !important;
+    --user-ink-muted: var(--ink-2) !important;
+    --user-ink-soft: var(--ink-3) !important;
+    --user-border: var(--hair) !important;
+    --user-border-strong: var(--hair-2) !important;
+    --user-accent: var(--rl-accent) !important;
+    --user-accent-soft: var(--accent-soft) !important;
+    --user-action-bg: var(--rl-accent) !important;
+    --user-action-bg-hover: color-mix(in oklab, var(--rl-accent) 88%, #fff) !important;
+    --user-action-bg-active: color-mix(in oklab, var(--rl-accent) 82%, #000) !important;
+    --user-action-foreground: #ffffff !important;
+    --user-radius-card: var(--r-xl) !important;
+    --user-radius-control: var(--r-md) !important;
+    --user-shadow-card: inset 0 1px 0 0 var(--glass-inner-hi), inset 0 0 0 0.5px var(--glass-edge), var(--shadow-2) !important;
+    --product-content-max: var(--grid-max-width) !important;
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11", "ss01", "ss03";
+}
+
+/* ---- Core Ready Library Primitives (.lg, .wordmark, .caption, .lbl, .kbd, .draw, .led) ---- */
+.mono {
+    font-family: var(--font-mono) !important;
+    font-feature-settings: "zero", "ss01";
+    letter-spacing: -0.01em;
+}
+.serif {
+    font-family: var(--font-serif) !important;
+    font-weight: 400;
+}
+.hfp-wordmark {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    white-space: nowrap;
+    color: var(--ink);
+}
+.hfp-wordmark i {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 21px;
+    letter-spacing: -0.01em;
+    color: var(--rl-accent);
+    margin-left: 1px;
+}
+
+kbd,
+.kbd {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1;
+    padding: 3px 6px;
+    border-radius: 5px;
+    color: var(--ink-3);
+    background: var(--fill);
+    box-shadow: inset 0 0 0 0.5px var(--hair-2);
+    white-space: nowrap;
+}
+
+.caption {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    letter-spacing: -0.01em;
+    flex-wrap: wrap;
+}
+.caption b {
+    color: var(--ink-2);
+    font-weight: 500;
+}
+.caption .dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--ink-4);
+    flex: none;
+}
+.caption .ledg {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 0 3px rgb(31 174 107 / 0.16);
+    flex: none;
+}
+
+.lbl {
+    font-family: var(--font-mono);
+    font-size: var(--fs-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    font-weight: 600;
+    display: block;
+}
+
+/* ---- Liquid Glass Surface (.lg) ---- */
+.lg {
+    position: relative;
+    isolation: isolate;
+    background:
+        linear-gradient(rgb(var(--amb) / var(--amb-alpha)), rgb(var(--amb) / var(--amb-alpha))),
+        rgb(var(--glass-tint) / var(--glass-alpha));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    box-shadow:
+        inset 0 1px 0 0 var(--glass-inner-hi),
+        inset 0 -1px 0 0 var(--glass-inner-lo),
+        inset 0 0 0 0.5px var(--glass-edge),
+        var(--shadow-2);
+    border-radius: var(--r-xl);
+    transition:
+        background-color var(--d-3) var(--ease-out),
+        box-shadow var(--d-3) var(--ease-out),
+        transform var(--d-3) var(--ease-out);
+}
+.lg::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+        var(--la),
+        var(--glass-rim-hi) 0%,
+        var(--glass-rim-lo) 32%,
+        transparent 50%,
+        var(--glass-rim-lo) 70%,
+        var(--glass-rim-hi) 100%
+    );
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+        linear-gradient(#000 0 0) content-box exclude,
+        linear-gradient(#000 0 0);
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0.55;
+}
+.lg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+        var(--lg-ov, none) 0 0 / 100% 100% no-repeat,
+        radial-gradient(120% 60% at 50% -18%, rgb(255 255 255 / 0.14), transparent 60%);
+    pointer-events: none;
+    z-index: -1;
+}
+.lg.strong {
+    --glass-alpha: var(--glass-alpha-strong);
+}
+.lg.ink {
+    --glass-tint: 14 14 18;
+    --glass-alpha: 0.86;
+    --glass-rim-hi: rgba(255, 255, 255, 0.55);
+    --glass-rim-lo: rgba(255, 255, 255, 0.08);
+    --glass-inner-hi: rgba(255, 255, 255, 0.24);
+    --glass-inner-lo: rgba(0, 0, 0, 0.4);
+    color: #ffffff;
+}
+.dark .lg.ink,
+[data-theme="dark"] .lg.ink {
+    --glass-tint: 246 246 248;
+    --glass-alpha: 0.92;
+    --glass-rim-hi: rgba(255, 255, 255, 1);
+    --glass-rim-lo: rgba(255, 255, 255, 0.3);
+    --glass-inner-hi: rgba(255, 255, 255, 0.9);
+    --glass-inner-lo: rgba(0, 0, 0, 0.12);
+    color: #0b0b0e;
+}
+
+/* ---- Hero Action Pill (.draw) & Print-Signal LED (.led) ---- */
+.draw {
+    height: 54px;
+    min-width: 196px;
+    padding: 0 22px 0 20px;
+    border-radius: var(--r-pill);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 11px;
+    font-family: var(--font-display);
+    font-size: 15.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.led {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--rl-accent);
+    flex: none;
+    box-shadow:
+        0 0 0 4px rgb(255 90 31 / 0.2),
+        0 0 14px rgb(255 90 31 / 0.9);
+}
+.led.busy {
+    animation: hfp-led-pulse 640ms var(--ease-in-out) infinite alternate;
+}
+@keyframes hfp-led-pulse {
+    to {
+        box-shadow:
+            0 0 0 7px rgb(255 90 31 / 0.06),
+            0 0 24px rgb(255 90 31 / 1);
+        transform: scale(1.18);
+    }
+}
+
+/* ---- Liquid Press & Jelly Release ---- */
+.press {
+    transition:
+        transform 520ms var(--ease-spring),
+        background-color var(--d-2) var(--ease-out),
+        color var(--d-2),
+        box-shadow var(--d-2);
+    transform-origin: var(--ox, 50%) var(--oy, 50%);
+}
+.press:active {
+    transform: scale(0.95);
+    transition-duration: 110ms;
+    transition-timing-function: var(--ease-out);
+}
+.press.jelly {
+    animation: hfp-jelly 560ms var(--ease-out);
+}
+@keyframes hfp-jelly {
+    0% {
+        transform: scale(0.95, 0.95);
+    }
+    30% {
+        transform: scale(1.04, 0.97);
+    }
+    55% {
+        transform: scale(0.99, 1.02);
+    }
+    100% {
+        transform: scale(1, 1);
+    }
+}
+
+/* ---- Dotted Projection Desk Stage ---- */
+.hfp-stage-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background:
+        radial-gradient(960px 540px at 78% 14%, rgb(255 90 31 / 0.065), transparent 68%),
+        radial-gradient(1200px 700px at 50% 40%, var(--stage) 30%, var(--stage-2) 100%);
+}
+.hfp-stage-dots {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle at 1px 1px, var(--ink-4) 0.75px, transparent 1.3px);
+    background-size: 24px 24px;
+    opacity: 0.55;
+    -webkit-mask: radial-gradient(85% 80% at 50% 45%, #000 28%, transparent 92%);
+    mask: radial-gradient(85% 80% at 50% 45%, #000 28%, transparent 92%);
+}
+.hfp-stage-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(0 0 0 / 0.06));
+}
+.dark .hfp-stage-vignette,
+[data-theme="dark"] .hfp-stage-vignette {
+    background: radial-gradient(120% 90% at 50% 50%, transparent 50%, rgb(0 0 0 / 0.42));
+}
+
+/* ---- Glass Shelf Pane (Ready Library Bookcase Divider) ---- */
+.hfp-glass-shelf-pane {
+    position: relative;
+    height: 14px;
+    margin: 20px 0 22px;
+}
+.hfp-glass-shelf-pane .pane-top {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 5px;
+    border-radius: 3px 3px 0 0;
+    background: linear-gradient(180deg, var(--shelf-top), color-mix(in oklab, var(--shelf-top) 60%, transparent));
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.28),
+        inset 0 0 0 0.5px var(--shelf-edge);
+}
+.hfp-glass-shelf-pane .pane-face {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 5px;
+    bottom: 0;
+    border-radius: 0 0 4px 4px;
+    background: linear-gradient(180deg, color-mix(in oklab, var(--shelf-face) 100%, rgb(var(--amb) / 0.2)), var(--shelf-face));
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+    backdrop-filter: blur(10px) saturate(160%);
+    box-shadow:
+        inset 0 -1px 0 rgb(255 255 255 / 0.12),
+        inset 0 0 0 0.5px var(--shelf-edge),
+        0 18px 26px -14px var(--shelf-cast),
+        0 3px 6px -3px var(--shelf-cast);
+}
+.hfp-glass-shelf-pane .bracket {
+    position: absolute;
+    top: 14px;
+    width: 4px;
+    height: 16px;
+    border-radius: 0 0 3px 3px;
+    background: var(--bracket);
+}
+.hfp-glass-shelf-pane .bracket.l {
+    left: 8%;
+}
+.hfp-glass-shelf-pane .bracket.r {
+    right: 8%;
+}
+
+/* ---- Splash Sheet (Ready Library 2200×1396 Proportional Poster Frame) ---- */
+.splash {
+    --u: min(max(0.32px, min(calc(43vw / 1990), calc(50vh / 1207))), calc(90vw / 2200), calc(90vh / 1396));
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background:
+        radial-gradient(900px 500px at 50% 42%, rgb(255 90 31 / 0.08), transparent 70%),
+        var(--stage);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    transition: opacity 0.36s var(--ease-out);
+    cursor: pointer;
+}
+.splash.out {
+    opacity: 0;
+    pointer-events: none;
+}
+.sp-art {
+    position: relative;
+    width: calc(2200 * var(--u));
+    height: calc(1396 * var(--u));
+    text-align: center;
+    transform: translateY(calc(-40 * var(--u)));
+}
+.sp-art > * {
+    position: absolute;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    line-height: 1;
+    white-space: nowrap;
+}
+.sp-kicker {
+    top: calc(140 * var(--u));
+    font-family: var(--font-mono);
+    font-size: max(10px, calc(26 * var(--u)));
+    font-weight: 500;
+    letter-spacing: 0.34em;
+    padding-left: 0.34em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+.splash h1 {
+    top: calc(215 * var(--u));
+    font: 400 calc(280 * var(--u)) / 1 var(--font-serif);
+    letter-spacing: -0.02em;
+}
+.splash h1 i {
+    font-style: italic;
+    color: var(--rl-accent);
+}
+.sp-zh {
+    top: calc(574 * var(--u));
+    font-family: var(--font-cloth);
+    font-size: calc(54 * var(--u));
+    letter-spacing: 0.14em;
+    padding-left: 0.14em;
+}
+.sp-en {
+    top: calc(668 * var(--u));
+    font: italic 400 calc(46 * var(--u)) / 1 var(--font-serif);
+    letter-spacing: -0.01em;
+    color: var(--ink-2);
+}
+.load-bar {
+    top: calc(793 * var(--u));
+    width: calc(1420 * var(--u));
+    height: 1.5px;
+    background: var(--hair-2);
+    overflow: hidden;
+}
+.load-bar i {
+    display: block;
+    height: 100%;
+    background: var(--rl-accent);
+    transform-origin: left;
+    transform: scaleX(0);
+}
+.sp-stats {
+    top: calc(849 * var(--u));
+    width: calc(1420 * var(--u));
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 0;
+    margin: 0 auto;
+    list-style: none;
+    opacity: 0;
+    transition: opacity 0.45s var(--ease-out);
+}
+.sp-stats.on {
+    opacity: 1;
+}
+.sp-stats li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: calc(4 * var(--u));
+    border-left: 1px solid var(--hair-2);
+}
+.sp-stats li:first-child {
+    border-left: 0;
+}
+.sp-stats b {
+    margin-top: calc(-2 * var(--u));
+    font: 400 calc(96 * var(--u)) / 1 var(--font-serif);
+    font-variant-numeric: tabular-nums;
+}
+.sp-stats span {
+    margin-top: calc(18 * var(--u));
+    font-size: max(11px, calc(26 * var(--u)));
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    padding-left: 0.14em;
+}
+.sp-stats small {
+    margin-top: calc(14 * var(--u));
+    font-family: var(--font-mono);
+    font-size: max(8px, calc(18 * var(--u)));
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    padding-left: 0.28em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+.sp-repo {
+    top: calc(1268 * var(--u));
+    font: 500 max(12px, calc(36 * var(--u))) / 1 var(--font-mono);
+}
+.sp-credit {
+    top: calc(1334 * var(--u));
+    font-family: var(--font-mono);
+    font-size: max(9px, calc(20 * var(--u)));
+    font-weight: 500;
+    letter-spacing: 0.32em;
+    padding-left: 0.32em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+@media (max-width: 700px) {
+    .sp-art {
+        width: auto;
+        height: auto;
+        transform: none;
+        padding: 0 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .sp-art > * {
+        position: static;
+        white-space: normal;
+    }
+    .sp-kicker {
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        padding-left: 0.2em;
+        line-height: 1.7;
+        max-width: 320px;
+    }
+    .splash h1 {
+        margin-top: 10px;
+        font-size: clamp(48px, 15vw, 72px);
+    }
+    .sp-zh {
+        margin-top: 14px;
+        font-size: 15px;
+        letter-spacing: 0.08em;
+        line-height: 1.5;
+    }
+    .sp-en {
+        margin-top: 6px;
+        font-size: 15px;
+    }
+    .load-bar {
+        width: min(320px, 82vw);
+        margin-top: 22px;
+    }
+    .sp-stats {
+        margin-top: 20px;
+        width: min(340px, 86vw);
+        grid-template-columns: repeat(2, 1fr);
+        row-gap: 18px;
+    }
+    .sp-stats li:nth-child(3) {
+        border-left: 0;
+    }
+    .sp-stats b {
+        font-size: 36px;
+    }
+    .sp-stats span {
+        margin-top: 8px;
+        font-size: 11px;
+    }
+    .sp-stats small {
+        margin-top: 6px;
+        font-size: 8px;
+    }
+    .sp-repo {
+        margin-top: 28px;
+        font-size: 12px;
+    }
+    .sp-credit {
+        margin-top: 10px;
+        font-size: 9px;
+    }
+}
+
+/* ============================================================================
+   Global Workspace Shell, Sidebar, Headers, Cards, Modals & Controls
+   ============================================================================ */
+
+/* 1. Workspace Shell & Liquid-Glass Sidebar */
+body .app-user-workspace {
+    background:
+        radial-gradient(1100px 620px at 78% 10%, rgb(255 90 31 / 0.055), transparent 68%),
+        radial-gradient(1200px 700px at 50% 40%, var(--stage) 30%, var(--stage-2) 100%) !important;
+    color: var(--ink) !important;
+}
+
+body .app-user-workspace .app-workspace-sidebar {
+    --workspace-reference-sidebar: var(--sidebar-width);
+    width: var(--sidebar-width) !important;
+    flex-basis: var(--sidebar-width);
+    background:
+        linear-gradient(180deg, rgb(var(--glass-tint) / 0.72), rgb(var(--glass-tint) / 0.54)) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+    border-right: 1px solid var(--hair-2) !important;
+    box-shadow: inset -1px 0 0 var(--glass-inner-hi);
+}
+body .app-user-workspace .app-workspace-sidebar.is-collapsed {
+    width: var(--sidebar-collapsed-width) !important;
+    flex-basis: var(--sidebar-collapsed-width) !important;
+}
+body .app-user-workspace .app-workspace-sidebar-nav {
+    background: transparent !important;
+}
+
+/* Sidebar primary "New Project" pill with print-signal accent */
+body .app-user-workspace .app-workspace-nav-link[data-nav-id="new"] {
+    background: var(--ink) !important;
+    color: var(--stage) !important;
+    border-radius: var(--r-pill) !important;
+    font-family: var(--font-display);
+    font-weight: 600 !important;
+    letter-spacing: -0.01em;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.22),
+        0 10px 24px -10px rgb(0 0 0 / 0.45) !important;
+    margin-bottom: 4px;
+}
+body .app-user-workspace .app-workspace-nav-link[data-nav-id="new"] .app-workspace-nav-icon {
+    color: var(--rl-accent) !important;
+}
+body .app-user-workspace .app-workspace-nav-link[data-nav-id="new"]:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.3),
+        0 14px 28px -10px rgb(255 90 31 / 0.35) !important;
+}
+
+/* Sidebar regular nav items — liquid segmented pill feel */
+body .app-user-workspace .app-workspace-nav-link:not([data-nav-id="new"]) {
+    border-radius: var(--r-pill) !important;
+    padding-inline: 14px !important;
+    min-height: 40px !important;
+    font-weight: 500;
+}
+body .app-user-workspace .app-workspace-nav-active-pill {
+    border-radius: var(--r-pill) !important;
+    background: var(--fill-2) !important;
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        inset 0 0 0 0.5px var(--hair-2) !important;
+}
+body .app-user-workspace .app-workspace-nav-link.is-active:not([data-nav-id="new"])::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--rl-accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    flex-shrink: 0;
+}
+
+/* 2. Page Headers across all sections (/project, /assets, /skills, /settings, /agents, /plugins) */
+body .app-user-workspace .app-page-header h1,
+body .app-user-workspace .settings-pane-header h2,
+body .app-user-workspace .skill-market-page .app-page-header h1,
+body .app-user-workspace .assets-library-hero h1 {
+    font-family: var(--font-cloth) !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.015em !important;
+}
+
+/* 3. Rigorous Grid Container Alignment on Collection & Section Pages */
+body .app-user-workspace .studio-collection-page > div,
+body .app-user-workspace .studio-collection-page.lib-tv-project-page > div,
+body .app-user-workspace .app-section-page-content > div {
+    max-width: var(--grid-max-width) !important;
+    margin-inline: auto !important;
+    padding-inline: var(--grid-margin) !important;
+}
+@media (max-width: 900px) {
+    :root {
+        --grid-margin: 18px;
+        --grid-gutter: 14px;
+    }
+}
+@media (min-width: 1800px) {
+    :root {
+        --grid-max-width: 1560px;
+        --grid-gutter: 24px;
+    }
+}
+
+/* 4. Project Library (/project) — Glass Cards & Editorial Film Reels */
+body .app-user-workspace .lib-tv-project-page .canvas-collection-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)) !important;
+    gap: var(--grid-row-gap) var(--grid-gutter) !important;
+}
+body .app-user-workspace .libtv-create-project-card {
+    border-radius: var(--r-xl) !important;
+    border: 1px dashed var(--hair-2) !important;
+    background:
+        radial-gradient(120% 90% at 50% 0%, var(--accent-soft), transparent 68%),
+        rgb(var(--glass-tint) / 0.48) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+    backdrop-filter: blur(18px) saturate(170%);
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        var(--shadow-2) !important;
+    transition:
+        transform var(--d-3) var(--ease-spring),
+        border-color var(--d-2),
+        box-shadow var(--d-3) !important;
+}
+body .app-user-workspace .libtv-create-project-card:hover {
+    transform: translateY(-3px) !important;
+    border-style: solid !important;
+    border-color: var(--rl-accent) !important;
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        var(--shadow-3) !important;
+}
+body .app-user-workspace .libtv-create-project-icon {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background: var(--rl-accent) !important;
+    color: #fff !important;
+    box-shadow: 0 0 0 5px var(--accent-soft);
+}
+body .app-user-workspace .lib-tv-project-page .libtv-library-card-cover {
+    border-radius: var(--r-lg) !important;
+    border: 1px solid var(--hair-2) !important;
+    background: rgb(var(--glass-tint) / 0.56) !important;
+    box-shadow: var(--book-shadow) !important;
+    transition:
+        transform var(--d-3) var(--ease-spring),
+        box-shadow var(--d-3) var(--ease-out),
+        border-color var(--d-2);
+}
+body .app-user-workspace .lib-tv-project-page .libtv-library-card:hover .libtv-library-card-cover {
+    transform: translateY(-4px);
+    border-color: color-mix(in oklab, var(--rl-accent) 55%, var(--hair-2)) !important;
+    box-shadow: var(--shadow-3) !important;
+}
+body .app-user-workspace .lib-tv-project-page .libtv-library-card-title {
+    font-family: var(--font-cloth) !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+}
+body .app-user-workspace .lib-tv-project-page .libtv-library-card-date {
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+}
+
+/* 5. Creation Studio (/create) — Ready Library Liquid Segmented Tabs, Glass Composer & Editorial Cards */
+body .app-user-workspace .creation-home h1 {
+    font-family: var(--font-cloth) !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.02em !important;
+}
+body .app-user-workspace .creation-mode-tabs {
+    border-radius: var(--r-pill) !important;
+    padding: 4px !important;
+    background: var(--fill) !important;
+    box-shadow: inset 0 0 0 0.5px var(--hair-2) !important;
+}
+body .app-user-workspace .creation-mode-indicator {
+    border-radius: var(--r-pill) !important;
+    background: rgb(255 255 255 / 0.92) !important;
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.08),
+        0 3px 10px -2px rgba(0, 0, 0, 0.14),
+        inset 0 1px 0 #fff !important;
+}
+.dark body .app-user-workspace .creation-mode-indicator,
+[data-theme="dark"] body .app-user-workspace .creation-mode-indicator {
+    background: rgb(255 255 255 / 0.14) !important;
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgb(255 255 255 / 0.2),
+        inset 0 0 0 0.5px rgb(255 255 255 / 0.12) !important;
+}
+body .app-user-workspace .creation-mode-button {
+    border-radius: var(--r-pill) !important;
+    font-family: var(--font-display);
+}
+body .app-user-workspace .creation-chat-composer {
+    border-radius: var(--r-2xl) !important;
+    background:
+        linear-gradient(rgb(var(--amb) / 0.04), rgb(var(--amb) / 0.04)),
+        rgb(var(--glass-tint) / 0.68) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+    border: 1px solid var(--hair-2) !important;
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        var(--shadow-3) !important;
+}
+body .app-user-workspace .creation-chat-composer:focus-within {
+    border-color: color-mix(in oklab, var(--rl-accent) 55%, var(--hair-2)) !important;
+}
+body .app-user-workspace .creation-home .creation-submit.ant-btn .creation-submit-action {
+    background: var(--rl-accent) !important;
+    color: #ffffff !important;
+    box-shadow:
+        0 6px 18px -6px rgb(255 90 31 / 0.65),
+        inset 0 1px 0 rgb(255 255 255 / 0.32) !important;
+}
+body .app-user-workspace .creation-featured-card {
+    border-radius: var(--r-xl) !important;
+    border: 1px solid var(--hair) !important;
+    background: rgb(var(--glass-tint) / 0.56) !important;
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        var(--shadow-2) !important;
+    transition:
+        transform var(--d-3) var(--ease-spring),
+        box-shadow var(--d-3) var(--ease-out) !important;
+}
+body .app-user-workspace .creation-featured-card:hover {
+    transform: translateY(-4px) !important;
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        var(--shadow-3) !important;
+}
+
+/* 6. Skills Marketplace (/skills), Settings (/settings), Agents (/agents), Plugins (/plugins) */
+body .app-user-workspace .skill-market-row,
+body .app-user-workspace .settings-channel,
+body .app-user-workspace .agent-tool,
+body .app-user-workspace .plugin-card {
+    border-radius: var(--r-xl) !important;
+    border: 1px solid var(--hair) !important;
+    background: rgb(var(--glass-tint) / 0.58) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(175%);
+    backdrop-filter: blur(18px) saturate(175%);
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        var(--shadow-1) !important;
+    transition:
+        transform var(--d-2) var(--ease-out),
+        border-color var(--d-2),
+        box-shadow var(--d-2);
+}
+body .app-user-workspace .skill-market-row {
+    padding: 18px 22px !important;
+    margin-bottom: 12px !important;
+}
+body .app-user-workspace .agent-tool {
+    padding: 16px 20px !important;
+    margin-bottom: 10px !important;
+}
+body .app-user-workspace .skill-market-meta {
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    gap: 8px !important;
+}
+body .app-user-workspace .skill-market-meta > span {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: var(--r-pill);
+    background: var(--fill);
+    box-shadow: inset 0 0 0 0.5px var(--hair);
+    color: var(--ink-2);
+}
+body .app-user-workspace .skill-market-row:hover,
+body .app-user-workspace .settings-channel:hover,
+body .app-user-workspace .agent-tool:hover {
+    border-color: var(--hair-2) !important;
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        var(--shadow-2) !important;
+}
+body .app-user-workspace .skill-market-copy h2,
+body .app-user-workspace .agent-tool-row h2 {
+    font-family: var(--font-cloth) !important;
+    font-weight: 600 !important;
+}
+
+/* Mobile Floating Sidebar Toggle — Reserve Header Clearance so Titles Never Collide */
+@media (max-width: 1023px) {
+    body .app-user-workspace.app-product-workspace .app-workspace-floating-menu {
+        top: 12px !important;
+        left: 14px !important;
+        width: 38px !important;
+        height: 38px !important;
+        border-radius: var(--r-pill) !important;
+        background: rgb(var(--glass-tint) / 0.78) !important;
+        -webkit-backdrop-filter: blur(18px) saturate(180%);
+        backdrop-filter: blur(18px) saturate(180%);
+        box-shadow:
+            inset 0 1px 0 var(--glass-inner-hi),
+            inset 0 0 0 0.5px var(--hair-2),
+            var(--shadow-2) !important;
+    }
+    body .app-user-workspace .app-section-page .app-page-header,
+    body .app-user-workspace .settings-page .app-page-header,
+    body .app-user-workspace .lib-tv-project-page .app-page-header,
+    body .app-user-workspace .assets-library-page .assets-library-hero {
+        padding-left: 48px !important;
+    }
+    body .app-user-workspace .settings-pane-header {
+        padding-left: 48px !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+    }
+    body .app-user-workspace .settings-pane-header > div:last-child {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+}
+
+/* Diagnostics Modal — Prevent Horizontal Text Clipping on Narrow Viewports */
+body.app-user-overlays .diagnostics-modal .ant-modal-content,
+body.app-product-overlays .diagnostics-modal .ant-modal-content {
+    border-radius: var(--r-2xl) !important;
+    background: rgb(var(--glass-tint) / 0.88) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid var(--hair-2) !important;
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        var(--shadow-4) !important;
+}
+body.app-user-overlays .diagnostics-modal p,
+body.app-product-overlays .diagnostics-modal p {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+}
+
+/* 7. Infinite Canvas Workbench (/canvas/:id) — Floating Liquid-Glass Topbar, Dock & Agent Sidebar */
+.canvas-topbar-libtv-brand-mark {
+    border: 0 !important;
+    transform: none !important;
+    width: 22px !important;
+    height: 22px !important;
+}
+.canvas-topbar-libtv-brand-mark::after {
+    display: none !important;
+}
+.canvas-topbar-cluster {
+    border-radius: var(--r-pill) !important;
+    background: rgb(var(--glass-tint) / 0.72) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        inset 0 0 0 0.5px var(--hair-2),
+        var(--shadow-2) !important;
+}
+.canvas-topbar-title-row button {
+    font-family: var(--font-cloth) !important;
+}
+.hfp-starter-fan {
+    position: relative;
+    height: 92px;
+    width: 160px;
+    margin-bottom: 18px;
+}
+.hfp-starter-fan span {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 22px;
+    height: 78px;
+    border-radius: 3px;
+    margin-left: -11px;
+    transform-origin: 50% 120%;
+    transform: rotate(calc(var(--k) * 9deg)) translateX(calc(var(--k) * 15px));
+    box-shadow:
+        inset 0 0 0 1px rgb(255 255 255 / 0.14),
+        3px 4px 10px -3px rgb(0 0 0 / 0.45);
+    background-image: linear-gradient(
+        90deg,
+        rgb(0 0 0 / 0.22),
+        rgb(255 255 255 / 0.16) 22%,
+        transparent 60%,
+        rgb(0 0 0 / 0.2)
+    );
+}
+.hfp-starter-pill {
+    padding: 10px 20px;
+    border-radius: var(--r-pill);
+    background: rgb(var(--glass-tint) / 0.72);
+    -webkit-backdrop-filter: blur(18px) saturate(175%);
+    backdrop-filter: blur(18px) saturate(175%);
+    box-shadow:
+        inset 0 1px 0 var(--glass-inner-hi),
+        inset 0 0 0 0.5px var(--hair-2),
+        var(--shadow-2);
+    font-family: var(--font-display);
+}
+.canvas-assistant-sidebar {
+    background:
+        linear-gradient(180deg, rgb(var(--glass-tint) / 0.78), rgb(var(--glass-tint) / 0.64)) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    border-left: 1px solid var(--hair-2) !important;
+    box-shadow:
+        inset 1px 0 0 var(--glass-inner-hi),
+        var(--shadow-3) !important;
+}
+.canvas-assistant-sidebar h2 {
+    font-family: var(--font-display) !important;
+    letter-spacing: -0.02em;
+}
+
+/* 8. Video Player (Vidstack .canvas-video-player) — Ready Library Liquid-Glass Transport Chrome */
+.canvas-video-player {
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+.canvas-video-player .vds-time-slider .vds-slider-track-fill {
+    background: var(--rl-accent) !important;
+}
+.canvas-video-player .vds-time-slider .vds-slider-thumb {
+    background: #ffffff !important;
+    border: 2px solid var(--rl-accent) !important;
+    box-shadow: 0 0 0 4px rgb(255 90 31 / 0.22) !important;
+}
+.canvas-video-player .vds-time {
+    font-family: var(--font-mono) !important;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 9. Remote / Keyboard / TV Focus Ring Discipline & Reduced Motion */
+:focus-visible {
+    outline: 2px solid var(--rl-accent) !important;
+    outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+    }
+}
+@media (prefers-reduced-transparency: reduce) {
+    .lg,
+    body .app-user-workspace .app-workspace-sidebar,
+    body .app-user-workspace .creation-chat-composer,
+    .canvas-assistant-sidebar {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        --glass-alpha: 0.96;
+    }
+}
