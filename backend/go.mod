@@ -10,7 +10,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.48
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
-	github.com/volcengine/volc-sdk-golang v1.0.257
+	github.com/volcengine/volc-sdk-golang v1.0.258
 	github.com/wailsapp/wails/v2 v2.16.0
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/sdk v1.46.0
