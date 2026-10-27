@@ -18,6 +18,10 @@ const buildCommit = (() => {
 })();
 const apiProxyTarget = process.env.VITE_API_PROXY_TARGET?.trim() || "http://127.0.0.1:8080";
 const desktopLaunchToken = process.env.VITE_DESKTOP_LAUNCH_TOKEN?.trim();
+const devOwnerTokenFile = process.env.BEEFTV_DEV_OWNER_TOKEN_FILE?.trim();
+if (devOwnerTokenFile && new URL(apiProxyTarget).hostname !== "127.0.0.1") {
+    throw new Error("BEEFTV_DEV_OWNER_TOKEN_FILE requires a loopback API target");
+}
 const heavyMediaEnabled = resolveHeavyMediaEnabled(process.env.BEEFTV_FULL_MEDIA_RESOURCES);
 
 function pruneOptionalMediaPlugin() {
@@ -81,6 +85,19 @@ export default defineConfig({
                 changeOrigin: true,
                 xfwd: true,
                 ...(desktopLaunchToken ? { headers: { "X-Desktop-Token": desktopLaunchToken } } : {}),
+                ...(devOwnerTokenFile ? {
+                    configure(proxy) {
+                        proxy.on("proxyReq", (proxyRequest, request) => {
+                            const host = request.headers.host;
+                            const path = request.url?.split("?")[0];
+                            if (request.method === "POST" && /^\/api\/ops\/[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(path || "") &&
+                                ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress || "") &&
+                                /^127\.0\.0\.1:\d+$/.test(host || "") && request.headers.origin === `http://${host}`) {
+                                proxyRequest.setHeader("X-Beeftv-Owner", readFileSync(devOwnerTokenFile, "utf8").trim());
+                            }
+                        });
+                    },
+                } : {}),
             },
         },
     },

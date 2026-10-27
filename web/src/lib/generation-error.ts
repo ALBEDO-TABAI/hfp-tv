@@ -134,7 +134,7 @@ const CATEGORY_COPY: Record<GenerationErrorCategory, CategoryCopy> = {
     concurrency: { reason: "同时进行的生成过多", action: "请等待已有任务完成后再试" },
     provider_unavailable: { reason: "模型服务暂时不可用", action: "请稍后重试" },
     network: { reason: "网络连接失败", action: "请检查网络并核对原任务状态后，再决定是否重新生成" },
-    request_not_sent: { reason: "未能连接服务，本次请求尚未提交", action: "请检查网络或代理后重试" },
+    request_not_sent: { reason: "本次请求尚未提交", action: "请查看详情，排除问题后重试" },
     timeout: { reason: "模型服务响应超时", action: "请稍后查询原任务，不要立即重新提交" },
     submission_uncertain: { reason: "提交结果尚未确认，上游任务可能仍在执行", action: "请先查询原任务状态，不要立即重新提交" },
     async_failed: { reason: "生成任务没有完成", action: "请查看详情后决定是否重试" },

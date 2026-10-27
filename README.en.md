@@ -162,6 +162,8 @@ BeefTV also includes project and personal asset libraries, asynchronous tasks, m
 
 See [Quick Start](QUICKSTART.md) for model setup and building from source, and the [desktop release guide](docs/desktop-release.md) for packaging requirements.
 
+For the local browser development setup, use Bun 1.4.4 or newer and Node.js 24.15 or newer, then follow the commands in [README.md](README.md#本地运行指南). Build the protocol packages, install the assistant dependencies, and configure its launch command before starting the backend. The development proxy uses the local workspace owner credential for same-origin operations and must listen on loopback.
+
 ## Contributing and license
 
 Issues and pull requests are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the development workflow and testing requirements.

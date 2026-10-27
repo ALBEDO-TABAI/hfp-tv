@@ -43,12 +43,16 @@
 ## 本地运行指南
 
 ### 环境要求
-- **Bun** `>= 1.3.9`（或 Node.js `>= 20.19`）
+- **Bun** `>= 1.4.4`（安装前端与助手依赖）
+- **Node.js** `>= 24.15`（运行本地创作助手）
 - **Go** `>= 1.25`（编译并启动本地 SQLite 与资源服务后端）
 
 ### 1. 启动后端服务
 ```bash
+./plugin-packages/build-packages.sh
 mkdir -p .local/project-workbench-debug .local/cache/go-build .local/cache/go-mod .local/cli
+(cd agent-host && bun install --frozen-lockfile)
+node -e 'const fs = require("node:fs"); const file = ".local/project-workbench-debug/agent_config.json"; if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify({hostCommand: process.execPath, hostArgs: [require("node:path").resolve("agent-host/server.mjs")]}), {mode: 0o600});'
 cd backend
 GOCACHE=../.local/cache/go-build GOMODCACHE=../.local/cache/go-mod go build -o ../.local/beeftv-server ./cmd/server
 GOCACHE=../.local/cache/go-build GOMODCACHE=../.local/cache/go-mod go build -o ../.local/cli/beeftv ./cmd/beeftv
@@ -64,7 +68,9 @@ CANVAS_BACKEND_DATA_DIR=../.local/project-workbench-debug \
 ```bash
 cd web
 bun install --frozen-lockfile
-VITE_API_PROXY_TARGET=http://127.0.0.1:43180 bun run dev -- --host 0.0.0.0 --port 43123
+VITE_API_PROXY_TARGET=http://127.0.0.1:43180 \
+BEEFTV_DEV_OWNER_TOKEN_FILE=../.local/project-workbench-debug/agent_owner_token \
+bun run dev -- --host 127.0.0.1 --port 43123
 ```
 
 打开浏览器访问 `http://127.0.0.1:43123`。
