@@ -3,9 +3,9 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="hfp-tv · AI 影视与短剧创作工作台" />
-        <link rel="icon" href="/hfp-logo.svg" type="image/svg+xml" />
-        <title>hfp-tv</title>
+        <meta name="description" content="hfp - all in one · AI 影视与短剧创作工作台" />
+        <link rel="icon" href="/app-icon.png" type="image/png" />
+        <title>hfp - all in one</title>
         <style>
             html,
             body {
@@ -27,22 +27,7 @@
                 width: 44px;
                 height: 44px;
                 transform: translate(-50%, -50%);
-                background: linear-gradient(105deg, #c9c9c9 0%, #f4f4f6 45%, #ff6a2c 52%, #f4f4f6 60%, #c9c9c9 100%);
-                background-size: 240% 100%;
-                background-position: 100% 0;
-                -webkit-mask: url('/hfp-logo.svg') center / contain no-repeat;
-                mask: url('/hfp-logo.svg') center / contain no-repeat;
-                animation: appearance-bootstrap-shimmer 2.2s ease-in-out infinite;
-            }
-            @keyframes appearance-bootstrap-shimmer {
-                0%, 12% { background-position: 100% 0; }
-                82%, 100% { background-position: 0 0; }
-            }
-            @media (prefers-reduced-motion: reduce) {
-                #root:empty::after {
-                    animation: none;
-                    background: #f4f4f6;
-                }
+                background: url('/app-icon.png') center / contain no-repeat;
             }
         </style>
         <script>
@@ -54,7 +39,6 @@
             document.documentElement.dataset.theme = theme;
             document.documentElement.style.colorScheme = theme;
             document.documentElement.style.setProperty("--background", theme === "dark" ? "#0b0b0d" : "#ebebee");
-            document.documentElement.style.setProperty("--stage", theme === "dark" ? "#0b0b0d" : "#ebebee");
         </script>
     </head>
     <body class="bg-background text-foreground antialiased">

@@ -198,7 +198,7 @@ export function CanvasAssistantSidebar(props: Props) {
         <div className="canvas-assistant-panel" data-canvas-no-zoom>
             <header className="canvas-assistant-header">
                 <div className="canvas-assistant-heading">
-                    <h2>hfp-tv Agent</h2>
+                    <h2>hfp - all in one Agent</h2>
                     {assistant.streaming ? (
                         <span className="canvas-assistant-live-badge" aria-hidden="true">
                             <span className="canvas-assistant-live-dot" />
@@ -374,7 +374,7 @@ export function CanvasAssistantSidebar(props: Props) {
                 closable={false}
                 onClose={() => assistant.setOpen(false)}
                 size="min(380px, 92vw)"
-                aria-label="hfp-tv Agent"
+                aria-label="hfp - all in one Agent"
             >
                 {content}
             </AppDrawer>
@@ -382,7 +382,7 @@ export function CanvasAssistantSidebar(props: Props) {
     }
 
     return (
-        <aside ref={sidebarRef} className="canvas-assistant-sidebar" aria-label="hfp-tv Agent" style={{ width: assistant.width, flexBasis: assistant.width }}>
+        <aside ref={sidebarRef} className="canvas-assistant-sidebar" aria-label="hfp - all in one Agent" style={{ width: assistant.width, flexBasis: assistant.width }}>
             <button
                 type="button"
                 className="canvas-assistant-resize"

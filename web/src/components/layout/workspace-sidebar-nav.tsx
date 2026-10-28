@@ -55,7 +55,7 @@ function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[];
                 { ...toolItem("skills", "/skills"), title: "技能" },
                 { id: "settings:channels", title: "模型配置", icon: Settings2, to: "/settings?section=channels" },
                 ...(getDesktopAppBinding()?.StorageSettings ? [{ id: "settings:storage", title: "存储设置", icon: HardDrive, to: "/settings?section=storage" }] : []),
-                { id: "agents", title: "hfp-tv MCP", icon: Plug, to: "/agents" },
+                { id: "agents", title: "hfp - all in one MCP", icon: Plug, to: "/agents" },
             ],
         },
     ];
@@ -85,7 +85,7 @@ function WorkspaceSwitcher({ collapsed, onNavigate, onExpand, onCollapse }: { co
                     <BrandLogoFrame className="app-workspace-brand-mark grid size-7 shrink-0 place-items-center rounded-[var(--r-xs)]" logoClassName="size-6 object-contain" alt="" fallback={<span className="app-workspace-brand-placeholder" aria-hidden>h</span>} />
                     <span className="flex min-w-0 flex-col">
                         <span className="app-workspace-brand-wordmark hfp-wordmark truncate leading-none">
-                            {appearance.brandName === "hfp-tv" ? <>hfp<i>-tv</i></> : appearance.brandName}
+                            {appearance.brandName === "hfp - all in one" ? <>hfp - <i style={{ color: "inherit" }}>all in one</i></> : appearance.brandName}
                         </span>
                     </span>
                 </span>

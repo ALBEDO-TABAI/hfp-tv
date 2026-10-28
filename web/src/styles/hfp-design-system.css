@@ -4,6 +4,13 @@
    ============================================================================ */
 
 @font-face {
+    font-family: "Mizuki Ming";
+    src: url("/ui-fonts/MizukiMing-Regular.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+}
+@font-face {
     font-family: "RL Sans";
     src: url("/ui-fonts/Inter.woff2") format("woff2");
     font-weight: 100 900;
@@ -53,6 +60,7 @@
     --font-mono: "RL Mono", ui-monospace, "PingFang SC", "RL CJK", monospace;
     --font-serif: "RL Serif", "RL Serif SC", "Songti SC", Georgia, serif;
     --font-cloth: "RL Serif", "RL Serif SC", "Songti SC", "STSong", serif;
+    --font-brand: "Mizuki Ming", "Songti SC", serif;
 
     /* Override workspace font primitives */
     --font-sans: var(--font-ui);
@@ -163,11 +171,6 @@
     --book-shadow: 0 1px 1px rgba(0, 0, 0, 0.08), 0 20px 32px -18px rgba(20, 20, 40, 0.5), 0 4px 10px -4px rgba(20, 20, 40, 0.18);
 
     /* ---- Glass Shelf Pane ---- */
-    --shelf-top: rgb(255 255 255 / 0.78);
-    --shelf-face: rgb(255 255 255 / 0.44);
-    --shelf-edge: rgb(11 11 14 / 0.1);
-    --shelf-cast: rgb(20 20 40 / 0.16);
-    --bracket: #c9c9cf;
 
     --amb: 255 110 60;
     --amb-alpha: 0.06;
@@ -213,11 +216,6 @@
     --shadow-4: 0 8px 24px rgba(0, 0, 0, 0.45), 0 48px 120px -32px rgba(0, 0, 0, 0.8);
     --book-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 20px 34px -16px rgba(0, 0, 0, 0.8), 0 4px 10px -4px rgba(0, 0, 0, 0.5);
 
-    --shelf-top: rgb(255 255 255 / 0.16);
-    --shelf-face: rgb(255 255 255 / 0.07);
-    --shelf-edge: rgb(255 255 255 / 0.1);
-    --shelf-cast: rgb(0 0 0 / 0.5);
-    --bracket: #3a3a40;
     --amb-alpha: 0.08;
 }
 
@@ -288,8 +286,10 @@ body.app-product-overlays {
     font-weight: 400;
 }
 .hfp-wordmark {
-    font-family: var(--font-display);
-    font-weight: 600;
+    font-family: var(--font-brand);
+    font-weight: 400;
+    font-style: normal;
+    font-synthesis: none;
     font-size: 18px;
     line-height: 1;
     letter-spacing: -0.025em;
@@ -300,7 +300,7 @@ body.app-product-overlays {
     font-family: var(--font-serif);
     font-style: italic;
     font-weight: 400;
-    font-size: 21px;
+    font-size: inherit;
     letter-spacing: -0.01em;
     color: var(--rl-accent);
     margin-left: 1px;
@@ -510,85 +510,6 @@ kbd,
     }
 }
 
-/* ---- Dotted Projection Desk Stage ---- */
-.hfp-stage-bg {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    overflow: hidden;
-    background:
-        radial-gradient(960px 540px at 78% 14%, rgb(255 90 31 / 0.065), transparent 68%),
-        radial-gradient(1200px 700px at 50% 40%, var(--stage) 30%, var(--stage-2) 100%);
-}
-.hfp-stage-dots {
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(circle at 1px 1px, var(--ink-4) 0.75px, transparent 1.3px);
-    background-size: 24px 24px;
-    opacity: 0.55;
-    -webkit-mask: radial-gradient(85% 80% at 50% 45%, #000 28%, transparent 92%);
-    mask: radial-gradient(85% 80% at 50% 45%, #000 28%, transparent 92%);
-}
-.hfp-stage-vignette {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(0 0 0 / 0.06));
-}
-.dark .hfp-stage-vignette,
-[data-theme="dark"] .hfp-stage-vignette {
-    background: radial-gradient(120% 90% at 50% 50%, transparent 50%, rgb(0 0 0 / 0.42));
-}
-
-/* ---- Glass Shelf Pane (Ready Library Bookcase Divider) ---- */
-.hfp-glass-shelf-pane {
-    position: relative;
-    height: 14px;
-    margin: 20px 0 22px;
-}
-.hfp-glass-shelf-pane .pane-top {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 5px;
-    border-radius: 3px 3px 0 0;
-    background: linear-gradient(180deg, var(--shelf-top), color-mix(in oklab, var(--shelf-top) 60%, transparent));
-    box-shadow:
-        inset 0 1px 0 rgb(255 255 255 / 0.28),
-        inset 0 0 0 0.5px var(--shelf-edge);
-}
-.hfp-glass-shelf-pane .pane-face {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 5px;
-    bottom: 0;
-    border-radius: 0 0 4px 4px;
-    background: linear-gradient(180deg, color-mix(in oklab, var(--shelf-face) 100%, rgb(var(--amb) / 0.2)), var(--shelf-face));
-    -webkit-backdrop-filter: blur(10px) saturate(160%);
-    backdrop-filter: blur(10px) saturate(160%);
-    box-shadow:
-        inset 0 -1px 0 rgb(255 255 255 / 0.12),
-        inset 0 0 0 0.5px var(--shelf-edge),
-        0 18px 26px -14px var(--shelf-cast),
-        0 3px 6px -3px var(--shelf-cast);
-}
-.hfp-glass-shelf-pane .bracket {
-    position: absolute;
-    top: 14px;
-    width: 4px;
-    height: 16px;
-    border-radius: 0 0 3px 3px;
-    background: var(--bracket);
-}
-.hfp-glass-shelf-pane .bracket.l {
-    left: 8%;
-}
-.hfp-glass-shelf-pane .bracket.r {
-    right: 8%;
-}
-
 /* ---- Splash Sheet (Ready Library 2200×1396 Proportional Poster Frame) ---- */
 .splash {
     --u: min(max(0.32px, min(calc(43vw / 1990), calc(50vh / 1207))), calc(90vw / 2200), calc(90vh / 1396));
@@ -637,10 +558,11 @@ kbd,
 }
 .splash h1 {
     top: calc(215 * var(--u));
-    font: 400 calc(280 * var(--u)) / 1 var(--font-serif);
+    font: 400 calc(190 * var(--u)) / 1 var(--font-brand);
     letter-spacing: -0.02em;
 }
 .splash h1 i {
+    font-family: var(--font-serif);
     font-style: italic;
     color: var(--rl-accent);
 }
@@ -754,7 +676,7 @@ kbd,
     }
     .splash h1 {
         margin-top: 10px;
-        font-size: clamp(48px, 15vw, 72px);
+        font-size: clamp(32px, 8vw, 48px);
     }
     .sp-zh {
         margin-top: 14px;
@@ -806,9 +728,7 @@ kbd,
 
 /* 1. Workspace Shell & Liquid-Glass Sidebar */
 body .app-user-workspace {
-    background:
-        radial-gradient(1100px 620px at 78% 10%, rgb(255 90 31 / 0.055), transparent 68%),
-        radial-gradient(1200px 700px at 50% 40%, var(--stage) 30%, var(--stage-2) 100%) !important;
+    background: var(--stage) !important;
     color: var(--ink) !important;
 }
 

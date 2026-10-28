@@ -90,7 +90,8 @@ and cgo bindings distributed under their package license.
 | `web/public/canvas/models/facecap.glb` | three.js example face-cap model; distributed with the MIT-licensed three.js examples |
 | `web/public/canvas/models/director-repro-triangle.gltf` | BeefTV hand-authored offline test fixture; MIT |
 | `web/public/icons/*.svg` | Compatibility/service identifiers based on `@lobehub/icons` where applicable; package code is MIT, names and marks remain property of their owners |
-| `web/public/ui-fonts/*.woff2`, `web/public/fonts/*.woff2` | Inter, Inter Tight, Instrument Serif, Geist Mono, Noto Sans SC, Noto Serif SC — SIL Open Font License 1.1 (`licenses/ui/OFL-*.txt`, `licenses/ui/noto-*-OFL.txt`) |
+| `web/public/ui-fonts/*.woff2` (except Mizuki Ming), `web/public/fonts/*.woff2` | Inter, Inter Tight, Instrument Serif, Geist Mono, Noto Sans SC, Noto Serif SC — SIL Open Font License 1.1 (`licenses/ui/OFL-*.txt`, `licenses/ui/noto-*-OFL.txt`) |
+| `web/public/ui-fonts/MizukiMing-Regular.woff2` | Mizuki Ming / 水木明体 12.401, unchanged from [MEE-Developers/Mizuki-Ming](https://github.com/MEE-Developers/Mizuki-Ming/releases/tag/12.401), derived from IPA Mincho fonts — IPA Font License 1.0 (`licenses/ui/IPA-MizukiMing.md`; distributed beside the font as `MizukiMing-LICENSE.md`). Original IPA fonts: https://moji.or.jp/ipafont/ |
 | `web/src/lib/hfp-glass.ts` | Liquid-glass bevel displacement & specular map optics adapted from `Glass-HQ/liquid-glass` (MIT License, Copyright (c) 2026 Glass HQ; `licenses/ui/LICENSE-liquid-glass.txt`) |
 
 ## Images and demonstration media

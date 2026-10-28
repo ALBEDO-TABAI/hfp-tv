@@ -36,7 +36,7 @@ function Count({ n }: { n: number | null }) {
 }
 
 /**
- * hfp-tv Poster-Sheet Splash Screen — adapted directly from Ready Library (藏书阁) `src/ui/Splash.tsx`.
+ * hfp - all in one Poster-Sheet Splash Screen — adapted directly from Ready Library (藏书阁) `src/ui/Splash.tsx`.
  * Uses the 2200×1396 proportional typographic sheet with Instrument Serif + Geist Mono + 4 live studio counters.
  */
 export function HfpSplash({ forceShow = false, onFinished }: { forceShow?: boolean; onFinished?: () => void }) {
@@ -132,7 +132,7 @@ export function HfpSplash({ forceShow = false, onFinished }: { forceShow?: boole
         <div
             className={`splash${out ? " out" : ""}`}
             role="status"
-            aria-label="hfp-tv 启动幕布"
+            aria-label="hfp - all in one 启动幕布"
             onClick={() => {
                 setOut(true);
                 window.setTimeout(() => {
@@ -144,7 +144,7 @@ export function HfpSplash({ forceShow = false, onFinished }: { forceShow?: boole
             <div className="sp-art">
                 <p className="sp-kicker">AI-Native Video Screening Room · Infinite Canvas · v2.0.3</p>
                 <h1>
-                    hfp<i>-tv</i>
+                    hfp - <i>all in one</i>
                 </h1>
                 <p className="sp-zh">一句构想，在自由画布中化作分镜与成片。</p>
                 <p className="sp-en">One spark on an infinite desk, cut and projected into cinema.</p>
@@ -162,7 +162,7 @@ export function HfpSplash({ forceShow = false, onFinished }: { forceShow?: boole
                         </li>
                     ))}
                 </ul>
-                <p className="sp-repo">hfp-tv · Local-First Video Studio</p>
+                <p className="sp-repo">hfp - all in one · Local-First Video Studio</p>
                 <p className="sp-credit">Crafted with Ready Library Art Direction · Based on BeefTV</p>
             </div>
         </div>

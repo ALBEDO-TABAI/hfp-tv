@@ -1,4 +1,4 @@
-export const capabilityOptions = [{ value: "beeftv.canvas", label: "hfp-tv 画布工具" }, { value: "model.image", label: "图片理解模型" }, { value: "model.video", label: "视频理解模型" }, { value: "model.audio", label: "音频理解模型" }];
+export const capabilityOptions = [{ value: "beeftv.canvas", label: "hfp - all in one 画布工具" }, { value: "model.image", label: "图片理解模型" }, { value: "model.video", label: "视频理解模型" }, { value: "model.audio", label: "音频理解模型" }];
 export function requirementLabel(value: string) {
     return capabilityOptions.find(item => item.value === value)?.label || `未确认的能力：${value}`;
 }

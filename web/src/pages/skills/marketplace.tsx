@@ -75,7 +75,7 @@ export default function SkillMarketplace() {
             <div className="skill-market-toolbar"><Input.Search aria-label="搜索技能" placeholder="搜索名称或用途" allowClear value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} /><Button onClick={reload}>刷新</Button></div>
             {error ? <Alert type="error" showIcon title={error} action={<Button size="small" onClick={reload}>重试</Button>} /> : loading ? <Skeleton active paragraph={{ rows: 6 }} /> : <>
                 {tab === "market" ? items.map(item => <article className="skill-market-row" key={`${item.skillId}/${item.releaseId}`}>
-                    <div className="skill-market-copy"><h2>{item.name} <span>{item.versionLabel}</span></h2><p>{item.description}</p><div className="skill-market-meta"><span>{item.author?.replace(/BeefTV/g, "hfp-tv")}</span><span>{item.license}</span><span>{item.verification === "tested" ? "有实测记录" : "效果尚未验证"}</span></div>{item.compatibility?.status === "unsupported" ? <p className="skill-market-warning">当前环境不满足：{item.compatibility.reasons?.join("、")}</p> : null}</div>
+                    <div className="skill-market-copy"><h2>{item.name} <span>{item.versionLabel}</span></h2><p>{item.description}</p><div className="skill-market-meta"><span>{item.author?.replace(/BeefTV/g, "hfp - all in one")}</span><span>{item.license}</span><span>{item.verification === "tested" ? "有实测记录" : "效果尚未验证"}</span></div>{item.compatibility?.status === "unsupported" ? <p className="skill-market-warning">当前环境不满足：{item.compatibility.reasons?.join("、")}</p> : null}</div>
                     <Button onClick={() => openRelease(item.skillId, item.releaseId)} loading={busy}>查看与安装</Button>
                 </article>) : local.map(skill => <article className="skill-market-row" key={skill.skillId}>
                     <div className="skill-market-copy"><h2>{skill.skillName} <span>{skill.version}</span> {!skill.isAdded ? <Tag>已停用</Tag> : null}</h2><p>{skill.description}</p><div className="skill-market-meta"><span>{skill.sourceType === "market" ? "市场固定版本" : "本机技能"}</span><span>{skill.fileCount} 个文件</span></div>
@@ -91,7 +91,7 @@ export default function SkillMarketplace() {
         </>}
         <AppModal open={Boolean(release)} title="检查技能并安装" onCancel={() => { setRelease(null); setParams({ tab: "market" }); }} footer={<Button type="primary" loading={busy} disabled={release?.requirements.some(value => !capabilityOptions.some(item => item.value === value))} onClick={install}>安装此版本</Button>} width={720}>
             {release ? <div className="skill-market-preview">
-                <h2>{release.name} · {release.versionLabel}</h2><p>{release.description}</p><p>作者：{release.author?.replace(/BeefTV/g, "hfp-tv")} · 许可：{release.license}</p>
+                <h2>{release.name} · {release.versionLabel}</h2><p>{release.description}</p><p>作者：{release.author?.replace(/BeefTV/g, "hfp - all in one")} · 许可：{release.license}</p>
                 <p>使用条件：{release.requirements.length ? release.requirements.map(requirementLabel).join("、") : "没有额外工具要求"}</p>{release.requirementNotes ? <p>{release.requirementNotes}</p> : null}
                 {release.requirements.some(value => value.startsWith("model.")) ? <Alert type="info" title="使用前需要在模型配置中选择支持所需理解能力的模型。安装不代表这些条件已满足。" /> : null}
                 <p>模型与费用请按技能说明确认。安装只保存文件，使用时由你选择模型。</p><p>安装后不会自动运行，也不会替你切换模型。后续更新需要再次确认。</p>

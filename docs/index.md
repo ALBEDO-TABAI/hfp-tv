@@ -1,6 +1,14 @@
-# BeefTV 文档
+# hfp - all in one 文档
 
-BeefTV 是一个本地优先、轻量、AI Native 的视频工作台。本页只收录公开使用、开发和维护所需的文档。
+hfp - all in one 是基于 BeefTV 的本地视频创作工作台。本页收录当前开发入口及继承的专题资料；上游历史验收记录不代表本分支已经通过同样的验证。
+
+## 开发必读
+
+1. [仓库地图：职责、入口和数据链路](repository-map.md)
+2. [开发规范：改动边界、验证与提交](../CONTRIBUTING.md)
+3. [本地开发：完整准备、启动、数据与重启](local-development.md)
+4. [排查指南：保存、插件、助手和模型错误](troubleshooting.md)
+5. [AI 协作约定](../AGENTS.md)与[视觉设计规范](DESIGN.md)
 
 ## 开始使用
 
@@ -28,7 +36,7 @@ BeefTV 是一个本地优先、轻量、AI Native 的视频工作台。本页只
 
 - [后端本地开发](content/docs/backend/local-development.mdx)
 - [HTTP API](content/docs/backend/http-api.mdx)
-- [代码地图](content/docs/backend/code-map.mdx)
+- [后端领域代码地图](content/docs/backend/code-map.mdx)
 - [官方 Pi SDK 复用矩阵](refactor/pi-official-reuse.md)
 - [Skill 市场 Agent 接口与前端交接](refactor/skill-market-agent-access.md)
 - [桌面技能用户流程与联调](refactor/skill-market-desktop-journey.md)

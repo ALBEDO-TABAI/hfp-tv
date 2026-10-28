@@ -593,7 +593,7 @@
 .app-user-workspace.app-product-workspace .app-workspace-sidebar-brand-button { min-height: 52px; padding: 0 8px; color: var(--user-ink); }
 .app-user-workspace.app-product-workspace .app-workspace-brand-mark { width: 36px; height: 36px; border: 0; border-radius: 10px; color: var(--user-ink) !important; background: var(--user-ink); }
 .app-user-workspace.app-product-workspace .app-workspace-brand-mark svg { color:var(--user-page-bg); }
-.app-user-workspace.app-product-workspace .app-workspace-brand-wordmark { color: var(--user-ink); font-size: 20px; font-style: italic; font-weight: 780; letter-spacing: -.055em; }
+.app-user-workspace.app-product-workspace .app-workspace-brand-wordmark { color: var(--user-ink); font-family: var(--font-brand); font-size: 20px; font-style: normal; font-weight: 400; letter-spacing: -.01em; }
 .app-user-workspace.app-product-workspace .app-workspace-sidebar-collapse-button { color: var(--user-ink-soft); }
 .app-user-workspace.app-product-workspace .app-workspace-sidebar-collapse-button:hover { background:var(--user-surface-hover);color:var(--user-ink); }
 .app-user-workspace.app-product-workspace .app-workspace-sidebar-scroll-area { gap: 16px; padding: 10px 18px 18px; }

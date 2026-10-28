@@ -15,12 +15,7 @@ export function HomeDashboard({ projects, loading, error, onRetry }: { projects:
     const latestProject = projects[0];
 
     return (
-        <main className="beeftv-home hfp-home" aria-label="hfp-tv 首页">
-            <div className="hfp-stage-bg" aria-hidden="true">
-                <div className="hfp-stage-dots" />
-                <div className="hfp-stage-vignette" />
-            </div>
-
+        <main className="beeftv-home hfp-home" aria-label="hfp - all in one 首页">
             <div className="hfp-home-container">
                 {/* Editorial Masthead — Ready Library Hero Grammar */}
                 <header className="hfp-hero-masthead">
@@ -34,7 +29,7 @@ export function HomeDashboard({ projects, loading, error, onRetry }: { projects:
                             <span><b>{beefTVCapabilityItems.length}</b> 项制片能力</span>
                         </div>
                         <h1 className="lib-title hfp-hero-title">
-                            hfp<em>-tv</em>
+                            hfp - <em>all in one</em>
                         </h1>
                         <p className="hfp-hero-subtitle">
                             面向 AI 时代的电影感视频创作工作台——在自由画布中串联分镜、模型、素材与时间线成片。
@@ -79,7 +74,7 @@ export function HomeDashboard({ projects, loading, error, onRetry }: { projects:
                     </button>
 
                     <p className="hfp-stage-hint mono">
-                        从空白画布、短剧分镜、参考图像或与 hfp-tv Agent 对话开始
+                        从空白画布、短剧分镜、参考图像或与 hfp - all in one Agent 对话开始
                     </p>
                 </section>
 
@@ -115,14 +110,6 @@ export function HomeDashboard({ projects, loading, error, onRetry }: { projects:
                         ))}
                     </nav>
                 </section>
-
-                {/* Glass Shelf Divider (Ready Library Bookcase Pane) */}
-                <div className="hfp-glass-shelf-pane" aria-hidden="true">
-                    <div className="pane-top" />
-                    <div className="pane-face" />
-                    <span className="bracket l" />
-                    <span className="bracket r" />
-                </div>
 
                 {/* Recent Projects Screening Reels */}
                 <section className="beeftv-home-section beeftv-recents hfp-recents-section">

@@ -35,7 +35,7 @@ function AssistantProjectDownload({output}: {output: Extract<AssistantTurnOutput
                 if (!blob) throw Error("missing project"); url=URL.createObjectURL(blob);
             }
             const result = await downloadOwnedOrBrowserMedia({fileName:output.fileName,resourceId:output.resourceId,browserUrl:url || undefined});
-            assertUserScope(scope);if(result === "saved")setFeedback("工程已保存，可在 hfp-tv 导入后继续编辑");
+            assertUserScope(scope);if(result === "saved")setFeedback("工程已保存，可在 hfp - all in one 导入后继续编辑");
         } catch { if(userScopeMatches(scope))setFeedback("工程下载未完成，请重试"); }
         finally { setLoading(false);if(url)setTimeout(()=>URL.revokeObjectURL(url),1000); }
     }

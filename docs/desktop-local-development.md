@@ -1,5 +1,7 @@
 # BeefTV 本地桌面开发与验收
 
+本文保留原生 Wails 开发与上游验收资料。hfp - all in one 当前的浏览器启动与重启以[本地开发指南](local-development.md)为准。
+
 BeefTV 的桌面版是 Wails 应用：前端运行在 WebView，Go 后端在同一进程内启动一个仅监听 `127.0.0.1` 的 loopback API。桌面 profile 不注册交互式登录路由，首次启动通过 `/api/workspace/bootstrap` 创建或读取本地工作区。
 
 ## 数据位置
@@ -24,13 +26,13 @@ backend\cmd\desktop\build\bin\BeefTV.exe
 
 ## 开发与构建
 
-统一浏览器预览与 Wails dev（共用 `web/src`、Vite `3000` 和本地 Go API `8080`）：
+仓库保留以下 Wails 联调脚本：
 
 ```bash
 ./scripts/beeftv-shared-dev.sh
 ```
 
-脚本会为本次开发会话生成一个临时桌面令牌，并让 Vite 代理自动转发到同一个 Go 后端；生产包仍使用随机令牌和动态 loopback 端口。
+脚本会生成临时桌面令牌。目前脚本中的 Vite 端口是 `3000`，而 `backend/cmd/desktop/wails.json` 指向 `43123`；使用前需对齐并验证。浏览器开发身份与原生窗口身份不同，不能仅凭健康接口响应认定写操作可用。
 
 前端检查：
 
@@ -74,7 +76,9 @@ backend/cmd/desktop/build/bin/BeefTV.app
 
 Wails 2.16 生产包只把 `/` 和 `index.html` 交给前端运行时；深路径（例如 `/canvas/:id`）会落到资源 handler 并返回 404。原生窗口因此使用 hash 路由：刷新仍请求 `/`，画布地址形如 `/#/canvas/<id>`。浏览器部署继续使用 History 路径，`/api` 与媒体地址不进入 hash。
 
-## 最近一次验收
+## 上游历史验收记录
+
+以下是继承的验收记录，不是 hfp - all in one 当前分支的发布或安装证明。当前 Wails 配置中的应用名为 `hfp - all in one`，输出文件名为 `hfp-all-in-one`，部分发行脚本仍使用 `BeefTV`；打包前必须核对实际产物路径。
 
 - 统一开发脚本已验证：Wails 日志显示 `Frontend DevServer URL: http://127.0.0.1:3000`；浏览器代理和后端直连的 `/api/health/live` 返回相同 `dev` 构建信息；`/api/workspace/bootstrap` 经浏览器代理返回 HTTP 200。
 

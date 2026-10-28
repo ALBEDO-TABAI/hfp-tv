@@ -2863,7 +2863,7 @@
     }
 
     .full-screen-loader-logo-image { width: 38px; height: 38px; }
-    .full-screen-loader-logo-fallback { display: block; width: 36px; height: 36px; background: currentColor; mask: url('/hfp-logo.svg') center / contain no-repeat; -webkit-mask: url('/hfp-logo.svg') center / contain no-repeat; }
+    .full-screen-loader-logo-fallback { display: block; width: 36px; height: 36px; background: url('/app-icon.png') center / contain no-repeat; }
     .workspace-route-loader-logo .full-screen-loader-logo-fallback { width: 16px; height: 16px; }
 
     .full-screen-loader-orbit {
@@ -2982,26 +2982,14 @@
     .beeftv-loading-logo {
         display: block;
         width: min(240px, 42vw);
-        aspect-ratio: 17 / 10;
-        background: linear-gradient(105deg, #c9c9c9 0%, #e4e4e4 43%, #fff 49%, #fff 52%, #e4e4e4 58%, #c9c9c9 100%);
-        background-size: 240% 100%;
-        background-position: 100% 0;
-        -webkit-mask: url('/hfp-logo.svg') center / contain no-repeat;
-        mask: url('/hfp-logo.svg') center / contain no-repeat;
-        animation: appearance-bootstrap-shimmer 2.6s ease-in-out infinite;
+        aspect-ratio: 1;
+        background: url('/app-icon.png') center / contain no-repeat;
     }
 
     .beeftv-loading-logo.is-compact { width: 48px; }
 
     .workspace-route-loader { background: #090909; color: #fff; }
     .workspace-route-loader-content { gap: var(--space-2); color: inherit; }
-
-    @media (prefers-reduced-motion: reduce) {
-        .beeftv-loading-logo {
-            animation: none;
-            background: #f2f2f2;
-        }
-    }
 
     :where(.ant-btn) {
         letter-spacing: 0;

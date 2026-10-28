@@ -5,26 +5,16 @@ import { appearanceLogoURL, useAppearanceStore } from "@/stores/use-appearance-s
 import type { ThemeName } from "@/stores/use-theme-store";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 
-/**
- * hfp-tv mark — adapted from Ready Library's shelf mark:
- * three film reels / storyboard spines, one leaning in motion, and the print-signal REC dot.
- */
 export function HfpLogoMark({ size = 26, className }: { size?: number; className?: string }) {
     return (
-        <svg width={size} height={size} viewBox="0 0 26 26" className={cn("hfp-logo-mark shrink-0", className)} aria-hidden="true">
-            <rect x="1" y="1" width="24" height="24" rx="5.5" fill="var(--ink, currentColor)" />
-            <rect x="4.8" y="5" width="4" height="16" rx="1.1" fill="var(--logo-ink, #ebebee)" />
-            <rect x="10.4" y="6.8" width="4" height="14.2" rx="1.1" fill="var(--logo-ink, #ebebee)" opacity="0.58" />
-            <rect x="15.8" y="9.2" width="4" height="11.8" rx="1.1" transform="rotate(-14 17.8 15)" fill="var(--logo-ink, #ebebee)" />
-            <circle cx="19.6" cy="6.4" r="2.6" fill="var(--rl-accent, #ff5a1f)" />
-        </svg>
+        <img src="/app-icon.png" width={size} height={size} className={cn("hfp-logo-mark shrink-0 object-contain", className)} alt="" aria-hidden="true" draggable={false} />
     );
 }
 
 export function HfpWordmark({ className }: { className?: string }) {
     return (
         <span className={cn("hfp-wordmark", className)}>
-            hfp<i>-tv</i>
+            hfp - <i>all in one</i>
         </span>
     );
 }

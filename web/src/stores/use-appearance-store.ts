@@ -5,22 +5,22 @@ import { applySkinTheme, DEFAULT_CLASSIC_SKIN, normalizeSkinDefinition } from "@
 
 export const DEFAULT_PUBLIC_APPEARANCE: PublicAppearance = {
     schemaVersion: 7,
-    brandName: "hfp-tv",
-    brandSlug: "hfp-tv",
+    brandName: "hfp - all in one",
+    brandSlug: "hfp-all-in-one",
     authHeroTitle: "让一个故事，\n从文字走向银幕。",
     authHeroDescription: "",
-    logoUrl: "/hfp-logo.svg",
-    darkLogoUrl: "/hfp-logo-dark.svg",
+    logoUrl: "/app-icon.png",
+    darkLogoUrl: "/app-icon.png",
     logoFrameEnabled: false,
     authVideoUrl: "https://boss-shjd.biliapi.net/updream/aniforge/video/video_bbcb00bd-650d-4249-9346-5cd21fd2484c_m1hc-u0-1pu13x-3v1s.mp4",
     authVideoPosterUrl: "https://i0.hdslb.com/bfs/aitool/aniforge/image/02933f26-5f1b-49ff-a811-b7f95ee5e5b8_m1hc-u0-sau.jpg",
     authVideoAutoplay: true,
     skinId: "classic",
     activeSkin: DEFAULT_CLASSIC_SKIN,
-    seoTitle: "hfp-tv",
-    seoDescription: "hfp-tv，本地优先的开源 AI 视频创作工作台。",
+    seoTitle: "hfp - all in one",
+    seoDescription: "hfp - all in one，本地优先的开源 AI 视频创作工作台。",
     seoKeywords: "",
-    footerCopyright: `© ${new Date().getFullYear()} hfp-tv. Open source video studio.`,
+    footerCopyright: `© ${new Date().getFullYear()} hfp - all in one. Open source video studio.`,
     icpFilingEnabled: false,
     icpFilingNumber: "",
     logoConfigured: false,
@@ -125,6 +125,7 @@ export function applyAppearanceMetadata(appearance: PublicAppearance, targetDocu
         targetDocument.head.appendChild(favicon);
     }
     favicon.href = appearanceLogoURL(appearance, "dark");
+    favicon.removeAttribute("type");
 
     const location = targetDocument.defaultView?.location;
     if (location && (location.protocol === "http:" || location.protocol === "https:")) {

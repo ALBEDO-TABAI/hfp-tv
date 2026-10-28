@@ -1,5 +1,5 @@
 /**
- * hfp-tv Liquid Glass Runtime
+ * hfp - all in one Liquid Glass Runtime
  * Adapted from Ready Library (藏书阁) / Glass-HQ/liquid-glass (MIT License, © 2026 Glass HQ;
  * see licenses/ui/LICENSE-liquid-glass.txt).
  */

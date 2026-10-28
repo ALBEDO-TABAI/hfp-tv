@@ -1,8 +1,8 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "hfp-tv",
-  "outputfilename": "hfp-tv",
-  "info": { "protocols": [{ "scheme": "hfp-tv", "description": "hfp-tv skill link", "role": "Viewer" }, { "scheme": "beeftv", "description": "hfp-tv compatibility skill link", "role": "Viewer" }] },
+  "name": "hfp - all in one",
+  "outputfilename": "hfp-all-in-one",
+  "info": { "protocols": [{ "scheme": "hfp-tv", "description": "hfp - all in one skill link", "role": "Viewer" }, { "scheme": "beeftv", "description": "hfp - all in one compatibility skill link", "role": "Viewer" }] },
   "frontend:dir": "../../../web",
   "frontend:install": "bun install --frozen-lockfile",
   "frontend:build": "bun run build:desktop",
@@ -11,6 +11,6 @@
   "assetdir": "frontend/dist",
   "wailsjsdir": "frontend/wailsjs",
   "author": {
-    "name": "hfp-tv & BeefTV Contributors"
+    "name": "hfp - all in one & BeefTV Contributors"
   }
 }

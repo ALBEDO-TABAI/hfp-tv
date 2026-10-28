@@ -1,25 +1,27 @@
-# hfp-tv
+# hfp - all in one
+
+[中文](README.md) · [English](README.en.md)
 
 **High-Performance · Local-First · AI-Native Video Screening Room & Infinite Canvas Studio**
 
-**hfp-tv** 是基于开源项目 [BeefTV](https://github.com/glanderness/BeefTV) 构建的 AI 视频与短剧创作工作台，并以 **「藏书阁 (Ready Library)」** 的艺术指导（Art Direction）与设计系统进行了全面重构：采用 Inter / Inter Tight / Instrument Serif / Geist Mono / Noto Sans & Serif SC 混排体系、点阵放映桌面、液态玻璃光学表面（Liquid Glass）、信号橙（Print Signal `#ff5a1f` / `#ff6a2c`）焦点系统以及严格的 12 列响应式栅格。
+**hfp - all in one** 是基于开源项目 [BeefTV](https://github.com/glanderness/BeefTV) 构建的 AI 视频与短剧创作工作台，并以 **「藏书阁 (Ready Library)」** 的艺术指导（Art Direction）与设计系统进行了全面重构：采用 Inter / Inter Tight / Instrument Serif / Geist Mono / Noto Sans & Serif SC 混排体系、点阵放映桌面、液态玻璃光学表面（Liquid Glass）、信号橙（Print Signal `#ff5a1f` / `#ff6a2c`）焦点系统以及严格的 12 列响应式栅格。
 
 ---
 
 ## 非官方衍生版本声明 · Unofficial Derivative Notice
 
 **中文说明**
-- **非官方独立修改版**：`hfp-tv`（仓库地址：`https://github.com/ALBEDO-TABAI/hfp-tv`）是基于上游公开项目 [glanderness/BeefTV](https://github.com/glanderness/BeefTV) 独立修改而成的衍生版本，**并非 BeefTV 官方发布版本，亦未获得 BeefTV 官方背书或商业授权**。
+- **非官方独立修改版**：`hfp - all in one`（仓库地址：`https://github.com/ALBEDO-TABAI/hfp-tv`）是基于上游公开项目 [glanderness/BeefTV](https://github.com/glanderness/BeefTV) 独立修改而成的衍生版本，**并非 BeefTV 官方发布版本，亦未获得 BeefTV 官方背书或商业授权**。
 - **主要变更摘要**：
-  1. 产品品牌与用户界面全面重命名为 `hfp-tv`（含全新胶片书脊标志、斜体衬线字标与海报式启动幕布）。
+  1. 产品品牌与用户界面全面重命名为 `hfp - all in one`（含全新胶片书脊标志、斜体衬线字标与海报式启动幕布）。
   2. 保留上游 100% 功能与本地优先架构（详见 [`docs/FEATURES.md`](docs/FEATURES.md)）。
   3. 依据「藏书阁 (Ready Library)」设计语言对全部视觉、UI 组件、液态玻璃材质、双主题色板、12 列响应式栅格与交互动效进行了彻底重做（详见设计规范 [`docs/DESIGN.md`](docs/DESIGN.md)）。
 - **开源与源码可用许可**：本仓库免费公开分发，并严格遵循与上游相同的许可证条款——即 [`LICENSE`](LICENSE)（**Part A: `BeefTV Source Available License 1.0`** 与 **Part B: 历史 `MIT` 许可证**），完整保留 [`NOTICE`](NOTICE)、[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 及 [`licenses/`](licenses/) 下的全部第三方与字体/光学算法许可文件。
 
 **English Notice**
-- **Unofficial, Independently Modified Version**: `hfp-tv` (`https://github.com/ALBEDO-TABAI/hfp-tv`) is an unofficial, independently modified derivative based on the open-source project [glanderness/BeefTV](https://github.com/glanderness/BeefTV). **It is NOT an official BeefTV release and is NOT endorsed by or affiliated with BeefTV.**
+- **Unofficial, Independently Modified Version**: `hfp - all in one` (`https://github.com/ALBEDO-TABAI/hfp-tv`) is an unofficial, independently modified derivative based on the open-source project [glanderness/BeefTV](https://github.com/glanderness/BeefTV). **It is NOT an official BeefTV release and is NOT endorsed by or affiliated with BeefTV.**
 - **Summary of Changes**:
-  1. Rebranded user-facing surfaces and package metadata to `hfp-tv` with a new film-spine emblem, serif-paired wordmark, and poster-sheet splash screen.
+  1. Rebranded user-facing surfaces and package metadata to `hfp - all in one` with a new film-spine emblem, serif-paired wordmark, and poster-sheet splash screen.
   2. Preserved 100% of upstream features and local-first workspace capabilities (see [`docs/FEATURES.md`](docs/FEATURES.md)).
   3. Completely redid the art direction, visual design, liquid-glass material surfaces, typography pairing, 12-column responsive grid, and interactions following the Ready Library (「藏书阁」) design system (see [`docs/DESIGN.md`](docs/DESIGN.md)).
 - **License & Free Distribution**: Distributed free of charge under the exact same [`LICENSE`](LICENSE) (**Part A: `BeefTV Source Available License 1.0`** + **Part B: historical `MIT` License**), with [`NOTICE`](NOTICE), [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), and [`licenses/`](licenses/) retained in full.
@@ -31,7 +33,7 @@
 1. **100% 完整保留上游能力**：
    - **无限画布工作台 (`/canvas/:id`)**：自由画布与短剧流水线双起点，支持图片、视频、音频、文本、分镜表、批量创作表、3D 导演台、AI 超分（Topaz）、Excalidraw 绘图、文件夹与可复用工作流节点。
    - **专业媒体工具**：Vidstack 视频播放器（悬停静音预览、H.265 按需转 H.264 代理）、行内视频裁剪、视频截帧、音频提取、多视频合并、图片 3D 多角度机位与光影预设、4/9/16/25 及 5×5 自定义宫格切分、Seedream 图层拆分。
-   - **hfp-tv Agent 创作助手与可复用工作流**：支持多轮对话分镜提案、整片批量生成确认、多模态结果审查，以及将画布节点封装为带版本管理的可复用工作流模板。
+   - **hfp - all in one Agent 创作助手与可复用工作流**：支持多轮对话分镜提案、整片批量生成确认、多模态结果审查，以及将画布节点封装为带版本管理的可复用工作流模板。
    - **独立多模态创作室 (`/create`)**：支持视频、图片、文本三模式生成，`@` 智能引用素材与技能、内置 AI 提示词优化器、分镜轨预览与历史会话管理。
    - **时间线成片剪辑器 (`/projects/:id/editor`)**：200 步撤销/重做命令状态机、8 个内置片段/字幕插件、本地 `whisper.cpp` / 云端语音转写字幕、本机 FFmpeg 成片渲染导出。
    - **个人资产库 (`/assets`)、技能市场 (`/skills`)、模型配置与诊断 (`/settings`)、MCP 外部工具接入 (`/agents`)、插件中心 (`/plugins`)**。
@@ -47,41 +49,15 @@
 - **Node.js** `>= 24.15`（运行本地创作助手）
 - **Go** `>= 1.25`（编译并启动本地 SQLite 与资源服务后端）
 
-### 1. 启动后端服务
-```bash
-./plugin-packages/build-packages.sh
-mkdir -p .local/project-workbench-debug .local/cache/go-build .local/cache/go-mod .local/cli
-(cd agent-host && bun install --frozen-lockfile)
-node -e 'const fs = require("node:fs"); const file = ".local/project-workbench-debug/agent_config.json"; if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify({hostCommand: process.execPath, hostArgs: [require("node:path").resolve("agent-host/server.mjs")]}), {mode: 0o600});'
-cd backend
-GOCACHE=../.local/cache/go-build GOMODCACHE=../.local/cache/go-mod go build -o ../.local/beeftv-server ./cmd/server
-GOCACHE=../.local/cache/go-build GOMODCACHE=../.local/cache/go-mod go build -o ../.local/cli/beeftv ./cmd/beeftv
+按[本地开发指南](docs/local-development.md)完成前端依赖、模型插件、助手依赖与启动配置，再依次启动后端和前端。浏览器入口为 `http://127.0.0.1:43123`，开发数据保存在被 Git 忽略的 `.local/project-workbench-debug`。
 
-BEEFTV_UI_BOOTSTRAP=1 \
-BEEFTV_ALLOWED_ORIGINS="http://127.0.0.1:43123,http://localhost:43123" \
-CANVAS_BACKEND_ADDR=127.0.0.1:43180 \
-CANVAS_BACKEND_DATA_DIR=../.local/project-workbench-debug \
-../.local/beeftv-server
-```
+## 开发文档
 
-### 2. 启动前端开发服务
-```bash
-cd web
-bun install --frozen-lockfile
-VITE_API_PROXY_TARGET=http://127.0.0.1:43180 \
-BEEFTV_DEV_OWNER_TOKEN_FILE=../.local/project-workbench-debug/agent_owner_token \
-bun run dev -- --host 127.0.0.1 --port 43123
-```
-
-打开浏览器访问 `http://127.0.0.1:43123`。
-
-### 3. 类型检查、测试与生产构建
-```bash
-cd web
-bun run typecheck
-bun run pretest
-bun run build
-```
+- [仓库地图](docs/repository-map.md)：目录职责、主链路与常用修改入口。
+- [开发规范](CONTRIBUTING.md)：改动边界、验证与提交要求。
+- [本地开发与重启](docs/local-development.md)：可执行步骤、数据保护和身份配置。
+- [故障排查](docs/troubleshooting.md)：保存失败、插件缺失、助手与模型错误。
+- [完整文档索引](docs/index.md)与 [AI 协作约定](AGENTS.md)。
 
 ---
 
