@@ -81,7 +81,7 @@ func registerAssistantContinuationRoutes(r gin.IRouter, svc *app.Service, guard 
 		ok(c, gin.H{"cancelled": true})
 	})
 	r.POST("/assistant/runtime/continuations/:id/verify", func(c *gin.Context) {
-		if !isLoopbackRequest(c.Request) || !isAssistantHostRequest(c, svc) {
+		if !requestIdentity(c, svc).SourceAllowed || !isAssistantHostRequest(c, svc) {
 			c.JSON(http.StatusForbidden, gin.H{"code": http.StatusForbidden, "reason": "forbidden", "msg": "需要内置助手宿主身份"})
 			return
 		}

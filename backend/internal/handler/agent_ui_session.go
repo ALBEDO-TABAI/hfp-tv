@@ -5,7 +5,6 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -75,6 +74,9 @@ func (s *uiSessionStore) verify(token, userID string) (uiSession, bool) {
 // 2) 内置 UI 会话凭据 → 读写（绑定签发时的用户）；
 // 其他一律未认证。
 func resolveAgentCapability(c *gin.Context, svc *app.Service, clients *agentops.ClientRegistry, ui *uiSessionStore, userID string) (readOnly bool, identity string, ok bool, reason string) {
+	if trust := requestIdentity(c, svc); trust.Hosted {
+		return !trust.Owner, "workspace-owner", trust.Owner, "工作区身份未认证"
+	}
 	if strings.TrimSpace(c.GetHeader("X-Beeftv-Client")) != "" {
 		readOnly, label, err := resolveClientMode(c, svc, clients)
 		if err != nil {
@@ -89,13 +91,14 @@ func resolveAgentCapability(c *gin.Context, svc *app.Service, clients *agentops.
 }
 
 // RegisterAgentUISessionRoutes 只在本机同源且能出示 owner 凭据（或显式开发引导）时签发 UI 会话。
-func RegisterAgentUISessionRoutes(r gin.IRouter, svc *app.Service, ui *uiSessionStore, desktopTrust func(*http.Request) bool) {
+func RegisterAgentUISessionRoutes(r gin.IRouter, svc *app.Service, ui *uiSessionStore) {
 	r.POST("/assistant/ui-session", func(c *gin.Context) {
-		if strings.TrimSpace(c.GetHeader("X-Beeftv-Client")) != "" {
+		identity := requestIdentity(c, svc)
+		if !identity.Hosted && strings.TrimSpace(c.GetHeader("X-Beeftv-Client")) != "" {
 			fail(c, http.StatusForbidden, app.BadAuthRequest("外部客户端不能签发界面会话"))
 			return
 		}
-		if !isLoopbackRequest(c.Request) {
+		if !identity.SourceAllowed {
 			fail(c, http.StatusForbidden, app.BadAuthRequest("只接受本机同源请求"))
 			return
 		}
@@ -104,10 +107,7 @@ func RegisterAgentUISessionRoutes(r gin.IRouter, svc *app.Service, ui *uiSession
 			failService(c, err)
 			return
 		}
-		ownerOK := agentops.OwnerTokenMatches(svc.DataDir(), strings.TrimSpace(c.GetHeader("X-Beeftv-Owner")))
-		devBootstrap := strings.TrimSpace(os.Getenv("BEEFTV_UI_BOOTSTRAP")) == "1"
-		// The UI bootstrap secret comes through the Wails binding, separately from entry credentials.
-		desktopShell := desktopTrust != nil && desktopTrust(c.Request)
+		ownerOK, devBootstrap, desktopShell := identity.Owner, identity.DevBootstrap, identity.UI
 		if !ownerOK && !devBootstrap && !desktopShell {
 			fail(c, http.StatusForbidden, app.BadAuthRequest("签发内置 UI 会话需要 owner 凭据或显式本地引导"))
 			return

@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log"
@@ -41,6 +40,8 @@ type Runtime struct {
 	service          *app.Service
 	localApp         *localapp.App
 	handler          http.Handler
+	callbackHandler  http.Handler
+	workspaceID      string
 	status           *systemStatus
 	launchToken      string
 	uiBootstrapToken string
@@ -58,7 +59,7 @@ type Runtime struct {
 
 func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 	cfg := raw.withDefaults()
-	if cfg.Profile != ProfileServer && cfg.Profile != ProfileDesktop {
+	if cfg.Profile != ProfileServer && cfg.Profile != ProfileDesktop && cfg.Profile != ProfileHosted {
 		return nil, fmt.Errorf("不支持的运行模式：%s", cfg.Profile)
 	}
 	if strings.TrimSpace(cfg.DataDir) == "" {
@@ -71,7 +72,7 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 		return nil, err
 	}
 	var workspaceLock *os.File
-	if cfg.Profile == ProfileDesktop {
+	if cfg.Profile == ProfileDesktop || cfg.Profile == ProfileHosted {
 		var err error
 		workspaceLock, err = runtimeinfo.LockWorkspace(cfg.DataDir)
 		if err != nil {
@@ -180,8 +181,6 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 	}
 	scope := workspace.Context{ID: owner.ID, DataDir: cfg.DataDir}
 
-	// 桌面启动令牌在构建路由前解析：它既是整个 API 的入口凭据，也是「本机受信任 UI」
-	// 的判据（内置助手签发 UI 会话时使用）。服务端形态没有它，DesktopTrust 为 nil。
 	launchToken := ""
 	uiBootstrapToken := ""
 	if cfg.Profile == ProfileDesktop {
@@ -199,6 +198,21 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 			}
 		}
 	}
+	hostToken := ""
+	if cfg.Profile == ProfileHosted {
+		launchToken, err = httptransport.NewLaunchToken()
+		if err == nil {
+			hostToken, err = httptransport.NewLaunchToken()
+		}
+		if err != nil {
+			cleanupService()
+			return nil, err
+		}
+	}
+	trust := canvasHandler.NewLocalRequestTrust(svc.DataDir(), launchToken, uiBootstrapToken)
+	if cfg.Profile == ProfileHosted {
+		trust = canvasHandler.NewHostedRequestTrust(scope.ID, launchToken, hostToken)
+	}
 
 	router := gin.New()
 	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
@@ -214,7 +228,12 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 	router.Use(canvasHandler.WorkspaceMiddleware(scope))
 	// 本机可信凭据在组合根生成：owner 凭据与宿主凭据只在本机数据目录，0600。
 	agentops.EnsureAgentCredentials(svc.DataDir())
-	assistantHost := assistantruntime.New(assistantruntime.OptionsFromService(svc))
+	hostOptions := assistantruntime.OptionsFromService(svc)
+	if cfg.Profile == ProfileHosted {
+		hostOptions.HostToken = func() string { return hostToken }
+		hostOptions.BackendCallback = func() (string, string) { return result.BaseURL(), launchToken }
+	}
+	assistantHost := assistantruntime.New(hostOptions)
 	svc.SetAssistantContinuationSubmitter(canvasHandler.AssistantContinuationSubmitter(svc, assistantHost))
 	api := router.Group("/api")
 	status := newSystemStatus(db, svc, true)
@@ -233,7 +252,7 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 		Appearance:         svc.AppearanceDomain(),
 		Diagnostics:        svc.DiagnosticsDomain(),
 		Eagle:              eagle.New(),
-		DesktopTrust:       desktopTrust(launchToken, uiBootstrapToken),
+		Trust:              trust,
 	})
 	businessCatalog := canvasHandler.NewBusinessCatalog(router.Routes())
 	canvasHandler.RegisterBusinessDiscovery(api, businessCatalog, svc)
@@ -242,12 +261,10 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 	})
 
 	rootHandler := http.Handler(router)
-	protected := rootHandler
-	if launchToken != "" {
-		protected = httptransport.RequireLaunchToken(launchToken)(rootHandler)
-	}
+	protected := trust.GatewayHandler(rootHandler)
 	clients := agentops.NewClientRegistry(svc.DataDir())
 	rootHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity := trust.Resolve(r)
 		if tool, allowed := businessCatalog.Match(r.Method, r.URL.Path); allowed && isLoopbackRemote(r.RemoteAddr) {
 			if reg, valid := clients.Lookup(r.Header.Get("X-Beeftv-Client"), strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))); valid {
 				if reg.Mode == agentops.ClientReadOnly && !tool.ReadOnly {
@@ -256,7 +273,7 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 					_, _ = w.Write([]byte(`{"code":403,"reason":"read_only_client","msg":"此连接仅支持读取"}`))
 					return
 				}
-				if r.Header.Get("X-Beeftv-Agent-Turn") != "" || r.Header.Get("X-Beeftv-Agent-Token") != "" || !canvasHandler.IsLocalBusinessRequest(r) {
+				if r.Header.Get("X-Beeftv-Agent-Turn") != "" || r.Header.Get("X-Beeftv-Agent-Token") != "" || !identity.SourceAllowed {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusForbidden)
 					_, _ = w.Write([]byte(`{"code":403,"reason":"invalid_external_identity","msg":"外部调用不能使用助手身份"}`))
@@ -265,8 +282,8 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 				router.ServeHTTP(w, canvasHandler.WithExternalBusinessPrincipal(r, reg.Mode == agentops.ClientReadOnly))
 				return
 			}
-			if r.Header.Get("X-Beeftv-Client") == "" && agentops.OwnerTokenMatches(svc.DataDir(), strings.TrimSpace(r.Header.Get("X-Beeftv-Owner"))) && canvasHandler.IsLocalBusinessRequest(r) {
-				if launchToken != "" && r.Header.Get("X-Desktop-Token") != launchToken {
+			if r.Header.Get("X-Beeftv-Client") == "" && identity.Owner && identity.SourceAllowed {
+				if !identity.EntryAllowed {
 					protected.ServeHTTP(w, r)
 					return
 				}
@@ -285,7 +302,7 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 			}
 		}
 		if r.Header.Get("X-Beeftv-Client") != "" {
-			if launchToken != "" && r.Header.Get("X-Desktop-Token") != launchToken {
+			if !identity.EntryAllowed {
 				protected.ServeHTTP(w, r)
 				return
 			}
@@ -296,6 +313,11 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 		}
 		protected.ServeHTTP(w, r)
 	})
+	var callbackHandler http.Handler
+	if cfg.Profile == ProfileHosted {
+		rootHandler = trust.GatewayHandler(router)
+		callbackHandler = trust.AssistantCallbackHandler(router)
+	}
 	return &Runtime{
 		workspaceLock:    workspaceLock,
 		cfg:              cfg,
@@ -303,6 +325,8 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 		service:          svc,
 		localApp:         localRoot,
 		handler:          rootHandler,
+		callbackHandler:  callbackHandler,
+		workspaceID:      scope.ID,
 		status:           status,
 		launchToken:      launchToken,
 		uiBootstrapToken: uiBootstrapToken,
@@ -332,6 +356,10 @@ func initializeService(svc *app.Service) error {
 
 func (r *Runtime) Handler() http.Handler { return r.handler }
 
+func (r *Runtime) GatewayHandler() http.Handler { return r.handler }
+
+func (r *Runtime) WorkspaceID() string { return r.workspaceID }
+
 func (r *Runtime) Start() error {
 	if r == nil || r.closed.Load() {
 		return errors.New("运行时已关闭")
@@ -346,7 +374,11 @@ func (r *Runtime) Start() error {
 	}
 	r.listener = listener
 	httpContext, cancelHTTP := context.WithCancel(context.Background())
-	r.httpServer = &http.Server{Handler: r.handler, ReadHeaderTimeout: 10 * time.Second,
+	listenerHandler := r.handler
+	if r.cfg.Profile == ProfileHosted {
+		listenerHandler = r.callbackHandler
+	}
+	r.httpServer = &http.Server{Handler: listenerHandler, ReadHeaderTimeout: 10 * time.Second,
 		BaseContext: func(net.Listener) context.Context { return httpContext }}
 	// Shutdown waits for streams but does not cancel them. Its callback runs
 	// after Durable releases its invocations while the ops listener is alive.
@@ -379,10 +411,10 @@ func (r *Runtime) Start() error {
 		if err := runtimeinfo.Write(r.cfg.DataDir, opsURL, buildinfo.Current().Version); err != nil {
 			log.Printf("未能写入运行时地址（外部 Agent 需手动指定 BEEFTV_BASE_URL）：%v", err)
 		}
-		if r.assistantHost != nil {
-			if err := r.assistantHost.Start(opsURL, r.launchToken); err != nil {
-				log.Printf("内置创作助手宿主未启动（不影响应用启动）：%v", err)
-			}
+	}
+	if r.cfg.Profile == ProfileDesktop || r.cfg.Profile == ProfileHosted {
+		if err := r.assistantHost.Start(r.BaseURL(), r.launchToken); err != nil {
+			log.Printf("内置创作助手宿主未启动（不影响应用启动）：%v", err)
 		}
 	}
 	if r.beefAPI != nil {
@@ -547,18 +579,4 @@ func isLoopbackRemote(remoteAddr string) bool {
 	}
 	parsed := net.ParseIP(strings.Trim(host, "[]"))
 	return parsed != nil && parsed.IsLoopback()
-}
-
-// desktopTrust 用桌面启动令牌判定请求是否来自受信任的桌面壳。
-// 令牌为空（服务端形态）时返回 nil，表示没有这条信任路径。
-func desktopTrust(launchToken, uiToken string) func(*http.Request) bool {
-	want := []byte(strings.TrimSpace(launchToken))
-	if len(want) == 0 {
-		return nil
-	}
-	return func(r *http.Request) bool {
-		got := []byte(r.Header.Get(httptransport.LaunchTokenHeader))
-		ui := []byte(r.Header.Get("X-Beeftv-UI-Bootstrap"))
-		return len(got) == len(want) && subtle.ConstantTimeCompare(got, want) == 1 && len(uiToken) > 0 && subtle.ConstantTimeCompare(ui, []byte(uiToken)) == 1
-	}
 }

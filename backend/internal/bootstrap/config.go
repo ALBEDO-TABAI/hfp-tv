@@ -11,6 +11,7 @@ type Profile string
 const (
 	ProfileServer  Profile = "server"
 	ProfileDesktop Profile = "desktop"
+	ProfileHosted  Profile = "hosted"
 )
 
 // DefaultServerListenAddr 是服务端 profile 未设置监听地址时的回环地址。
@@ -36,7 +37,9 @@ func (c Config) withDefaults() Config {
 	if c.DatabaseDriver == "" {
 		c.DatabaseDriver = "sqlite"
 	}
-	if c.ListenAddr == "" {
+	if c.Profile == ProfileHosted {
+		c.ListenAddr = "127.0.0.1:0"
+	} else if c.ListenAddr == "" {
 		if c.Profile == ProfileDesktop {
 			c.ListenAddr = "127.0.0.1:0"
 		} else {

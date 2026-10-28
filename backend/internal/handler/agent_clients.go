@@ -25,9 +25,9 @@ import (
 // RegisterAgentClientRoutes 暴露 /agent-clients：列出、签发、吊销外部客户端凭据。
 // 信任判据与签发内置 UI 会话完全一致（本机同源 + owner 凭据 / 桌面壳 / 显式本地引导），
 // 外部客户端凭据一律不能进入这组路由。
-func RegisterAgentClientRoutes(r gin.IRouter, svc *app.Service, clients *agentops.ClientRegistry, desktopTrust func(*http.Request) bool) {
+func RegisterAgentClientRoutes(r gin.IRouter, svc *app.Service, clients *agentops.ClientRegistry) {
 	r.GET("/agent-clients", func(c *gin.Context) {
-		if !requireDesktopUITrust(c, svc, desktopTrust) {
+		if !requireDesktopUITrust(c, svc) {
 			return
 		}
 		cliPath, cliAvailable := bundledCLIPath()
@@ -42,7 +42,7 @@ func RegisterAgentClientRoutes(r gin.IRouter, svc *app.Service, clients *agentop
 	})
 
 	r.POST("/agent-clients", func(c *gin.Context) {
-		if !requireDesktopUITrust(c, svc, desktopTrust) {
+		if !requireDesktopUITrust(c, svc) {
 			return
 		}
 		var req struct {
@@ -76,7 +76,7 @@ func RegisterAgentClientRoutes(r gin.IRouter, svc *app.Service, clients *agentop
 	})
 
 	r.DELETE("/agent-clients/:id", func(c *gin.Context) {
-		if !requireDesktopUITrust(c, svc, desktopTrust) {
+		if !requireDesktopUITrust(c, svc) {
 			return
 		}
 		if err := clients.Revoke(c.Param("id")); err != nil {
@@ -96,19 +96,17 @@ func failAgentOps(c *gin.Context, err error) {
 
 // requireDesktopUITrust 复用签发内置 UI 会话的同一条信任链。
 // 外部客户端凭据在这里没有任何作用：它只能操作工作区，不能签发或吊销凭据。
-func requireDesktopUITrust(c *gin.Context, svc *app.Service, desktopTrust func(*http.Request) bool) bool {
-	if strings.TrimSpace(c.GetHeader("X-Beeftv-Client")) != "" {
+func requireDesktopUITrust(c *gin.Context, svc *app.Service) bool {
+	identity := requestIdentity(c, svc)
+	if !identity.Hosted && strings.TrimSpace(c.GetHeader("X-Beeftv-Client")) != "" {
 		fail(c, http.StatusForbidden, app.BadAuthRequest("外部客户端不能管理客户端凭据"))
 		return false
 	}
-	if !isLoopbackRequest(c.Request) {
+	if !identity.SourceAllowed {
 		fail(c, http.StatusForbidden, app.BadAuthRequest("只接受本机同源请求"))
 		return false
 	}
-	ownerOK := agentops.OwnerTokenMatches(svc.DataDir(), strings.TrimSpace(c.GetHeader("X-Beeftv-Owner")))
-	devBootstrap := strings.TrimSpace(os.Getenv("BEEFTV_UI_BOOTSTRAP")) == "1"
-	desktopShell := desktopTrust != nil && desktopTrust(c.Request)
-	if !ownerOK && !devBootstrap && !desktopShell {
+	if !identity.Owner && !identity.DevBootstrap && !identity.UI {
 		fail(c, http.StatusForbidden, app.BadAuthRequest("管理客户端凭据需要 owner 凭据或桌面界面"))
 		return false
 	}

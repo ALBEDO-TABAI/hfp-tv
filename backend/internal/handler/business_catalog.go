@@ -26,8 +26,6 @@ type BusinessCatalog struct{ Tools []BusinessTool }
 type externalBusinessKey struct{}
 type externalBusinessPrincipal struct{ ReadOnly bool }
 
-func IsLocalBusinessRequest(r *http.Request) bool { return isLoopbackRequest(r) }
-
 func WithExternalBusinessPrincipal(r *http.Request, readOnly bool) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), externalBusinessKey{}, externalBusinessPrincipal{ReadOnly: readOnly}))
 }

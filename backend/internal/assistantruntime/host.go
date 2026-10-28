@@ -23,6 +23,9 @@ type Options struct {
 	OwnerToken      func() string
 	Environ         func() []string
 	BackendAddr     func() string
+	// Hosted kernels pin their callback address and credentials in-process;
+	// browser requests and inherited environment cannot choose this authority.
+	BackendCallback func() (opsURL, launchToken string)
 	Executable      func() (string, error)
 	GOOS            string
 	ReadyTimeout    time.Duration
@@ -240,6 +243,12 @@ func (h *Host) Ensure(provider assistant.Provider, opsURL, desktopToken string, 
 func (h *Host) startOwned(config HostConfig, provider assistant.Provider, opsURL, desktopToken string) error {
 	if h.closed {
 		return invalidArg("host_stopping", "应用正在退出，不能启动助手宿主")
+	}
+	if h.opts.BackendCallback != nil {
+		opsURL, desktopToken = h.opts.BackendCallback()
+		if opsURL == "" || desktopToken == "" {
+			return invalidArg("host_callback_unavailable", "助手回调入口尚未启动")
+		}
 	}
 	return h.proc.startOwned(config, provider.Fingerprint(), h.readyTimeout(), func(port int, nonce, listenFD string) []string {
 		return h.buildEnv(provider, childPin{

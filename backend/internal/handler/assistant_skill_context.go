@@ -62,7 +62,7 @@ func registerAssistantSkillContextRoutes(r gin.IRouter, svc *app.Service, guard 
 
 func registerAssistantRuntimeSkillContextRoutes(r gin.IRouter, svc *app.Service) {
 	route := func(c *gin.Context) {
-		if !isLoopbackRequest(c.Request) || !isAssistantHostRequest(c, svc) {
+		if !requestIdentity(c, svc).SourceAllowed || !isAssistantHostRequest(c, svc) {
 			fail(c, http.StatusForbidden, app.Forbidden("仅内置助手宿主可以管理技能状态"))
 			return
 		}

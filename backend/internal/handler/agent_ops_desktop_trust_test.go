@@ -15,11 +15,8 @@ import (
 
 func TestTrustedDesktopUICanCommitDocument(t *testing.T) {
 	env := newAssistantTestEnv(t, nil)
-	trust := func(r *http.Request) bool {
-		return r.Header.Get("X-Desktop-Token") == "launch" && r.Header.Get("X-Beeftv-UI-Bootstrap") == "ui"
-	}
 	router := gin.New()
-	router.Use(RuntimeDependenciesMiddleware(RuntimeDependencies{DesktopTrust: trust}))
+	router.Use(RuntimeDependenciesMiddleware(RuntimeDependencies{Trust: NewLocalRequestTrust(env.service.DataDir(), "launch", "ui")}))
 	api := router.Group("/api")
 	RegisterAgentOpsRoutes(api, env.service, agentops.NewStore(env.service.Database()), env.clients)
 

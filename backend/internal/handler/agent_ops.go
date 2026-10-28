@@ -26,7 +26,7 @@ func RegisterAgentOpsRoutes(r gin.IRouter, svc *app.Service, store *agentops.Sto
 	agentops.RegisterDefaultOps(registry)
 
 	r.GET("/ops", func(c *gin.Context) {
-		if !isLoopbackRequest(c.Request) {
+		if !requestIdentity(c, svc).SourceAllowed {
 			fail(c, http.StatusForbidden, app.BadAuthRequest("操作层只接受本机请求"))
 			return
 		}
@@ -51,7 +51,7 @@ func RegisterAgentOpsRoutes(r gin.IRouter, svc *app.Service, store *agentops.Sto
 	})
 
 	r.POST("/ops/clients", func(c *gin.Context) {
-		if !isLoopbackRequest(c.Request) {
+		if !requestIdentity(c, svc).SourceAllowed {
 			fail(c, http.StatusForbidden, app.BadAuthRequest("客户端登记只接受本机请求"))
 			return
 		}
@@ -82,7 +82,7 @@ func RegisterAgentOpsRoutes(r gin.IRouter, svc *app.Service, store *agentops.Sto
 	})
 
 	r.GET("/ops/clients", func(c *gin.Context) {
-		if !isLoopbackRequest(c.Request) {
+		if !requestIdentity(c, svc).SourceAllowed {
 			fail(c, http.StatusForbidden, app.BadAuthRequest("客户端登记只接受本机请求"))
 			return
 		}
@@ -93,8 +93,7 @@ func RegisterAgentOpsRoutes(r gin.IRouter, svc *app.Service, store *agentops.Sto
 	})
 
 	r.POST("/ops/:op", func(c *gin.Context) {
-		// 本机入口：只接受 loopback 来源，避免被浏览器跨站或外部主机调用。
-		if !isLoopbackRequest(c.Request) {
+		if !requestIdentity(c, svc).SourceAllowed {
 			fail(c, http.StatusForbidden, app.BadAuthRequest("操作层只接受本机请求"))
 			return
 		}
@@ -161,8 +160,15 @@ func RegisterAgentOpsRoutes(r gin.IRouter, svc *app.Service, store *agentops.Sto
 // 内置助手宿主：凭自己那份后端注入的宿主凭据拿到读写；页面的 UI 会话凭据不在这里。
 // owner 通道是手工 UI 与本机直连的身份。
 func resolveCaller(c *gin.Context, svc *app.Service, clients *agentops.ClientRegistry) (agentops.Caller, string, error) {
-	if isAssistantHostRequest(c, svc) {
+	identity := requestIdentity(c, svc)
+	if identity.AssistantHost {
 		return agentops.Caller{Kind: agentops.CallerAssistant}, "assistant-host", nil
+	}
+	if identity.Hosted {
+		if identity.Owner {
+			return agentops.Caller{Kind: agentops.CallerManual}, "workspace-owner", nil
+		}
+		return agentops.Caller{}, "", errUnidentified
 	}
 	clientID := strings.TrimSpace(c.GetHeader("X-Beeftv-Client"))
 	if clientID != "" {
@@ -173,31 +179,27 @@ func resolveCaller(c *gin.Context, svc *app.Service, clients *agentops.ClientReg
 		}
 		return agentops.Caller{Kind: agentops.CallerExternal, ReadOnly: reg.Mode == agentops.ClientReadOnly}, reg.Label, nil
 	}
-	if agentops.OwnerTokenMatches(svc.DataDir(), strings.TrimSpace(c.GetHeader("X-Beeftv-Owner"))) {
+	if identity.Owner {
 		return agentops.Caller{Kind: agentops.CallerManual}, "owner", nil
 	}
-	if trustedDesktopUI(c) {
+	if identity.UI {
 		return agentops.Caller{Kind: agentops.CallerManual}, "desktop-ui", nil
 	}
 	return agentops.Caller{}, "", errUnidentified
 }
 
-func trustedDesktopUI(c *gin.Context) bool {
-	if c == nil || c.Request == nil || !isLoopbackRequest(c.Request) {
-		return false
-	}
-	dependencies, ok := runtimeDependencies(c)
-	if !ok || dependencies.DesktopTrust == nil {
-		return false
-	}
-	return dependencies.DesktopTrust(c.Request)
-}
-
 // requireTrustedDesktopWritePrincipal is the creation.write principal check.
 // Registered client tokens only skip the launch token on /api/ops; they cannot
 // take these writes even when a launch token is also present.
-// Hosted runtimes leave DesktopTrust unset and still allow the workspace owner.
 func requireTrustedDesktopWritePrincipal(c *gin.Context, message string) bool {
+	identity := requestIdentity(c, nil)
+	if identity.Hosted {
+		if identity.Owner {
+			return true
+		}
+		fail(c, http.StatusUnauthorized, app.Unauthorized("工作区身份未认证"))
+		return false
+	}
 	if principal, valid := externalBusiness(c); valid {
 		if !principal.ReadOnly {
 			return true
@@ -209,11 +211,10 @@ func requireTrustedDesktopWritePrincipal(c *gin.Context, message string) bool {
 		fail(c, http.StatusForbidden, app.Forbidden(message))
 		return false
 	}
-	dependencies, ok := runtimeDependencies(c)
-	if !ok || dependencies.DesktopTrust == nil {
+	if !identity.RequireUI {
 		return true
 	}
-	if !trustedDesktopUI(c) {
+	if !identity.UI {
 		fail(c, http.StatusForbidden, app.Forbidden(message))
 		return false
 	}

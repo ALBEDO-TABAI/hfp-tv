@@ -468,6 +468,25 @@ func TestLaunchPinsPortAndDropsSpoofedOwnerOpenAI(t *testing.T) {
 	}
 }
 
+func TestHostedCallbackOverridesRequestAddressAndCredentials(t *testing.T) {
+	host := fixtureHost(t, "http")
+	host.opts.HostToken = func() string { return "kernel-host" }
+	host.opts.BackendCallback = func() (string, string) { return "http://127.0.0.1:12345/api", "kernel-launch" }
+	if err := host.Launch(fixtureProvider(), "https://browser.example/api", "browser-token"); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(host.dataDir(), "child-env.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := strings.Split(string(raw), "\n")
+	if envValue(env, "BEEFTV_OPS_URL") != "http://127.0.0.1:12345/api" ||
+		envValue(env, "BEEFTV_AGENT_DESKTOP_TOKEN") != "kernel-launch" ||
+		envValue(env, "BEEFTV_AGENT_HOST_TOKEN") != "kernel-host" {
+		t.Fatal("child callback authority was not pinned by the kernel")
+	}
+}
+
 func TestRestartFailureDoesNotReportSuccessOrKeepEndpoint(t *testing.T) {
 	host := fixtureHost(t, "http")
 	provider := fixtureProvider()

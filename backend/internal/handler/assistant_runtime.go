@@ -13,7 +13,7 @@ import (
 func registerAssistantRuntimeRoutes(r gin.IRouter, svc *app.Service) {
 	registerAssistantRuntimeSkillContextRoutes(r, svc)
 	handle := func(c *gin.Context) {
-		if !isLoopbackRequest(c.Request) || !isAssistantHostRequest(c, svc) {
+		if !requestIdentity(c, svc).SourceAllowed || !isAssistantHostRequest(c, svc) {
 			fail(c, http.StatusForbidden, app.Forbidden("仅内置助手宿主可以恢复或结束任务"))
 			return
 		}
@@ -38,7 +38,7 @@ func registerAssistantRuntimeRoutes(r gin.IRouter, svc *app.Service) {
 	}
 
 	r.POST("/assistant/runtime/turns/:turnId/bind-session", func(c *gin.Context) {
-		if !isLoopbackRequest(c.Request) || !isAssistantHostRequest(c, svc) {
+		if !requestIdentity(c, svc).SourceAllowed || !isAssistantHostRequest(c, svc) {
 			fail(c, http.StatusForbidden, app.Forbidden("仅内置助手宿主可以绑定会话"))
 			return
 		}
@@ -72,7 +72,7 @@ func registerAssistantRuntimeRoutes(r gin.IRouter, svc *app.Service) {
 		ok(c, map[string]any{"bound": true})
 	})
 	r.POST("/assistant/runtime/turns/:turnId/native-rehydrate", func(c *gin.Context) {
-		if !isLoopbackRequest(c.Request) || !isAssistantHostRequest(c, svc) {
+		if !requestIdentity(c, svc).SourceAllowed || !isAssistantHostRequest(c, svc) {
 			fail(c, http.StatusForbidden, app.Forbidden("仅内置助手宿主可以恢复历史素材"))
 			return
 		}

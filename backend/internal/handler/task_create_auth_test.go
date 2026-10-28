@@ -33,12 +33,9 @@ func TestRegisteredClientCannotCreatePaidTasksWithDesktopHeaders(t *testing.T) {
 	}
 	service := app.NewLocal(repository.New(db), t.TempDir())
 	t.Cleanup(func() { _ = service.Close() })
-	trust := func(r *http.Request) bool {
-		return r.Header.Get("X-Desktop-Token") == "launch" && r.Header.Get("X-Beeftv-UI-Bootstrap") == "ui"
-	}
 	capture := &captureTaskPort{}
 	deps := defaultRuntimeDependencies(service)
-	deps.DesktopTrust = trust
+	deps.Trust = NewLocalRequestTrust(service.DataDir(), "launch", "ui")
 	deps.Tasks = capture
 	deps.Generation = capture
 	router := gin.New()
@@ -191,11 +188,8 @@ func TestRegisteredClientCannotRetryPaidTasksWithDesktopHeaders(t *testing.T) {
 		t.Fatal(err)
 	}
 	seedRetryableFailedTask(t, db, owner.ID, "retry-auth-1")
-	trust := func(r *http.Request) bool {
-		return r.Header.Get("X-Desktop-Token") == "launch" && r.Header.Get("X-Beeftv-UI-Bootstrap") == "ui"
-	}
 	deps := defaultRuntimeDependencies(service)
-	deps.DesktopTrust = trust
+	deps.Trust = NewLocalRequestTrust(service.DataDir(), "launch", "ui")
 	router := gin.New()
 	router.Use(RuntimeDependenciesMiddleware(deps))
 	RegisterTaskRoutes(router.Group("/api"), service)

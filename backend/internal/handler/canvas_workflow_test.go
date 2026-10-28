@@ -13,7 +13,7 @@ func TestCanvasWorkflowWritesRequireTrustedUI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := &app.Service{}
 	deps := defaultRuntimeDependencies(svc)
-	deps.DesktopTrust = func(*http.Request) bool { return false }
+	deps.Trust = NewLocalRequestTrust("", "launch", "ui")
 	router := gin.New()
 	router.Use(RuntimeDependenciesMiddleware(deps))
 	registerCanvasWorkflowRoutes(router.Group("/api"), svc)

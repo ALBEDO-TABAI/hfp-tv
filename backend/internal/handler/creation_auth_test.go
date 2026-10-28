@@ -34,11 +34,8 @@ func TestExternalAgentTokenCannotApproveCreationWithArbitraryOwner(t *testing.T)
 		t.Fatal(err)
 	}
 	service := app.NewLocal(repository.New(db), t.TempDir())
-	trust := func(r *http.Request) bool {
-		return r.Header.Get("X-Desktop-Token") == "launch" && r.Header.Get("X-Beeftv-UI-Bootstrap") == "ui"
-	}
 	router := gin.New()
-	router.Use(RuntimeDependenciesMiddleware(RuntimeDependencies{DesktopTrust: trust}))
+	router.Use(RuntimeDependenciesMiddleware(RuntimeDependencies{Trust: NewLocalRequestTrust(service.DataDir(), "launch", "ui")}))
 	RegisterCreationRoutes(router.Group("/api"), service)
 
 	created := creationAuthCall(t, router, http.MethodPost, "/api/creation-runs", map[string]string{
