@@ -759,9 +759,7 @@ body .app-user-workspace .app-workspace-nav-link[data-nav-id="new"] {
     font-family: var(--font-display);
     font-weight: 600 !important;
     letter-spacing: -0.01em;
-    box-shadow:
-        inset 0 1px 0 rgb(255 255 255 / 0.22),
-        0 10px 24px -10px rgb(0 0 0 / 0.45) !important;
+    box-shadow: inset 0 1px 0 var(--glass-inner-hi) !important;
     margin-bottom: 4px;
 }
 body .app-user-workspace .app-workspace-nav-link[data-nav-id="new"] .app-workspace-nav-icon {
@@ -769,9 +767,7 @@ body .app-user-workspace .app-workspace-nav-link[data-nav-id="new"] .app-workspa
 }
 body .app-user-workspace .app-workspace-nav-link[data-nav-id="new"]:hover {
     transform: translateY(-1px);
-    box-shadow:
-        inset 0 1px 0 rgb(255 255 255 / 0.3),
-        0 14px 28px -10px rgb(255 90 31 / 0.35) !important;
+    box-shadow: inset 0 1px 0 var(--glass-inner-hi) !important;
 }
 
 /* Sidebar regular nav items — liquid segmented pill feel */

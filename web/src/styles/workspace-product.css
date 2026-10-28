@@ -608,7 +608,7 @@
 .app-user-workspace.app-product-workspace .app-workspace-nav-link .app-workspace-nav-icon { width: 30px; height: 30px; }
 .app-user-workspace.app-product-workspace .app-workspace-nav-link .app-workspace-nav-icon svg { width: 22px; height: 22px; }
 .app-user-workspace.app-product-workspace .app-workspace-nav-group-toggle { color:var(--user-ink-soft); }
-.app-user-workspace.app-product-workspace .app-workspace-sidebar-footer { border-top: 1px solid var(--user-border); background:var(--user-surface-muted); }
+.app-user-workspace.app-product-workspace .app-workspace-sidebar-footer { border-top: 0; background: transparent; }
 .app-user-workspace.app-product-workspace .app-workspace-update-version {
     color: var(--user-ink-muted);
 }
@@ -1241,13 +1241,11 @@
     color: var(--user-action-foreground) !important;
 }
 .app-user-workspace.app-product-workspace .app-workspace-sidebar-footer {
-    border-top-color: var(--user-border) !important;
-    background: var(--user-surface-muted) !important;
+    border-top: 0 !important;
+    background: transparent !important;
     box-shadow: none !important;
 }
-.dark .app-user-workspace.app-product-workspace .app-workspace-sidebar,
-.dark .app-user-workspace.app-product-workspace .app-workspace-sidebar-nav,
-.dark .app-user-workspace.app-product-workspace .app-workspace-sidebar-footer {
+.dark .app-user-workspace.app-product-workspace .app-workspace-sidebar {
     background: var(--user-surface) !important;
 }
 .app-user-workspace.app-product-workspace .app-workspace-brand-tagline {
@@ -1263,7 +1261,7 @@
     font-size: 16px !important;
 }
 .app-user-workspace.app-product-workspace .app-workspace-nav-link.is-active:not([data-nav-id="new"]) {
-    background: var(--user-surface-hover) !important;
+    background: transparent !important;
     color: var(--user-ink) !important;
 }
 .app-user-workspace.app-product-workspace .app-workspace-nav-link:hover:not(.is-active):not([data-nav-id="new"]) {
@@ -1328,7 +1326,7 @@
     background: var(--user-action-bg-hover) !important;
 }
 .app-user-workspace.app-product-workspace .app-workspace-nav-link.is-active:not([data-nav-id="new"]) {
-    background: var(--user-surface-hover) !important;
+    background: transparent !important;
     font-weight: 400 !important;
 }
 .app-user-workspace.app-product-workspace .app-workspace-nav-link .app-workspace-nav-icon {
