@@ -47,7 +47,10 @@ function incompleteCanvasProjection(id: string, scope: string, identity: string 
     });
 }
 
-type LocalCanvasContent = Partial<Pick<CanvasProject, "nodes" | "connections" | "chatSessions" | "activeChatId">>;
+export type InitialCanvasContent = Partial<Pick<CanvasProject,
+    "folderId" | "canvasTitle" | "nodes" | "connections" | "chatSessions" | "activeChatId" |
+    "starterMode" | "appearance" | "backgroundMode" | "showImageInfo" | "viewport" | "directorScenes" | "timeline"
+>>;
 type CanvasSaveSummary = Pick<CanvasProject, "id" | "title" | "createdAt" | "updatedAt" | "revision">;
 type CanvasDocumentPersistPatch = Partial<Pick<CanvasProject, "nodes" | "connections" | "timeline" | "chatSessions" | "activeChatId" | "appearance" | "backgroundMode" | "showImageInfo" | "title" | "folderId" | "directorScenes">>;
 
@@ -457,7 +460,7 @@ async function applyBackendCanvasRead(
  * Desktop ongoing saves commit through the operations registry. IndexedDB is
  * the offline cache, so a stopped backend never prevents opening a project.
  */
-export function beginLocalCanvasProject(title: string, projectId?: string, initialContent?: LocalCanvasContent, workspaceProjectId?: string) {
+export function beginLocalCanvasProject(title: string, projectId?: string, initialContent?: InitialCanvasContent, workspaceProjectId?: string) {
     const expected = captureUserScope();
     const id = useCanvasStore.getState().createProject(title, projectId, workspaceProjectId);
     if (initialContent) useCanvasStore.getState().updateProject(id, initialContent);
@@ -477,7 +480,7 @@ export function beginLocalCanvasProject(title: string, projectId?: string, initi
     return { id, saved };
 }
 
-export async function createLocalCanvasProject(title: string, projectId?: string, initialContent?: LocalCanvasContent, workspaceProjectId?: string) {
+export async function createLocalCanvasProject(title: string, projectId?: string, initialContent?: InitialCanvasContent, workspaceProjectId?: string) {
     const { id, saved } = beginLocalCanvasProject(title, projectId, initialContent, workspaceProjectId);
     await saved;
     return { id };
@@ -1215,7 +1218,7 @@ async function waitForCanvasBackendIdle(id: string, scope: string) {
     if (timer) publishCanvasSaveProgress(id, scope, true);
 }
 
-export async function deleteLocalCanvasProjects(ids: readonly string[]) {
+export async function deleteLocalCanvasProjects(ids: readonly string[], options: { recordHistory?: boolean } = {}) {
     const expected = captureUserScope();
     const scope = expected.userScope;
     const selected = [...new Set(ids)];
@@ -1251,7 +1254,7 @@ export async function deleteLocalCanvasProjects(ids: readonly string[]) {
         if (deleted.length) {
             useCanvasStore.getState().deleteProjects(deleted);
             const removed = snapshots.filter((item) => deleted.includes(item.id));
-            if (removed.length) useCanvasHistoryStore.getState().recordDeletedProjects(removed);
+            if (removed.length && options.recordHistory !== false) useCanvasHistoryStore.getState().recordDeletedProjects(removed);
             await flushCanvasStorePersistence().catch((error) => {
                 console.error("画布本地缓存写入失败，已从桌面数据库删除", { ids: deleted, error });
             });

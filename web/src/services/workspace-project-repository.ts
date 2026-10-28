@@ -1,9 +1,7 @@
 import { isLocalWorkspaceMode } from "@/services/workspace-mode";
-import { createLocalCanvasProject, deleteLocalCanvasProjects } from "@/services/local-workspace-repository";
+import { createLocalCanvasProject, deleteLocalCanvasProjects, type InitialCanvasContent } from "@/services/local-workspace-repository";
 import { createCanvasProjectWithRemoteSync, deleteCanvasProjectsWithRemoteSync } from "@/services/local-workspace-sync";
-import { useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
-
-type InitialCanvasContent = Partial<Pick<CanvasProject, "nodes" | "connections" | "chatSessions" | "activeChatId">>;
+import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 
 /**
  * Single project-storage boundary for workspace UI code.

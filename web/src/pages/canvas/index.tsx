@@ -25,6 +25,7 @@ import { isLocalWorkspaceMode } from "@/services/workspace-mode";
 import { usesBrowserLocalResourceStore } from "@/services/workspace-resource-storage";
 import { beginLocalCanvasProject, deleteLocalCanvasProjects, hydrateLocalCanvasProjectsFromBackend, syncLocalCanvasProjectToBackend } from "@/services/local-workspace-repository";
 import { createWorkspaceCanvasProject } from "@/services/workspace-project-repository";
+import { duplicateLocalWorkspaceProject } from "@/services/local-workspace-project-duplicate";
 import { listWorkspaceCanvasProjectsPage, type CanvasLibrarySummary } from "@/services/api/workspace-data";
 import { useUserStore } from "@/stores/use-user-store";
 import { listProjects } from "@/services/api/projects";
@@ -34,7 +35,7 @@ import { useAppearanceStore } from "@/stores/use-appearance-store";
 import { cn } from "@/lib/utils";
 import { assertUserScope, captureUserScope, type CapturedUserScope } from "@/lib/user-scope-guard";
 import { recordDiagnosticEvent } from "@/services/diagnostics/client-diagnostics";
-import { canvasIdsForWorkspaceProjects, canvasWorkspaceProjectId, listCanvasWorkspaceProjectCanvases, listCanvasWorkspaceProjectRoots, previewNodesForWorkspaceProject } from "@/lib/canvas/canvas-workspace-project";
+import { canvasIdsForWorkspaceProjects, canvasWorkspaceProjectId, listCanvasWorkspaceProjectRoots, previewNodesForWorkspaceProject } from "@/lib/canvas/canvas-workspace-project";
 
 const CanvasDeleteProjectsDialog = lazy(() => import("@/components/canvas/canvas-delete-projects-dialog").then((module) => ({ default: module.CanvasDeleteProjectsDialog })));
 
@@ -137,20 +138,9 @@ export default function CanvasPage() {
     };
     const duplicateCanvasProject = useCallback(async (project: CanvasLibrarySummary) => {
         if (!remoteMode) {
-            const sourceCanvases = listCanvasWorkspaceProjectCanvases(localProjects, project.id);
-            let copiedWorkspaceProjectId: string | undefined;
-            for (const [index, source] of sourceCanvases.entries()) {
-                const copy = await createWorkspaceCanvasProject(index === 0 ? `${project.title || "未命名项目"} 副本` : source.title, source.projectId, {
-                    nodes: source.nodes,
-                    connections: source.connections,
-                    chatSessions: source.chatSessions,
-                    activeChatId: source.activeChatId,
-                }, copiedWorkspaceProjectId);
-                copiedWorkspaceProjectId ||= copy.id;
-            }
-            if (!copiedWorkspaceProjectId) throw new Error("项目不存在");
-            message.success(`项目副本已创建，共 ${sourceCanvases.length} 张画布`);
-            enterProject(copiedWorkspaceProjectId);
+            const copy = await duplicateLocalWorkspaceProject(project.id);
+            message.success(`项目副本已创建，共 ${copy.canvasCount} 张画布`);
+            enterProject(copy.id);
             return;
         }
         const source = await loadCanvasProjectForEditing(project.id);
@@ -163,7 +153,7 @@ export default function CanvasPage() {
         });
         message.success("项目副本已创建");
         enterProject(copy.id);
-    }, [enterProject, localProjects, message, remoteMode]);
+    }, [enterProject, message, remoteMode]);
     const filteredProjects = useMemo(() => {
         if (remoteMode) return projects;
         const query = keyword.trim().toLowerCase();
@@ -416,7 +406,9 @@ export default function CanvasPage() {
                                         message.error(error instanceof Error ? error.message : "移动项目失败");
                                     }
                                 }}
-                                onDuplicate={() => duplicateCanvasProject(project)}
+                                onDuplicate={() => duplicateCanvasProject(project).catch((error) => {
+                                    message.error(error instanceof Error ? error.message : "创建副本失败，请重试");
+                                })}
                                 onDelete={() => {
                                     setDeleteIds([project.id]);
                                 }}
