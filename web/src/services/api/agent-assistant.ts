@@ -2,6 +2,9 @@
 // 三个端点的真实路径都在 /api/assistant/* 下；写错路径会让面板永远拿不到回复。
 import { ApiError, apiBaseURL, http } from "./request";
 import { assertUserScope, captureUserScope, userScopeMatches, type CapturedUserScope } from "@/lib/user-scope-guard";
+import { subscribeUserScope } from "@/lib/user-scope";
+import { isTeamDeployment } from "@/lib/deployment-mode";
+import { teamSessionSignal } from "@/services/team-session";
 
 /** 后端给出的不可用原因（穷举，见契约 A1）；未知值一律走兜底文案。 */
 export type AssistantUnavailableReason =
@@ -176,6 +179,7 @@ export type AssistantHistory = {
 let uiSession: { token: string; expiresAt: number; scope: CapturedUserScope } | null = null;
 let uiSessionPending: { promise: Promise<string>; scope: CapturedUserScope } | null = null;
 let uiSessionGeneration = 0;
+subscribeUserScope(() => { if (isTeamDeployment()) resetAgentUiSession(); });
 
 /**
  * 服务端失败原因只用于分支，展示给用户的永远是用户语。
@@ -471,7 +475,8 @@ export async function streamAgentChat(
     handlers: StreamHandlers,
     request: AgentChatRequest = {},
 ): Promise<void> {
-    const { signal, selectedNodeIds = [], references = [], sessionId, requestId, attachments = [], skills = [] } = request;
+    const { selectedNodeIds = [], references = [], sessionId, requestId, attachments = [], skills = [] } = request;
+    const signal = teamSessionSignal(request.signal);
     const scope = captureUserScope();
     let token: string;
     try {
@@ -582,6 +587,7 @@ async function readAgentTurnStream(
     try {
         for (;;) {
             const { value, done } = await reader.read();
+            if (isTeamDeployment()) signal?.throwIfAborted();
             if (done) {
                 buffer += decoder.decode();
                 if (buffer.trim()) handleLine(buffer);

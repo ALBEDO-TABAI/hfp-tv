@@ -1,6 +1,7 @@
 import { ArrowUpRight, Settings } from "lucide-react";
 import { Link } from "react-router";
 import { useUserStore } from "@/stores/use-user-store";
+import { isTeamDeployment } from "@/lib/deployment-mode";
 import { UserAvatar } from "./user-avatar";
 import "./workspace-account-card.css";
 
@@ -12,7 +13,7 @@ export function WorkspaceAccountCard({ onNavigate }: { onNavigate: () => void })
         <header className="workspace-account-card-identity">
             <UserAvatar user={user} className="workspace-account-card-avatar" />
             <div><strong>{user.displayName || user.username}</strong><span>@{user.username}</span></div>
-            <em>{user.role === "admin" ? "管理员" : "创作者"}</em>
+            {!isTeamDeployment() ? <em>{user.role === "admin" ? "管理员" : "创作者"}</em> : null}
         </header>
         <nav className="workspace-account-card-actions" aria-label="账户操作">
             <Link to="/settings" onClick={onNavigate}><Settings /><span>本地设置</span><ArrowUpRight /></Link>

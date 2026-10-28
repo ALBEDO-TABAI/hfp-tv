@@ -1,6 +1,10 @@
 import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
 
 import { assertUserScope, isUserScopeAbandonedError, type CapturedUserScope } from "@/lib/user-scope-guard";
+import { isTeamDeployment } from "@/lib/deployment-mode";
+import { isSameOriginApi, isWriteMethod } from "@/lib/team-auth";
+import { handleTeamUnauthorized, teamSessionSignal } from "@/services/team-session";
+import { getActiveUserScope } from "@/lib/user-scope";
 
 export type ApiParams = Record<string, string | string[] | number | number[] | undefined>;
 
@@ -48,7 +52,7 @@ export function getTransportFailureKind(error: unknown): "timeout" | "network" |
 }
 
 // 所有后端 JSON 请求共用同一实例，避免认证、Base URL 和错误语义在模块间漂移。
-export let apiBaseURL = import.meta.env.VITE_CANVAS_BACKEND_URL || "/api";
+export let apiBaseURL = isTeamDeployment() ? "/api" : import.meta.env.VITE_CANVAS_BACKEND_URL || "/api";
 // 本地预览和桌面模式都必须在后端暂不可用时尽快降级到本地工作区；
 // 没有超时会让启动水合一直停留在 loading，Playwright 和用户都看不到页面。
 export const apiClient = axios.create({ baseURL: apiBaseURL, withCredentials: true, timeout: 4_000 });
@@ -159,7 +163,26 @@ function assertExpectedHttpScope(config?: { expectedScope?: CapturedUserScope })
 
 apiClient.interceptors.request.use((config) => {
     assertExpectedHttpScope(config as HttpRequestConfig);
+    if (isTeamDeployment()) {
+        config.signal = teamSessionSignal(config.signal as AbortSignal | undefined);
+        const url = apiClient.getUri(config);
+        if (isSameOriginApi(url, window.location.origin)) {
+            if (isWriteMethod(config.method)) config.headers.set("X-Requested-With", "hfp");
+            // 私有媒体仍有浏览器强缓存，URL 必须随账号和工作区一起隔离。
+            if (!isWriteMethod(config.method) && /^\/api\/resources\/[^/]+\/file$/u.test(new URL(url, window.location.origin).pathname)) {
+                config.params = { ...config.params, _hfp_scope: getActiveUserScope() };
+            }
+        }
+    }
     return config;
+});
+
+apiClient.interceptors.response.use((response) => {
+    if (isTeamDeployment() && response.config.signal?.aborted) throw new axios.CanceledError();
+    return response;
+}, (error: unknown) => {
+    if (axios.isAxiosError(error) && error.config) handleTeamUnauthorized(apiClient.getUri(error.config), error.response?.status);
+    return Promise.reject(error);
 });
 
 async function send<T>(method: string, url: string, data?: unknown, config?: HttpRequestConfig) {

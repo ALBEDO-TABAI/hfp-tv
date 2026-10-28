@@ -1,5 +1,6 @@
 import { RESOURCE_BLOB_META_STORE_NAME, RESOURCE_BLOBS_STORE_NAME, localForageInstance } from "@/lib/localforage-storage";
-import { getActiveUserScope } from "@/lib/user-scope";
+import { getActiveUserScope, subscribeUserScope } from "@/lib/user-scope";
+import { isTeamDeployment } from "@/lib/deployment-mode";
 import { assertUserScope, captureUserScope, type CapturedUserScope } from "@/lib/user-scope-guard";
 import { getResourceBlob, resourceIdFromStorageKey } from "@/services/api/resources";
 import { createCanvasImagePreviewBlob } from "@/lib/canvas/canvas-image-preview-blob";
@@ -23,6 +24,16 @@ const persistedReads = new Map<string, Promise<Blob | null>>();
 const scheduled = new Set<string>();
 const cacheMetaTouchWarnings = new Set<string>();
 const metaTouchedAt = new Map<string, number>();
+subscribeUserScope(() => {
+    if (!isTeamDeployment()) return;
+    objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls.clear();
+    sessionBlobs.clear();
+    inFlight.clear();
+    persistedReads.clear();
+    metaTouchedAt.clear();
+    cacheMetaTouchWarnings.clear();
+});
 const downloadQueue: Array<{ key?: string; run: () => void }> = [];
 let activeDownloads = 0;
 let persistQueue: Promise<void> = Promise.resolve();

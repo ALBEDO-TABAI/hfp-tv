@@ -4,6 +4,7 @@ import { channelRequest } from "./custom-channel-relay";
 import { buildApiUrl } from "@/stores/use-config-store";
 import type { ResolvedAiConfig } from "./video-contracts";
 import { H3DirectorControl, type H3DirectorConfig, type H3DirectorPhase, type H3DirectorUpdate } from "@/lib/h3-director";
+import { teamSessionSignal } from "@/services/team-session";
 
 export type H3DirectorConnection = { control: H3DirectorControl; stop: () => Promise<void>; update: (value: H3DirectorUpdate) => void };
 
@@ -13,6 +14,7 @@ export async function openH3Director(
     callbacks: { onMedia: (stream: MediaStream) => void; onPhase: (phase: H3DirectorPhase) => void; onMessage?: (message: Record<string, unknown>) => void; onError?: (error: Error) => void },
     signal?: AbortSignal,
 ): Promise<H3DirectorConnection> {
+    signal = teamSessionSignal(signal);
     const proxy = buildApiUrl(config.baseUrl, "/h3/director/proxy");
     // All three bridge requests travel through the authenticated server boundary.
     // No fal key is present in the browser and session POSTs never auto-retry.

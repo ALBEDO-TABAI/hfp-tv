@@ -1,0 +1,38 @@
+.team-auth-page {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: var(--s6);
+    background: var(--stage);
+    color: var(--ink);
+}
+
+.team-auth-card {
+    width: min(100%, 420px);
+    padding: var(--s8);
+    border: 1px solid var(--hair);
+    border-radius: var(--r-xl);
+    background: var(--stage-2);
+    box-shadow: var(--shadow-2);
+}
+
+.team-auth-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    font-size: var(--fs-2xl);
+}
+
+.team-auth-card h1 {
+    margin: var(--s6) 0;
+    font-size: var(--fs-2xl);
+    font-family: var(--font-display);
+}
+
+.team-auth-card form {
+    margin-top: var(--s6);
+}
+
+.team-auth-card p {
+    color: var(--ink-2);
+}

@@ -1,8 +1,14 @@
 import { MEDIA_FILES_STORE_NAME, localForageInstance } from "@/lib/localforage-storage";
-import { getActiveUserScope } from "@/lib/user-scope";
+import { getActiveUserScope, subscribeUserScope } from "@/lib/user-scope";
+import { isTeamDeployment } from "@/lib/deployment-mode";
 
 const store = localForageInstance(MEDIA_FILES_STORE_NAME);
 const objectUrls = new Map<string, string>();
+subscribeUserScope(() => {
+    if (!isTeamDeployment()) return;
+    objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls.clear();
+});
 
 /** Local-only media persistence. This module never calls a network or resource API. */
 export async function saveLocalMedia(storageKey: string, blob: Blob, previewUrl?: string) {

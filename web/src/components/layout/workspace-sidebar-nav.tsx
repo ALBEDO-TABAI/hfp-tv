@@ -17,6 +17,8 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { getDesktopAppBinding } from "@/services/desktop-runtime";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { OnboardingEntry } from "@/components/onboarding/first-creation-guide";
+import { isTeamDeployment } from "@/lib/deployment-mode";
+import { TeamAccountMenu } from "./team-account-menu";
 
 export type WorkspaceNavItem = {
     id: string;
@@ -302,6 +304,7 @@ export function WorkspaceSidebarNav({ collapsed, onNavigate, onOpenSearch, onExp
             </LayoutGroup>
 
             <div className="app-workspace-sidebar-footer shrink-0 px-3 py-3">
+                {isTeamDeployment() ? <TeamAccountMenu collapsed={collapsed} /> : null}
                 <OnboardingEntry compact={collapsed} />
                 {footer.length ? (
                     <div className="flex flex-col gap-0.5">

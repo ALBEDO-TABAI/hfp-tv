@@ -1,4 +1,6 @@
 import { localAssetToInsertPayload } from "@/components/canvas/asset-picker-modal";
+import { isTeamDeployment } from "@/lib/deployment-mode";
+import { subscribeTeamCanvasUpdates } from "@/services/api/canvas-events";
 import { isCanvasNodeGenerating } from "@/lib/canvas/canvas-node-task-state";
 import { CanvasAssistantSidebar } from "./canvas-assistant-sidebar";
 import { useCanvasAssistantContinuation } from "./use-canvas-assistant-continuation";
@@ -227,7 +229,8 @@ function InfiniteCanvasPage() {
         })),
         [workspaceCanvases],
     );
-    const directorOnboardingScope = useUserStore((state) => state.user?.id?.trim() || "");
+    const directorOnboardingUser = useUserStore((state) => state.user?.id?.trim() || "");
+    const directorOnboardingScope = isTeamDeployment() ? canvasStorageScope : directorOnboardingUser;
     const nodesRef = useRef<CanvasNodeData[]>([]);
     const [nodes, setNodesState] = useState<CanvasNodeData[]>([]);
     const setNodes = useCallback<Dispatch<SetStateAction<CanvasNodeData[]>>>((value) => {
@@ -258,11 +261,13 @@ function InfiniteCanvasPage() {
         return () => { disposed = true; window.clearInterval(timer); };
     }, [projectId, setNodes]);
     useEffect(() => {
-        if (!projectId || !isLocalWorkspaceMode() || window.location.protocol !== "http:") return;
-        const source = new EventSource(`/api/canvas-projects/${encodeURIComponent(projectId)}/events`);
+        if (!projectId || !isLocalWorkspaceMode()) return;
         const sync = () => void refreshLocalCanvasProjectIfChanged(projectId).then((project) => {
             if (project) { setNodes(project.nodes || []); setConnections(project.connections || []); }
         });
+        if (isTeamDeployment()) return subscribeTeamCanvasUpdates(projectId, sync);
+        if (window.location.protocol !== "http:") return;
+        const source = new EventSource(`/api/canvas-projects/${encodeURIComponent(projectId)}/events`);
         source.addEventListener("canvas.updated", sync);
         return () => { source.removeEventListener("canvas.updated", sync); source.close(); };
     }, [projectId, setNodes]);

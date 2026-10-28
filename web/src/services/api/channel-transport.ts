@@ -4,6 +4,9 @@ import { createClientId } from "@/lib/client-id";
 import { explainGenerationError } from "@/lib/generation-error";
 import { channelRequest } from "@/services/api/custom-channel-relay";
 import { isSystemProxyBaseUrl } from "@/stores/use-config-store";
+import { isTeamDeployment } from "@/lib/deployment-mode";
+import { isSameOriginApi, isWriteMethod } from "@/lib/team-auth";
+import { handleTeamUnauthorized, teamSessionSignal } from "@/services/team-session";
 
 export type ChannelScene = "image" | "video" | "audio";
 
@@ -68,6 +71,7 @@ export function isChannelCancellation(error: unknown): boolean {
 export async function normalizeChannelFailure(error: unknown): Promise<never> {
     if (isChannelCancellation(error)) throw error;
     if (!axios.isAxiosError(error)) throw error;
+    if (error.config?.url) handleTeamUnauthorized(error.config.url, error.response?.status);
     const data = error.response?.data;
     const payload = data instanceof Blob ? await boundedBlobPayload(data) : (data ?? error.message);
     throw new ChannelResponseError(payload, error.response?.status);
@@ -120,6 +124,7 @@ export function createChannelTransport(config: ChannelTransportConfig, scene?: C
 
     const send = async <T>(method: "get" | "post", upstreamUrl: string, body: unknown, options?: ChannelCallOptions & { contentType?: string; responseType?: "blob" }) => {
         const request = channelRequest(config, upstreamUrl, sceneHeaders(options?.contentType, options?.headers));
+        if (isTeamDeployment() && isSameOriginApi(request.url, window.location.origin) && isWriteMethod(method)) request.headers["X-Requested-With"] = "hfp";
         return channelResponse(
             axios.request<T>({
                 method,
@@ -127,7 +132,7 @@ export function createChannelTransport(config: ChannelTransportConfig, scene?: C
                 data: method === "get" ? undefined : body,
                 headers: request.headers,
                 withCredentials: request.credentials === "include",
-                signal: options?.signal,
+                signal: teamSessionSignal(options?.signal),
                 responseType: options?.responseType,
             }), options?.acceptEventStream,
         );
@@ -139,6 +144,6 @@ export function createChannelTransport(config: ChannelTransportConfig, scene?: C
         postForm: (upstreamUrl, body, options) => send("post", upstreamUrl, body, options),
         get: (upstreamUrl, options) => send("get", upstreamUrl, undefined, options),
         getBlob: (upstreamUrl, options) => send("get", upstreamUrl, undefined, { ...options, responseType: "blob" }),
-        getExternalBlob: (url, headers, options) => channelResponse(axios.get<Blob>(url, { headers, responseType: "blob", signal: options?.signal })),
+        getExternalBlob: (url, headers, options) => channelResponse(axios.get<Blob>(url, { headers, responseType: "blob", signal: teamSessionSignal(options?.signal) })),
     };
 }

@@ -3,6 +3,8 @@ import { isLocalRuntimeMode } from "@/lib/runtime-mode";
 import { createClientId } from "@/lib/client-id";
 import { http, apiBaseURL, ApiError, type HttpRequestConfig } from "@/services/api/request";
 import { startOperation } from "@/stores/use-operation-progress";
+import { getActiveUserScope, subscribeUserScope } from "@/lib/user-scope";
+import { isTeamDeployment } from "@/lib/deployment-mode";
 
 export type RemoteResource = {
     id: string;
@@ -83,6 +85,12 @@ export class ResourceUploadError extends Error {
 const resourceCache = new Map<string, RemoteResource>();
 const resourceRequests = new Map<string, Promise<RemoteResource>>();
 const missingResourceIds = new Set<string>();
+subscribeUserScope(() => {
+    if (!isTeamDeployment()) return;
+    resourceCache.clear();
+    resourceRequests.clear();
+    missingResourceIds.clear();
+});
 
 export function resourceStorageKey(id: string) {
     return `resource:${id}`;
@@ -368,7 +376,8 @@ function resourceCacheKey(id: string, expected: CapturedUserScope) {
 
 export function resourceFileUrl(id: string) {
     const base = String(apiBaseURL).replace(/\/+$/, "");
-    return `${base}/resources/${encodeURIComponent(id)}/file`;
+    const scope = isTeamDeployment() ? `?_hfp_scope=${encodeURIComponent(getActiveUserScope())}` : "";
+    return `${base}/resources/${encodeURIComponent(id)}/file${scope}`;
 }
 
 function resourceProxyFileUrl(id: string) {
@@ -386,8 +395,7 @@ export function resolveResourceUrl(storageKey?: string, fallback = "") {
 // playbackVariantUrl 返回浏览器兼容播放副本 URL（H.265→H.264 转码结果）。
 // 副本就绪前由后端回退原件，调用方再按需降级。
 export function playbackVariantUrl(id: string) {
-    const base = String(apiBaseURL).replace(/\/+$/, "");
-    return `${base}/resources/${encodeURIComponent(id)}/file?variant=playback`;
+    return `${resourceFileUrl(id)}${isTeamDeployment() ? "&" : "?"}variant=playback`;
 }
 
 /**

@@ -1,4 +1,6 @@
 import { generationErrorMessage } from "@/lib/generation-error";
+import { teamSessionSignal } from "@/services/team-session";
+import { isTeamDeployment } from "@/lib/deployment-mode";
 import { GENERATION_RESULT_FETCH_STAGE } from "@/lib/generation-delivery-progress";
 import { assertUserScope, captureUserScope, isUserScopeAbandonedError, type CapturedUserScope } from "@/lib/user-scope-guard";
 import { ApiError, http, apiBaseURL, type BackendEnvelope, type HttpRequestConfig } from "@/services/api/request";
@@ -423,6 +425,7 @@ export function shouldUseTaskTextEvents(options?: Pick<WaitForGenerationTaskOpti
 }
 
 export async function waitForGenerationTask(id: string, options?: WaitForGenerationTaskOptions) {
+    if (isTeamDeployment()) options = { ...options, signal: teamSessionSignal(options?.signal) };
     if (shouldUseTaskTextEvents(options)) return waitForGenerationTaskTextEvents(id, options || {});
     const startedAt = Date.now();
     const intervalMs = options?.intervalMs || 2000;
@@ -487,6 +490,7 @@ export async function waitForGenerationTask(id: string, options?: WaitForGenerat
 }
 
 async function waitForGenerationTaskTextEvents(id: string, options: WaitForGenerationTaskOptions) {
+    options = { ...options, signal: teamSessionSignal(options.signal) };
     const startedAt = Date.now();
     const intervalMs = options.intervalMs || 1000;
     let lastTask = options.initialTask;

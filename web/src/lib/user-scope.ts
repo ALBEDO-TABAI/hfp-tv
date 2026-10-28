@@ -1,3 +1,5 @@
+import { isTeamDeployment } from "@/lib/deployment-mode";
+
 const ACTIVE_USER_SCOPE_KEY = "infinite-canvas:active-user-scope";
 const GUEST_SCOPE = "guest";
 
@@ -12,6 +14,7 @@ export type UserScopeEpoch = {
 const userScopeListeners = new Set<(epoch: UserScopeEpoch) => void>();
 
 function readStoredUserScope() {
+    if (isTeamDeployment()) return "";
     if (typeof window === "undefined") return "";
     try {
         return window.localStorage?.getItem(ACTIVE_USER_SCOPE_KEY) || "";
@@ -57,7 +60,7 @@ export function setActiveUserScope(userId?: string | null) {
     memoryScope = next;
     // Bump even when the scope string repeats so A→B→A cannot reuse a captured identity.
     activeUserScopeEpoch += 1;
-    if (typeof window !== "undefined") {
+    if (!isTeamDeployment() && typeof window !== "undefined") {
         try {
             window.localStorage?.setItem(ACTIVE_USER_SCOPE_KEY, next);
         } catch {

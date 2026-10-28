@@ -10,25 +10,36 @@ import { getWorkspaceBootstrap, type WorkspaceBootstrapPayload } from "@/service
 import { commitModelConfig, flushModelConfig, hydrateModelConfig } from "@/services/model-config-repository";
 import { normalizeConfigSnapshot, useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { isTeamDeployment } from "@/lib/deployment-mode";
+import type { PlatformIdentity } from "@/services/api/platform";
+import { bootstrapAppearance } from "@/services/appearance-bootstrap";
+import { hydrateLocalCanvasProjectsFromBackend } from "@/services/local-workspace-repository";
 
-export function WorkspaceBootstrapHydrator({ children }: { children: ReactNode }) {
+export function WorkspaceBootstrapHydrator({ children, identity }: { children: ReactNode; identity?: PlatformIdentity }) {
     const hydrated = useUserStore((state) => state.hydrated);
     const modelConfigReady = useRef(false);
     const [restoreStatus, setRestoreStatus] = useState<"loading" | "ready" | "error">("loading");
 
     useEffect(() => {
         let cancelled = false;
+        const controller = new AbortController();
+        let timer: number | undefined;
         const loadWorkspace = () => {
-            const bootstrap = getWorkspaceBootstrap();
-            const timeout = new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("本地工作区启动超时")), 15_000));
+            const bootstrap = getWorkspaceBootstrap(isTeamDeployment() ? controller.signal : undefined);
+            const timeout = new Promise<never>((_, reject) => { timer = window.setTimeout(() => reject(new Error("工作区启动超时")), 15_000); });
             return Promise.race([bootstrap, timeout]);
         };
         void initializeWorkspaceState({
             loadWorkspace,
             createLocalWorkspace: createLocalWorkspacePayload,
-            applySession: applyUserSession,
+            applySession: (payload) => applyUserSession(payload, identity),
             restoreModelConfig: hydrateLocalModelConfig,
         })
+            .then(async () => {
+                if (!isTeamDeployment() || cancelled) return;
+                await hydrateLocalCanvasProjectsFromBackend();
+                await bootstrapAppearance();
+            })
             .then(() => {
                 if (cancelled) return;
                 modelConfigReady.current = true;
@@ -46,6 +57,8 @@ export function WorkspaceBootstrapHydrator({ children }: { children: ReactNode }
             });
         return () => {
             cancelled = true;
+            controller.abort();
+            window.clearTimeout(timer);
         };
     }, []);
 
@@ -68,7 +81,7 @@ export function WorkspaceBootstrapHydrator({ children }: { children: ReactNode }
     }, []);
 
     if (restoreStatus === "error") return <WorkspaceErrorState title="工作区暂时无法加载" description="项目或模型配置未能完成读取。原有配置不会被覆盖，请重新加载后再试。" onRetry={() => window.location.reload()} />;
-    return hydrated && restoreStatus === "ready" ? children : <FullScreenLoader label="正在准备本地工作区" detail="加载项目、画布与模型配置" />;
+    return hydrated && restoreStatus === "ready" ? children : <FullScreenLoader label={isTeamDeployment() ? "正在准备工作区" : "正在准备本地工作区"} detail="加载项目、画布与模型配置" />;
 }
 
 export async function initializeWorkspaceState<T>({
@@ -76,12 +89,19 @@ export async function initializeWorkspaceState<T>({
     createLocalWorkspace,
     applySession,
     restoreModelConfig,
+    allowLocalFallback = !isTeamDeployment(),
 }: {
     loadWorkspace: () => Promise<T>;
     createLocalWorkspace: () => T;
     applySession: (payload: T) => Promise<void>;
     restoreModelConfig: () => Promise<void>;
+    allowLocalFallback?: boolean;
 }) {
+    if (!allowLocalFallback) {
+        await applySession(await loadWorkspace());
+        await restoreModelConfig();
+        return;
+    }
     try {
         try {
             await applySession(await loadWorkspace());

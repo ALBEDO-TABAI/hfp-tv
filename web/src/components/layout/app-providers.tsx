@@ -13,6 +13,9 @@ import { appQueryClient } from "@/lib/query-client";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import { applyAppearanceMetadata, useAppearanceStore } from "@/stores/use-appearance-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { isTeamDeployment } from "@/lib/deployment-mode";
+import { isTeamEntryPath } from "@/lib/team-auth";
+import { TeamSessionGate } from "@/components/workspace/team-session-gate";
 
 const ClientRootInit = lazy(() => import("@/components/layout/client-root-init").then((module) => ({ default: module.ClientRootInit })));
 
@@ -43,7 +46,15 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <ConfigProvider locale={zhCN} theme={getAntThemeConfig(dark, appearance.activeSkin)} modal={{ centered: true }}>
             <App message={{ duration: 3, maxCount: 3 }} notification={{ duration: 4.5, maxCount: 3, placement: "topRight" }}>
                 <QueryClientProvider client={appQueryClient}>
-                    {isolateDevRepro ? (
+                    {isTeamDeployment() ? (
+                        isTeamEntryPath(window.location.pathname) ? children : (
+                            <TeamSessionGate>{(identity) => (
+                                <WorkspaceBootstrapHydrator identity={identity}>
+                                    <ClientRootBoundary>{children}</ClientRootBoundary>
+                                </WorkspaceBootstrapHydrator>
+                            )}</TeamSessionGate>
+                        )
+                    ) : isolateDevRepro ? (
                         children
                     ) : (
                         <WorkspaceBootstrapHydrator>

@@ -7,8 +7,10 @@ import { loadAgentsPage, loadAssetsPage, loadCanvasPage, loadCanvasProjectPage, 
 import { CanvasRefreshShell } from "@/pages/canvas/canvas-refresh-shell";
 import RouteErrorPage from "@/pages/route-error";
 import { isLocalWorkspaceMode } from "@/services/workspace-mode";
+import { isTeamDeployment } from "@/lib/deployment-mode";
 
 const AgentsPage = lazy(loadAgentsPage);
+const AuthPage = lazy(() => import("@/pages/auth"));
 const AssetsPage = lazy(loadAssetsPage);
 const HomePage = lazy(loadHomePage);
 const CanvasPage = lazy(loadCanvasPage);
@@ -71,6 +73,10 @@ function devRoutes() {
 }
 
 export const router = createWorkspaceRouter([
+    ...(isTeamDeployment() ? [
+        { path: "/login", element: fullScreenDeferred(<AuthPage />), errorElement: <RouteErrorPage /> },
+        { path: "/invite/:token", element: fullScreenDeferred(<AuthPage />), errorElement: <RouteErrorPage /> },
+    ] : []),
     ...(import.meta.env.DEV ? devRoutes() : []),
     {
         element: <WorkspaceLayout />,

@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { createDirectorSaveCoordinator, type DirectorCloseDecision, type DirectorDraftEnvelope, type DirectorSaveCoordinator } from "@/lib/canvas/director/director-save";
 import { directorSaveProgress, idleDirectorSaveProgress, resolveDirectorDraftStorage, type DirectorSaveProgress } from "@/lib/canvas/director/director-save-wiring";
 import { recordDirectorDiagnostic } from "@/lib/canvas/director/director-diagnostics-recorder";
 import { useUserStore } from "@/stores/use-user-store";
+import { getActiveUserScope, subscribeUserScope } from "@/lib/user-scope";
+import { isTeamDeployment } from "@/lib/deployment-mode";
 import { registerDesktopUpdatePreparation } from "@/services/desktop-update-preparation";
 import type { DirectorScene } from "@/types/director";
 
@@ -34,7 +36,9 @@ export function useDirectorSaveCoordinator(input: { sceneId: string | null; init
 
     // scope 取响应式 user id：user-session 先切 active scope 再 setUser，
     // 因此这里能在用户变化时重建 coordinator，且不会在播放时每帧读 localStorage。
-    const scope = useUserStore((state) => state.user?.id) ?? "guest";
+    const userId = useUserStore((state) => state.user?.id) ?? "guest";
+    const activeScope = useSyncExternalStore(subscribeUserScope, getActiveUserScope, getActiveUserScope);
+    const scope = isTeamDeployment() ? activeScope : userId;
 
     // 依赖为空的 effect 每次 render 后都跑，保证 coordinator effect 读到的是最新回调。
     useEffect(() => {

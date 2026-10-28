@@ -13,17 +13,26 @@ import { defaultFeatureAvailability, useUserStore } from "@/stores/use-user-stor
 import type { WorkspaceBootstrapPayload } from "@/services/api/workspace";
 import { setWorkspaceCapabilitySnapshot } from "@/services/workspace-mode";
 import { withGenerationConsumersPaused } from "@/services/generation-consumer-lifecycle";
+import { isTeamDeployment } from "@/lib/deployment-mode";
+import { teamWorkspaceScope } from "@/lib/team-auth";
+import type { PlatformIdentity } from "@/services/api/platform";
+import { teamSessionSignal } from "@/services/team-session";
 
 /**
- * Hydrate the one implicit local workspace. This is deliberately not an auth
- * session: it only selects the persistence namespace and restores local stores.
+ * Select the persistence namespace before restoring workspace stores.
+ * Team identity comes from the platform; the kernel still runs a local workspace.
  */
-export async function applyUserSession(payload: WorkspaceBootstrapPayload) {
+export async function applyUserSession(payload: WorkspaceBootstrapPayload, identity?: PlatformIdentity) {
     // Drain old result writers before changing the persistence namespace or stores.
-    return withGenerationConsumersPaused(() => hydrateLocalWorkspace(payload));
+    return withGenerationConsumersPaused(() => hydrateLocalWorkspace(payload, identity));
 }
 
-async function hydrateLocalWorkspace(payload: WorkspaceBootstrapPayload) {
+async function hydrateLocalWorkspace(payload: WorkspaceBootstrapPayload, identity?: PlatformIdentity) {
+    const team = isTeamDeployment();
+    if (team && !identity) throw new Error("请先登录");
+    const scope = team && identity ? teamWorkspaceScope(identity.user.id, identity.workspace_id) : payload.workspace.id;
+    const signal = teamSessionSignal();
+    signal?.throwIfAborted();
     useUserStore.getState().setHydrated(false);
     setWorkspaceCapabilitySnapshot({
         contractVersion: payload.contractVersion,
@@ -33,7 +42,8 @@ async function hydrateLocalWorkspace(payload: WorkspaceBootstrapPayload) {
 
     try {
         await Promise.all([flushCanvasStorePersistence(), flushAssetStorePersistence()]);
-        setActiveUserScope(payload.workspace.id);
+        signal?.throwIfAborted();
+        setActiveUserScope(scope);
 
         const [persistedCanvas, persistedCanvasHistory, persistedAssets, persistedPlugins] = await Promise.all([
             localForageStorage.getItem(CANVAS_STORE_KEY),
@@ -44,6 +54,7 @@ async function hydrateLocalWorkspace(payload: WorkspaceBootstrapPayload) {
         const persistedConfig = scopedLocalStorage.getItem(CONFIG_STORE_KEY);
         const persistedCreationPreferences = scopedLocalStorage.getItem(CREATION_PREFERENCES_STORE_KEY);
 
+        signal?.throwIfAborted();
         usePluginStore.setState({ hydrated: false, runtimeStatuses: {}, pluginStates: {} });
         useUserStore.getState().setUser(payload.user);
         useUserStore.getState().setStorageMode("local");
@@ -59,6 +70,7 @@ async function hydrateLocalWorkspace(payload: WorkspaceBootstrapPayload) {
             useCreationPreferencesStore.persist.rehydrate(),
         ]);
 
+        signal?.throwIfAborted();
         useConfigStore.getState().replaceConfig(localWorkspaceConfig(useConfigStore.getState().config));
         useCanvasStore.setState((state) => ({ projects: state.projects.map(normalizeLocalCanvasProject) }));
         useAssetStore.setState((state) => ({ assets: state.assets.map(normalizeLocalAsset) }));
@@ -79,7 +91,7 @@ async function hydrateLocalWorkspace(payload: WorkspaceBootstrapPayload) {
         if (!persistedCreationPreferences) useCreationPreferencesStore.setState({ preferences: {} });
         if (!persistedConfig) useConfigStore.getState().replaceConfig(localWorkspaceConfig(defaultConfig));
     } finally {
-        useUserStore.getState().setHydrated(true);
+        if (!signal?.aborted) useUserStore.getState().setHydrated(true);
     }
 }
 

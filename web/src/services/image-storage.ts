@@ -2,7 +2,8 @@ import { nanoid } from "nanoid";
 import { readImageMeta } from "@/lib/image-utils";
 import { IMAGE_FILES_STORE_NAME, localForageInstance } from "@/lib/localforage-storage";
 import { isLocalRuntimeMode } from "@/lib/runtime-mode";
-import { getActiveUserScope } from "@/lib/user-scope";
+import { getActiveUserScope, subscribeUserScope } from "@/lib/user-scope";
+import { isTeamDeployment } from "@/lib/deployment-mode";
 import { assertUserScope, captureUserScope, isUserScopeAbandonedError, type CapturedUserScope } from "@/lib/user-scope-guard";
 import { importResourceFromUrl, isResourceUrl, resourceFileUrl, resourceIdFromStorageKey, resourceStorageKey, ResourceUploadError, uploadResourceFile } from "@/services/api/resources";
 import { cacheResourceObjectUrl, getCachedResourceBlob, getCachedResourceObjectUrl, primeResourceBlobCache } from "@/services/resource-blob-cache";
@@ -28,6 +29,11 @@ export type UploadedImage = {
 
 const store = localForageInstance(IMAGE_FILES_STORE_NAME);
 const objectUrls = new Map<string, string>();
+subscribeUserScope(() => {
+    if (!isTeamDeployment()) return;
+    objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls.clear();
+});
 
 export async function uploadImage(input: string | Blob, onProgress?: (uploadedBytes: number, totalBytes: number) => void, expectedScope?: CapturedUserScope): Promise<UploadedImage> {
     // 同一个逻辑上传在本地资源服务不可用后会退回 IndexedDB。

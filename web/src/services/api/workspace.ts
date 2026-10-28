@@ -21,8 +21,8 @@ export type WorkspaceBootstrapPayload = {
     features?: FeatureAvailability;
 };
 
-export function getWorkspaceBootstrap() {
-    return http.get<WorkspaceBootstrapPayload>("/workspace/bootstrap");
+export function getWorkspaceBootstrap(signal?: AbortSignal) {
+    return http.get<WorkspaceBootstrapPayload>("/workspace/bootstrap", { signal });
 }
 
 export function getLocalModelConfig() {

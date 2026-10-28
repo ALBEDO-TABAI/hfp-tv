@@ -1,4 +1,5 @@
 import axios from "axios";
+import { teamSessionSignal } from "@/services/team-session";
 
 import { explainGenerationError } from "@/lib/generation-error";
 import { assertChannelBlob, assertChannelPayload, ChannelResponseError, normalizeChannelFailure } from "@/services/api/channel-transport";
@@ -76,7 +77,7 @@ export function blobToDataUrl(blob: Blob) {
 
 export async function videoResultFromUrl(url: string, options?: RequestOptions): Promise<VideoGenerationResult> {
     try {
-        const response = await axios.get<Blob>(url, { responseType: "blob", signal: options?.signal });
+        const response = await axios.get<Blob>(url, { responseType: "blob", signal: teamSessionSignal(options?.signal) });
         await assertVideoBlob(response.data);
         return { blob: response.data };
     } catch (error) {
