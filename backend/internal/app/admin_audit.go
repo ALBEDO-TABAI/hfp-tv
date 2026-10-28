@@ -9,6 +9,9 @@ import (
 )
 
 func (s *Service) appendAdminAudit(actor *model.User, action string, targetType string, targetID string, summary string, metadata any) error {
+	if s.IsLocalMode() {
+		return nil
+	}
 	event, err := newAdminAuditEvent(actor, action, targetType, targetID, summary, metadata)
 	if err != nil {
 		return err

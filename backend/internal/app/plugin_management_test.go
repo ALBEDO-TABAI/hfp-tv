@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	"infinite-canvas/backend/internal/database"
 	"infinite-canvas/backend/internal/model"
 	"infinite-canvas/backend/internal/plugins"
 	"infinite-canvas/backend/internal/repository"
@@ -10,6 +11,46 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+func TestLocalPluginAvailabilityWithoutAdminAuditTable(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:"+newID()+"?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	if err := database.MigrateLocalSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	if db.Migrator().HasTable(&model.AdminAuditEvent{}) {
+		t.Fatal("local schema contains admin_audit_events")
+	}
+	repo := repository.New(db)
+	svc := NewLocal(repo, t.TempDir())
+	t.Cleanup(func() { _ = svc.Close() })
+	owner, err := svc.LocalWorkspaceOwner()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state, updateErr := svc.SetPluginPlatformAvailability(owner, PluginEditorShell, false)
+	persisted, err := repo.PluginPlatformState(PluginEditorShell)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if persisted == nil || persisted.Available || persisted.UpdatedBy != owner.ID {
+		t.Fatalf("persisted plugin state = %#v, want disabled by workspace owner", persisted)
+	}
+	if updateErr != nil {
+		t.Fatalf("SetPluginPlatformAvailability() after persisted available=false: %v", updateErr)
+	}
+	if state.PlatformAvailable || state.EffectiveEnabled {
+		t.Fatalf("disabled plugin state = %#v", state)
+	}
+}
 
 func TestApplicationPluginUsesUserStateUnderPlatformAvailability(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:"+newID()+"?mode=memory&cache=shared"), &gorm.Config{})
