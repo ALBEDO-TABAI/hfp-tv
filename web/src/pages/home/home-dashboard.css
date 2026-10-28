@@ -154,6 +154,9 @@
 
 /* ---- Projection Stage Hero Card ---- */
 .beeftv-home-hero.hfp-projection-stage {
+    --home-energy-core: #fff;
+    --home-energy-glow: rgb(255 255 255 / 0.28);
+    container-type: inline-size;
     position: relative;
     min-height: 168px;
     display: flex;
@@ -181,22 +184,26 @@
 
 .beeftv-home-dot-base {
     background-image: radial-gradient(circle, var(--ink-4) 0.7px, transparent 1.4px);
+    opacity: 0.55;
 }
 
 .beeftv-home-dot-flow {
-    background-image: radial-gradient(circle, color-mix(in oklab, var(--rl-accent) 65%, var(--ink)) 0.8px, transparent 1.5px);
-    -webkit-mask-image: radial-gradient(circle, transparent 18%, rgba(0, 0, 0, 0.2) 32%, rgba(0, 0, 0, 0.85) 50%, rgba(0, 0, 0, 0.2) 68%, transparent 82%);
-    mask-image: radial-gradient(circle, transparent 18%, rgba(0, 0, 0, 0.2) 32%, rgba(0, 0, 0, 0.85) 50%, rgba(0, 0, 0, 0.2) 68%, transparent 82%);
+    background-image:
+        radial-gradient(circle, var(--home-energy-core) 1px, transparent 1.8px),
+        radial-gradient(circle, var(--home-energy-glow), transparent 4px);
+    /* 固定点阵，只让光环向外经过，保留逐点亮起和熄灭的尾迹。 */
+    -webkit-mask-image: radial-gradient(circle closest-side, transparent calc(100% - 110px), #000 calc(100% - 32px), transparent 100%);
+    mask-image: radial-gradient(circle closest-side, transparent calc(100% - 110px), #000 calc(100% - 32px), transparent 100%);
     -webkit-mask-position: center;
     mask-position: center;
     -webkit-mask-repeat: no-repeat;
     mask-repeat: no-repeat;
     opacity: 0;
-    animation: beeftv-dot-ripple 4.4s cubic-bezier(0.33, 0, 0.2, 1) infinite;
+    animation: beeftv-dot-ripple 3.8s linear infinite;
 }
 
 .beeftv-home-dot-flow-delay {
-    animation-delay: -2.2s;
+    animation-delay: -1.9s;
 }
 
 .hfp-stage-frame-marks {
@@ -577,19 +584,26 @@
 @keyframes beeftv-dot-ripple {
     0% {
         opacity: 0;
-        -webkit-mask-size: 72px 72px;
-        mask-size: 72px 72px;
+        -webkit-mask-size: 24px 24px;
+        mask-size: 24px 24px;
     }
-    18% {
-        opacity: 0.36;
+    12%, 55% {
+        opacity: 0.9;
     }
-    72% {
-        opacity: 0.14;
+    80% {
+        opacity: 0.55;
     }
     100% {
         opacity: 0;
-        -webkit-mask-size: 1120px 1120px;
-        mask-size: 1120px 1120px;
+        -webkit-mask-size: 145cqw 145cqw;
+        mask-size: 145cqw 145cqw;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .beeftv-home-dot-flow {
+        display: none;
+        animation: none;
     }
 }
 
