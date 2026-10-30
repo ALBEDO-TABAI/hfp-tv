@@ -176,6 +176,12 @@ HTTPS 图片提交前读取同源 `/models` 元数据，仅成功响应明确声
 | `invitations` | 邀请链接 | 只存令牌哈希；一次性，`used_by` 用条件更新抢占，并发接受只有一个成功 |
 | `workspaces` | 工作区登记：所有者、相对数据目录、状态、存储额度（预留）、中转站密钥密文与末四位 | 一个用户一个工作区；数据目录是相对数据根的路径，网关拒绝越界路径；密钥用 `secrets/` 下的平台密钥加密 |
 | `audit_events` | 管理员与账号操作记录 | 只追加，不更新、不删除；不记录密码与密钥明文 |
+| `market_skills` | 已发布技能：所有者、名称、官方标记、是否上架、当前版本 | 首次审核通过时才创建；只有所有者能为它投新版本 |
+| `market_submissions` | 投稿稿件：作者、技能 ID、新技能或更新、状态（draft、ready_to_submit、in_review、published、rejected）、revision、元数据、内容摘要、包 SHA-256、文件清单、预览摘要、审核原因 | 上传、校验、送审、审核都用 revision 与预览摘要做条件更新；送审后不能再改，驳回后可重新上传 |
+| `market_releases` | 已发布版本：签名时的 Release JSON 与签名 | 原样返回签名内容，客户端逐字段比对；包文件在 `market/archives/<sha256>.zip` |
+| `market_tokens` | 投稿授权令牌 | 只存 SHA-256；30 天过期；吊销对未知令牌也返回成功 |
+| `market_device_authorizations` | 设备授权码 | 设备码只存摘要，确认码 10 分钟有效；兑换令牌后删除 |
+| `market_idempotency` | 新建稿件与送审的重复请求结果 | 主键 `(user_id, key)`，同一 key 返回同一结果 |
 
 ## 画布版本与快照
 

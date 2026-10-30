@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,6 +25,7 @@ import (
 	"infinite-canvas/backend/internal/bootstrap"
 	"infinite-canvas/backend/internal/kernelpool"
 	"infinite-canvas/backend/internal/referencestorage"
+	"infinite-canvas/backend/internal/skillmarket"
 	"infinite-canvas/backend/internal/teamserver"
 
 	"github.com/gin-gonic/gin"
@@ -147,6 +149,11 @@ func run(ctx context.Context) error {
 		}
 		shutdownTimeout = parsed
 	}
+	market, marketListener, err := startMarket(users, root)
+	if err != nil {
+		return err
+	}
+	defer marketListener.Close()
 	pool := kernelpool.New(kernelpool.Options{
 		Hosted:           bootstrap.HostedConfig{AssistantHostCommand: os.Getenv("TEAMSERVER_AGENT_HOST_COMMAND"), AssistantHostArgs: args},
 		RelayTemplate:    relayTemplate,
@@ -158,6 +165,7 @@ func run(ctx context.Context) error {
 		CookieSecure:   env("TEAMSERVER_COOKIE_SECURE", "true") != "false",
 		TrustedProxies: envListOrDefault("TEAMSERVER_TRUSTED_PROXIES", []string{"127.0.0.1", "::1"}),
 		AllowedOrigins: envList("TEAMSERVER_ALLOWED_ORIGINS"),
+		Market:         market,
 	})
 	if err != nil {
 		return err
@@ -167,6 +175,13 @@ func run(ctx context.Context) error {
 	// resume after a restart without waiting for their owner to log in.
 	go openActiveWorkspaces(ctx, users, server, pool)
 	go purgeSessions(ctx, users)
+
+	marketServer := &http.Server{Handler: teamserver.MarketHandler(market), ReadHeaderTimeout: 10 * time.Second}
+	go func() {
+		if err := marketServer.Serve(marketListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("内置技能市场停止：%v", err)
+		}
+	}()
 
 	addr := env("TEAMSERVER_ADDR", ":8080")
 	httpServer := &http.Server{Addr: addr, Handler: server.Handler(), ReadHeaderTimeout: 10 * time.Second}
@@ -193,8 +208,49 @@ func run(ctx context.Context) error {
 	if err := httpServer.Shutdown(httpCtx); err != nil {
 		_ = httpServer.Close()
 	}
+	_ = marketServer.Shutdown(httpCtx)
 	httpCancel()
 	return errors.Join(failure, pool.CloseAll(shutdownCtx))
+}
+
+// startMarket opens the in-house skill market on a loopback-only listener and
+// points every workspace kernel at it. The address must stay stable: kernels
+// bind stored publishing tokens to the exact market URL. Kernels also pin the
+// platform signing key, so only reviewed and signed releases install.
+func startMarket(users *accounts.Service, root string) (*skillmarket.Service, net.Listener, error) {
+	signer, err := skillmarket.LoadSigner(filepath.Join(root, "secrets"))
+	if err != nil {
+		return nil, nil, err
+	}
+	market, err := skillmarket.Open(users.DB(), users, signer, root)
+	if err != nil {
+		return nil, nil, err
+	}
+	addr := env("TEAMSERVER_MARKET_ADDR", "127.0.0.1:18090")
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil || (host != "127.0.0.1" && host != "::1" && host != "localhost") {
+		return nil, nil, errors.New("TEAMSERVER_MARKET_ADDR 必须是本机回环地址，例如 127.0.0.1:18090")
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, nil, fmt.Errorf("内置技能市场无法监听 %s：%w", addr, err)
+	}
+	base := "http://" + listener.Addr().String() + teamserver.MarketBasePath
+	for key, value := range map[string]string{
+		"BEEFTV_SKILLHUB_URL":               base,
+		"BEEFTV_SKILLHUB_TRUSTED_KEYS":      signer.TrustedKeysJSON(),
+		"BEEFTV_SKILLHUB_REQUIRE_SIGNATURE": "true",
+	} {
+		if previous := os.Getenv(key); previous != "" && previous != value {
+			log.Printf("%s 由团队服务器管理，忽略外部设置", key)
+		}
+		if err := os.Setenv(key, value); err != nil {
+			_ = listener.Close()
+			return nil, nil, err
+		}
+	}
+	log.Printf("内置技能市场：%s（签名密钥 %s）", base, signer.KeyID())
+	return market, listener, nil
 }
 
 func envListOrDefault(key string, fallback []string) []string {

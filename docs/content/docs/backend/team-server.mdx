@@ -6,7 +6,7 @@ title: 团队服务器
 
 团队服务器（`backend/cmd/teamserver`）用一个进程服务多名成员，每人一个独立工作区。它面向 10–30 人、账号由管理员分配的内部团队。架构取舍和后续分期见 [团队服务器与创意工坊方案](../../../team-server-and-workshop.md)。
 
-当前实现是方案的第一期“多人底座”：账号、会话、网关、内核池、公司中转站渠道和部署镜像。创意工坊、技能市场、配额与总并发不在本期范围内。
+当前实现了方案的第一期“多人底座”（账号、会话、网关、内核池、公司中转站渠道和部署镜像）和第三期“技能市场”（投稿、审核、签名与安装都在团队服务器内完成，不依赖上游服务）。创意工坊、配额与总并发尚未实现。
 
 ## 运行结构
 
@@ -23,7 +23,8 @@ title: 团队服务器
 | 路径 | 内容 |
 | --- | --- |
 | `platform.db` | 账号、会话、邀请、工作区登记、管理员操作记录 |
-| `secrets/` | 平台加密密钥（加密中转站密钥），权限 0700 |
+| `secrets/` | 平台加密密钥（加密中转站密钥）和技能签名私钥 `skillhub-signing.key`，权限 0700 |
+| `market/archives/` | 技能市场的投稿与发布包，按 SHA-256 命名，只写一次 |
 | `workspaces/<工作区ID>/` | 与桌面版相同的单机数据目录：SQLite、资源、模型配置、助手数据 |
 
 服务启动时会打开所有启用中的工作区，让重启前排队或进行中的生成任务继续执行。停用账号会立即作废会话并关闭该工作区内核。
@@ -70,6 +71,7 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 | `TEAMSERVER_AGENT_HOST_COMMAND` / `TEAMSERVER_AGENT_HOST_ARGS` | 镜像内为 `node` 与 `["/app/agent-host/server.mjs"]` | 助手子进程命令；`ARGS` 是 JSON 字符串数组 |
 | `TEAMSERVER_RELAY_CHANNEL_FILE` | 空 | 公司中转站渠道定义文件，见下节 |
 | `TEAMSERVER_REFERENCE_STORAGE_FILE` | 空 | 参考素材对象存储配置（`referencestorage.Config` 的 JSON），写入每个工作区 |
+| `TEAMSERVER_MARKET_ADDR` | `127.0.0.1:18090` | 内置技能市场的内部监听地址，只能是本机回环；要保持固定，内核保存的投稿授权和这个地址绑定 |
 | `CANVAS_SHUTDOWN_TIMEOUT` | `2m` | 每个内核关闭时等待后台任务的上限 |
 
 团队模式下前端用 `fetch` 读取画布事件流（`web/src/services/api/canvas-events.ts`），能拿到 401 并在 HTTPS 下工作。Caddy 示例配置对流式响应设置了 `flush_interval -1`。改用 nginx 时，`/api/` 需要关闭缓冲（`proxy_buffering off`），并把读超时设到 1 小时，否则任务事件流和助手对话会被截断。
@@ -89,6 +91,26 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 ### 参考素材
 
 托管内核不注册匿名资源下载路由。需要公网地址的模型协议，通过 `TEAMSERVER_REFERENCE_STORAGE_FILE` 配置的 S3 兼容对象存储上传参考素材，其余协议沿用内嵌素材。
+
+## 技能市场
+
+技能市场和团队服务器一起部署，投稿、审核、公共技能的存储都在企业服务器内（`backend/internal/skillmarket`）。
+
+- **接口**：市场实现工作区内核已有客户端使用的 SkillHub v1 合同（`internal/skillhub`），挂在只监听本机回环的内部端口 `TEAMSERVER_MARKET_ADDR` 的 `/skillhub/v1` 下，公网入口访问不到。启动时团队服务器把 `BEEFTV_SKILLHUB_URL`、`BEEFTV_SKILLHUB_TRUSTED_KEYS` 和 `BEEFTV_SKILLHUB_REQUIRE_SIGNATURE=true` 设给所有内核，外部设置的同名变量会被忽略。
+- **授权**：成员在“技能 → 我的投稿”点“连接投稿账号”，应用打开站内的 `/skills/authorize?code=…`，确认后回到投稿页点“检查授权状态”。授权有效期 30 天；停用账号后授权立即失效。
+- **投稿**：沿用现有投稿流程（准备 → 上传私有草稿 → 检查公开预览 → 确认送审）。市场按安装端的严格规则校验技能包：只接受文档、数据和图片文件，不接受 `scripts/`，`SKILL.md` 必须有 `name`/`description` 头信息。在应用里写的技能如果没有头信息，准备投稿时会按技能名和简介自动补上。
+- **审核**：管理员在“技能审核”页查看待审稿件、逐个文件阅读正文（纯文本显示，不渲染 HTML）、对比上一版的增删改，然后通过、通过并设为官方，或填写原因驳回。审核绑定管理员看到的版本，作者在此期间改动会提示刷新。
+- **发布与安装**：通过后平台用 `secrets/skillhub-signing.key` 的 Ed25519 私钥签名，内核只安装签过名且内容与签名一致的版本。下架只影响搜索和新安装，已装到工作区的副本不受影响。
+- **没有团队服务器的安装**（桌面版、单工作区开发服务）默认不连接任何市场，技能页提示“未配置技能市场”；需要时用 `BEEFTV_SKILLHUB_URL` 指定。
+
+| 管理与授权接口 | 说明 |
+| --- | --- |
+| `GET /api/platform/market/authorizations/:userCode`、`POST …/approve` | 站内确认页读取与批准设备授权（需登录） |
+| `GET /api/platform/admin/skill-submissions?status=pending\|processed` | 待审核或已处理的稿件 |
+| `GET /api/platform/admin/skill-submissions/:id`、`…/file?path=` | 稿件详情、上一版文件清单、单个文件内容 |
+| `POST /api/platform/admin/skill-submissions/:id/approve` | `{revision, previewDigest, official}`；稿件已变化时 409 `submission_changed` |
+| `POST /api/platform/admin/skill-submissions/:id/reject` | `{revision, reason}`；原因必填 |
+| `GET /api/platform/admin/market-skills`、`POST …/:skillId/unlist\|relist` | 已发布技能列表、下架与恢复 |
 
 ## 平台接口
 
@@ -111,11 +133,12 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 
 ## 备份
 
-备份时停止服务，或对 `platform.db` 和每个 `workspaces/*/open_ai_canvas.db` 用 SQLite 在线备份，再增量复制 `secrets/` 与各工作区的资源目录。`secrets/` 丢失后已绑定的中转站密钥无法解密，需要重新绑定。
+备份时停止服务，或对 `platform.db` 和每个 `workspaces/*/open_ai_canvas.db` 用 SQLite 在线备份，再增量复制 `secrets/`、`market/` 与各工作区的资源目录。`secrets/` 丢失后已绑定的中转站密钥无法解密，需要重新绑定；技能签名私钥也会变化，已发布的技能需要重新审核发布才能被内核信任。
 
-## 第一期未完成的部分
+## 尚未完成的部分
 
 - 没有存储配额和跨工作区的生成总并发上限：每个内核各自按默认并发 3 执行。
 - 助手子进程不会空闲回收。
 - 公司中转站密钥对本人可见（见上文）。
 - 镜像和 Compose 尚未在真实服务器上构建与压测。
+- 技能市场没有上游的 MCP 查询端点和发布历史页（`GET /skills/:skillId`），现有客户端都不调用它们；审核结果只有站内状态，没有通知。

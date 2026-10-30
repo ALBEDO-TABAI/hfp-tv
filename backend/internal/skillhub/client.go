@@ -13,7 +13,12 @@ import (
 	"time"
 )
 
-const DefaultURL = "https://beeftv.app/api/beeftv/skillhub/v1"
+// There is no public default market: the team server provides one to its
+// workspaces through BEEFTV_SKILLHUB_URL; other installs must configure it.
+const DefaultURL = ""
+
+// ErrNotConfigured is returned when no market URL is configured.
+var ErrNotConfigured = &Error{Status: 503, Reason: "market_not_configured", Message: "未配置技能市场：团队服务器部署会自动接入内置技能市场，其他环境请设置 BEEFTV_SKILLHUB_URL"}
 const MaxArchiveBytes = 10 << 20
 
 type File struct {
@@ -144,6 +149,9 @@ type Client struct {
 func (c *Client) BaseURL() string { return c.base.String() }
 
 func New(base string) (*Client, error) {
+	if strings.TrimSpace(base) == "" {
+		return nil, ErrNotConfigured
+	}
 	u, err := url.Parse(strings.TrimRight(base, "/"))
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "127.0.0.1" || u.Hostname() == "localhost" || u.Hostname() == "::1"))) {
 		return nil, fmt.Errorf("技能市场地址必须是可信 HTTPS 服务")

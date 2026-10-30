@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"infinite-canvas/backend/internal/kernel"
 	"infinite-canvas/backend/internal/skillhub"
@@ -119,7 +120,7 @@ func (s *Service) preparePublicationBundle(user, id, canvas string, meta skillhu
 		return nil, e
 	}
 	files := map[string][]byte{}
-	manifest := []skillhub.File{}
+	mimeTypes := map[string]string{}
 	for _, f := range bundle.Files {
 		b, e := base64.StdEncoding.DecodeString(f.ContentBase64)
 		if e != nil {
@@ -129,15 +130,7 @@ func (s *Service) preparePublicationBundle(user, id, canvas string, meta skillhu
 			return nil, kernel.BadAuthRequest("请移除脚本或私有配置后再投稿")
 		}
 		files[f.Path] = b
-		h := sha256.Sum256(b)
-		manifest = append(manifest, skillhub.File{Path: f.Path, SHA256: hex.EncodeToString(h[:]), Size: int64(len(b)), MimeType: f.MimeType})
-	}
-	data, e := encodeSkillArchive(files)
-	if e != nil {
-		return nil, e
-	}
-	if len(data) > skillhub.MaxArchiveBytes {
-		return nil, kernel.BadAuthRequest("投稿包超过10MiB")
+		mimeTypes[f.Path] = f.MimeType
 	}
 	if meta.Name == "" {
 		meta.Name = bundle.Name
@@ -154,9 +147,6 @@ func (s *Service) preparePublicationBundle(user, id, canvas string, meta skillhu
 		}
 		if meta.SourceURL == "" {
 			meta.SourceURL = source.SourceURL
-			if meta.SourceURL == "" {
-				meta.SourceURL = "https://beeftv.app/skills/" + source.SkillID + "?release=" + source.ReleaseID
-			}
 		}
 		if meta.Requirements == nil {
 			meta.Requirements = source.Requirements
@@ -180,9 +170,26 @@ func (s *Service) preparePublicationBundle(user, id, canvas string, meta skillhu
 	if meta.Showcase == nil {
 		meta.Showcase = []skillhub.Showcase{}
 	}
+	contentHash := bundle.ContentHash
+	if published := publicationSkillMarkdown(files["SKILL.md"], meta.Name, meta.Description); !bytes.Equal(published, files["SKILL.md"]) {
+		files["SKILL.md"] = published
+		contentHash = skillhub.ContentDigest(files)
+	}
+	manifest := make([]skillhub.File, 0, len(files))
+	for path, b := range files {
+		h := sha256.Sum256(b)
+		manifest = append(manifest, skillhub.File{Path: path, SHA256: hex.EncodeToString(h[:]), Size: int64(len(b)), MimeType: mimeTypes[path]})
+	}
+	data, e := encodeSkillArchive(files)
+	if e != nil {
+		return nil, e
+	}
+	if len(data) > skillhub.MaxArchiveBytes {
+		return nil, kernel.BadAuthRequest("投稿包超过10MiB")
+	}
 	sort.Slice(manifest, func(i, j int) bool { return manifest[i].Path < manifest[j].Path })
 	sum := sha256.Sum256(data)
-	p := &PublishPlan{PublicationTarget: target, Source: bundle.MarketRelease, Instruction: string(files["SKILL.md"]), CanvasID: canvas, ID: kernel.NewID(), SkillID: id, VersionID: bundle.VersionID, ContentHash: bundle.ContentHash, ArchiveSHA256: hex.EncodeToString(sum[:]), Metadata: meta, Files: manifest, Status: "awaiting_upload_confirmation", CreatedAt: time.Now()}
+	p := &PublishPlan{PublicationTarget: target, Source: bundle.MarketRelease, Instruction: string(files["SKILL.md"]), CanvasID: canvas, ID: kernel.NewID(), SkillID: id, VersionID: bundle.VersionID, ContentHash: contentHash, ArchiveSHA256: hex.EncodeToString(sum[:]), Metadata: meta, Files: manifest, Status: "awaiting_upload_confirmation", CreatedAt: time.Now()}
 	file, _ := s.planFile(user, p.ID)
 	if e = os.MkdirAll(filepath.Dir(file), 0700); e != nil {
 		return nil, e
@@ -445,4 +452,53 @@ func (s *Service) PublicationStatus(ctx context.Context, user, id string) (*Publ
 		}
 	}
 	return p, nil
+}
+
+// publicationSkillMarkdown gives a SKILL.md without any front matter the
+// name/description header Agent Skills installers require. Skills written in
+// the app often store only the instruction body. An existing header is never
+// rewritten; the market reports what to fix instead.
+func publicationSkillMarkdown(body []byte, name, description string) []byte {
+	if bytes.HasPrefix(bytes.ReplaceAll(body, []byte("\r\n"), []byte("\n")), []byte("---\n")) {
+		return body
+	}
+	slug := publicationSkillSlug(name)
+	description = strings.Join(strings.Fields(description), " ")
+	if description == "" {
+		description = strings.TrimSpace(name)
+	}
+	if runes := []rune(description); len(runes) > 1024 {
+		description = string(runes[:1024])
+	}
+	quotedName, _ := json.Marshal(slug)
+	quotedDescription, _ := json.Marshal(description)
+	header := "---\nname: " + string(quotedName) + "\ndescription: " + string(quotedDescription) + "\n---\n\n"
+	published := append([]byte(header), body...)
+	if _, err := skillhub.SkillName(published); err != nil {
+		return body
+	}
+	return published
+}
+
+func publicationSkillSlug(name string) string {
+	var out []rune
+	dash := false
+	for _, char := range strings.ToLower(strings.TrimSpace(name)) {
+		switch {
+		case unicode.IsLetter(char) || unicode.IsDigit(char):
+			out = append(out, char)
+			dash = false
+		case !dash && len(out) > 0:
+			out = append(out, '-')
+			dash = true
+		}
+	}
+	slug := strings.Trim(string(out), "-")
+	if runes := []rune(slug); len(runes) > 64 {
+		slug = strings.Trim(string(runes[:64]), "-")
+	}
+	if slug == "" {
+		return "skill"
+	}
+	return slug
 }

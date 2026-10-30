@@ -75,3 +75,19 @@ func TestPublicationTargetRejectsLocalCloudConfusionAndPreservesLegacyDraft(t *t
 		t.Fatal("explicit cloud update destination was lost", err)
 	}
 }
+
+func TestPublicationSkillMarkdownAddsMissingFrontMatterOnly(t *testing.T) {
+	body := []byte("读取剧本，按场景输出镜头表。")
+	published := publicationSkillMarkdown(body, "分镜 助手 V2", "把剧本\n拆成镜头表")
+	name, err := skillhub.SkillName(published)
+	if err != nil || name != "分镜-助手-v2" || !bytes.HasSuffix(published, body) {
+		t.Fatalf("front matter not added: %q %v", published, err)
+	}
+	existing := []byte("---\nname: Bad Name\ndescription: x\n---\nbody")
+	if !bytes.Equal(publicationSkillMarkdown(existing, "ok", "ok"), existing) {
+		t.Fatal("an existing header must not be rewritten")
+	}
+	if got := publicationSkillSlug("!!!"); got != "skill" {
+		t.Fatal(got)
+	}
+}

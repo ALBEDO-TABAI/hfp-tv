@@ -35,7 +35,7 @@ func runPublishing(ctx context.Context, c *skillhub.Client, a arguments, out io.
 	}
 	if a.command == "authorize" {
 		var auth skillhub.Authorization
-		if err = c.JSON(ctx, "POST", "authorizations", "", "", map[string]string{"clientName": "BeefTV Skills CLI"}, &auth); err != nil {
+		if err = c.JSON(ctx, "POST", "authorizations", "", "", map[string]string{"clientName": "hfp - all in one 技能命令行"}, &auth); err != nil {
 			return err
 		}
 		state.DeviceCode = auth.DeviceCode

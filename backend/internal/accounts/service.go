@@ -713,3 +713,42 @@ func (s *Service) Audit(ctx context.Context, limit int) ([]AuditView, error) {
 func (s *Service) PurgeExpiredSessions(ctx context.Context) error {
 	return s.db.WithContext(ctx).Where("expires_at <= ?", s.now().UTC()).Delete(&Session{}).Error
 }
+
+// DB exposes platform.db to sibling platform domains (the skill market) that
+// keep their own tables in the same file.
+func (s *Service) DB() *gorm.DB { return s.db }
+
+// ActiveUser returns an active account; disabled or missing users are
+// unauthenticated for every platform surface.
+func (s *Service) ActiveUser(ctx context.Context, id string) (*User, error) {
+	var user User
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUnauthenticated
+		}
+		return nil, err
+	}
+	if user.Status != StatusActive {
+		return nil, ErrUnauthenticated
+	}
+	return &user, nil
+}
+
+// UserNumber is a stable positive integer for clients whose wire format needs
+// a numeric account ID (the SkillHub session contract). It is the SQLite rowid.
+func (s *Service) UserNumber(ctx context.Context, id string) (int, error) {
+	var number int
+	err := s.db.WithContext(ctx).Raw("SELECT rowid FROM users WHERE id = ?", id).Scan(&number).Error
+	if err == nil && number <= 0 {
+		err = ErrUserNotFound
+	}
+	return number, err
+}
+
+// Record appends an audit event for actions owned by other platform domains.
+func (s *Service) Record(ctx context.Context, actorID, action, targetUserID, detail string) error {
+	if len(detail) > 512 {
+		detail = detail[:512]
+	}
+	return s.db.WithContext(ctx).Create(&AuditEvent{ActorUserID: actorID, Action: action, TargetUserID: targetUserID, Detail: detail, CreatedAt: s.now().UTC()}).Error
+}

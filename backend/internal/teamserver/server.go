@@ -19,6 +19,7 @@ import (
 	"infinite-canvas/backend/internal/accounts"
 	"infinite-canvas/backend/internal/bootstrap"
 	"infinite-canvas/backend/internal/kernelpool"
+	"infinite-canvas/backend/internal/skillmarket"
 
 	"github.com/gin-gonic/gin"
 )
@@ -46,6 +47,8 @@ type Options struct {
 	// AllowedOrigins are extra browser origins (besides the request host) allowed
 	// to send unsafe requests, e.g. a separate dev server.
 	AllowedOrigins []string
+	// Market is the in-house skill market; nil disables its platform routes.
+	Market *skillmarket.Service
 }
 
 type Server struct {
@@ -272,6 +275,7 @@ func (s *Server) routes() {
 	s.platformRoutes(platform)
 	admin := platform.Group("/admin", s.requireAdmin)
 	s.adminRoutes(admin)
+	s.marketRoutes(platform, admin)
 	s.engine.NoRoute(func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 		if requestPath == "/api" || strings.HasPrefix(requestPath, "/api/") {
