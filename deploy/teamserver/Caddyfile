@@ -1,0 +1,19 @@
+{$TEAMSERVER_DOMAIN} {
+	encode gzip
+	request_body {
+		max_size 1GB
+	}
+	reverse_proxy teamserver:8080 {
+		# 任务事件流与助手对话是长连接流式响应，逐条转发。
+		flush_interval -1
+		transport http {
+			read_timeout 1h
+			write_timeout 1h
+		}
+	}
+	header {
+		Referrer-Policy no-referrer
+		X-Content-Type-Options nosniff
+		Strict-Transport-Security "max-age=31536000"
+	}
+}

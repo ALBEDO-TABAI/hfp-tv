@@ -35,3 +35,4 @@ web/out
 .settings-key
 .env*
 !.env.example
+agent-host/node_modules

@@ -1,0 +1,46 @@
+# 团队服务器：一个进程服务多名成员，每人一个独立工作区内核。
+# 用法见 docs/content/docs/deployment/team-server.mdx。
+services:
+  teamserver:
+    image: hfp-teamserver:local
+    build:
+      context: ../..
+      dockerfile: deploy/teamserver/Dockerfile
+      args:
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+    environment:
+      TEAMSERVER_COOKIE_SECURE: ${TEAMSERVER_COOKIE_SECURE:-true}
+      # 只信任 Compose 网络里的 Caddy 传来的 X-Forwarded-For。
+      TEAMSERVER_TRUSTED_PROXIES: ${TEAMSERVER_TRUSTED_PROXIES:-172.16.0.0/12}
+      TEAMSERVER_RELAY_CHANNEL_FILE: ${TEAMSERVER_RELAY_CHANNEL_FILE:-}
+      TEAMSERVER_REFERENCE_STORAGE_FILE: ${TEAMSERVER_REFERENCE_STORAGE_FILE:-}
+      # 团队服务器强制关闭私网出站；内网中转站只按主机名精确放行。
+      CANVAS_ALLOW_PRIVATE_UPSTREAMS: "false"
+      CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS: ${CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS:-}
+      CANVAS_SHUTDOWN_TIMEOUT: ${CANVAS_SHUTDOWN_TIMEOUT:-2m}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - teamserver-data:/data
+      - ./config:/config:ro
+    restart: unless-stopped
+    stop_grace_period: 3m
+
+  caddy:
+    image: caddy:2.10-alpine
+    depends_on:
+      - teamserver
+    environment:
+      TEAMSERVER_DOMAIN: ${TEAMSERVER_DOMAIN:?请设置 TEAMSERVER_DOMAIN，例如 studio.example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  teamserver-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,10 @@
+{
+  "name": "公司中转站",
+  "baseUrl": "https://relay.example.com/v1",
+  "apiFormat": "openai",
+  "models": ["gpt-image-2", "seedance-2.0"],
+  "modelProfiles": [
+    { "model": "gpt-image-2", "capability": "image" },
+    { "model": "seedance-2.0", "capability": "video" }
+  ]
+}
