@@ -1,6 +1,6 @@
 # 多人服务器与创意工坊：推荐方案
 
-状态：方案建议，尚未实施。结论基于当前分支源码核对，涉及“按代码推断”的地方会单独注明，没有部署或压测。初版方案见 [server-workspaces-and-community.md](server-workspaces-and-community.md)，两者差异汇总在第 11 节。
+状态：第一期“多人底座”已实施（后端、前端与部署文件，见第 12 节），第二至四期尚未实施。结论基于源码核对，涉及“按代码推断”的地方会单独注明；镜像尚未在真实服务器上构建与压测。实施中核对出的修订汇总在第 12 节，运行与部署说明见 [团队服务器](content/docs/backend/team-server.mdx)。初版方案见 [server-workspaces-and-community.md](server-workspaces-and-community.md)，两者差异汇总在第 11 节。
 
 本文假设的使用场景：10–30 人的内部团队，账号由管理员分配，每人一个私有工作区；创意工坊和技能市场只对已登录用户可见。规模或开放范围变化时，第 2 节说明什么时候需要换架构。
 
@@ -42,13 +42,13 @@
 | 创作助手 | 每个运行时一个宿主子进程，模型和凭据在启动时固定（[host.go](../backend/internal/assistantruntime/host.go#L31)）；工具只有业务操作和计划/技能工具，没有 shell 或文件工具（[durable-session-owner.mjs](../agent-host/durable-session-owner.mjs#L464)） | 按工作区各起一个即可；模型无法借助手执行任意命令 |
 | 危险的本机接口 | 宿主启动命令可通过 `PUT /assistant/host/config` 写入（[agent_host_lifecycle.go](../backend/internal/handler/agent_host_lifecycle.go#L44)）；另有 Eagle 本机素材库、深度组件安装、外部 Agent 凭据签发 | 托管模式必须不注册这些接口 |
 | 管理员身份 | 当前身份永远是 admin（[workspace/service.go](../backend/internal/workspace/service.go#L58)），插件安装、卸载等管理员操作因此对任何调用者开放 | 托管模式下成员不能拿到这些能力 |
-| 公开资源地址 | 模型上游拉取本地参考素材用签名地址 `/api/public/resources/:id/file`，地址里没有工作区信息（[resource.go](../backend/internal/app/resource.go#L288)） | 多个内核时网关无法判断转给谁，需要在路径里带工作区标识 |
+| 公开资源地址 | 签名地址的生成代码还在（[resource.go](../backend/internal/app/resource.go#L110)），但 `/api/public/resources/*` 路由在本地路由图里没有注册，测试明确禁止注册（[api_test.go](../backend/internal/handler/api_test.go#L112)）；本地模式需要公网地址的协议走工作区的参考素材对象存储，其余内嵌 | 不新开匿名路由；平台给每个工作区下发同一份对象存储配置（第 12 节） |
 | 只读画布 | `?readonly=1` 只是视觉只读：自动保存、拖放上传、键盘删除都没关，连平移缩放也被禁用（[project.tsx](../web/src/pages/canvas/project.tsx#L196)） | 不能用来做公开浏览 |
 | 纯渲染预览 | [canvas-version-preview.tsx](../web/src/pages/canvas/canvas-version-preview.tsx) 接收内存中的画布、回调全是空操作、可平移缩放；非媒体节点目前只渲染成文本卡片 | 适合作为只读查看器的起点 |
 | 导出 / 导入格式 | v4 压缩包含完整画布（节点、连线、时间线、导演台场景、画板、外观，**也包括助手会话 `chatSessions`**），导入时改写全部媒体引用并支持回滚（[canvas-export.ts](../web/src/lib/canvas/canvas-export.ts)、[canvas-archive-restore.ts](../web/src/lib/canvas/canvas-archive-restore.ts)）；导入完全由前端编排，服务端没有导入功能 | 快照与复制沿用这套格式和改写规则，但助手会话必须剥离，导入要移植到服务端 |
 | 服务端打包 | 只导出单张画布；遇到画板直接报错（[archive.go](../backend/internal/canvas/archive.go#L44)），但画板早已存进 `canvas_drawings` 表；只收集 `storageKey`，只用 URL 引用的媒体会被静默漏掉。前端导入同样只认 `storageKey`，并要求文件清单和 `storageKey` 引用一一对应（[canvas-export.ts](../web/src/lib/canvas/canvas-export.ts#L268)） | 快照导出需要重写依赖收集，而且导出和导入必须一起改：只把 URL 引用的媒体加进清单，整包都会被现有导入拒收 |
 | 画布保存校验 | 图片、视频、音频节点必须带 `assetId`，指向本工作区一条引用该资源的素材记录，否则保存被拒（[library_canvas_guard.go](../backend/internal/asset/library_canvas_guard.go#L17)） | 复制时不能只建资源文件，还要建素材记录并改写 `assetId` |
-| 项目副本 | 项目卡片的“创建副本”只复制节点、连线和助手会话（[index.tsx](../web/src/pages/canvas/index.tsx#L138)），时间线、导演台场景和外观不复制；画板记录按画布 ID 存储，新画布里的画板节点找不到内容 | 现有副本功能有缺陷，不能当作工坊复制的基础；服务端复制做好后，“创建副本”也改用它 |
+| 项目副本 | 已修复（提交 `da0e99c`）：复制移入 [local-workspace-project-duplicate.ts](../web/src/services/local-workspace-project-duplicate.ts)，带上时间线、导演台、外观并按画布复制画板，失败回滚 | 仍由前端编排；工坊复制需要服务端实现，做好后“创建副本”可改用它 |
 | 技能市场 | 客户端连外部 BeefTV SkillHub（[client.go](../backend/internal/skillhub/client.go#L16)），支持设备码授权（[market_auth.go](../backend/internal/skills/market_auth.go)）和 Ed25519 签名校验（[trust.go](../backend/internal/skillhub/trust.go#L14)）；允许 `http://127.0.0.1` 作为市场地址（[client.go](../backend/internal/skillhub/client.go#L148)） | 平台实现同一套接口即可复用客户端与前端 |
 | 审核后台 | 路由里没有 `/login`、`/admin`；技能审核在外部网站完成 | 需要新建 |
 | 前端身份 | 启动接口失败时回落到写死的 `local` 身份（[workspace-bootstrap-hydrator.tsx](../web/src/components/workspace/workspace-bootstrap-hydrator.tsx#L91)）；缓存隔离键用工作区 ID（[user-session.ts](../web/src/lib/user-session.ts#L36)）；切换身份时 React Query 不清空 | 多人前必须改成“失败即回登录页”，并按账号隔离缓存 |
@@ -159,7 +159,7 @@ flowchart LR
 - 第一版：管理员创建账号或发邀请链接，用户名 + 密码（argon2id），关闭公开注册。首个管理员用命令行创建。创建账号时一并填写此人的中转站密钥（见 4.4），也可以稍后补绑。
 - 可选：飞书登录。团队已经在飞书协作，扫码登录省掉密码管理，离职在飞书停用后自动失效。账号体系按“外部身份可绑定”设计，第一版不必实现。
 - 角色只有两级：成员、管理员。内核里的 `local/admin` 只代表“这个工作区的所有者”，和平台管理员无关。
-- 会话存服务端，Cookie 设为 HttpOnly、Secure、SameSite=Lax；写请求校验 Origin 并要求自定义请求头，防 CSRF；登录失败限速；管理员可强制下线。
+- 会话存服务端，Cookie 设为 HttpOnly、Secure、SameSite=Lax；写请求必须带本站 Origin（或 `Sec-Fetch-Site: same-origin`），防 CSRF；登录失败限速；管理员可强制下线。实施时没有再要求自定义请求头：SameSite=Lax 加严格的 Origin 校验已经足够，前端的原始 fetch 路径也不用逐个改。
 - 停用账号：立即作废会话、关闭其内核和助手进程，数据保留。
 
 ### 4.2 网关与可信入口
@@ -175,7 +175,7 @@ flowchart LR
 
 每个托管内核另外监听一个只供自己助手宿主回调用的 `127.0.0.1` 随机端口，并配随机启动令牌，防止同机其他进程（包括别人的助手宿主）直接访问。
 
-模型上游拉取本地参考素材用的签名地址是唯一不需要登录的内核入口。托管模式下把它改成带工作区标识的路径（例如 `/api/public/w/<工作区ID>/resources/:id/file`），网关按路径找到内核，签名仍由内核用自己的密钥校验。
+~~模型上游拉取本地参考素材用的签名地址是唯一不需要登录的内核入口~~：核对后发现这条路由在本地路由图里并未注册（见第 1 节）。托管内核因此没有任何免登录入口；需要公网地址的协议改用平台下发的对象存储配置。
 
 ### 4.3 托管模式下不注册的接口
 
@@ -187,8 +187,9 @@ flowchart LR
 | 外部 Agent / MCP 凭据 | `/agent-clients`、`/ops/clients`，前端 `/agents` 页 | 依赖本机回环；第一版关闭，以后改为平台签发的个人令牌 |
 | Eagle 素材库 | `/plugins/eagle/*` | 读取服务器本机文件 |
 | 深度捕捉等本机组件 | `/depth-captures` 及组件安装 | 会下载安装可执行组件 |
-| 插件安装与卸载 | `POST /plugins`、`DELETE /plugins/:id` | 当前身份恒为 admin，谁都能装；改为部署时预装、管理员统一维护，成员保留启用/停用。另外这几个接口操作完成后会写 `admin_audit_events`，而本地数据库有意不建这张表（[local_schema_test.go](../backend/internal/bootstrap/local_schema_test.go#L18)），按代码推断会在操作已生效后返回错误，桌面版同样受影响；管理员操作记录应改记到平台库 |
-| 诊断包导出 | `/diagnostics/*` | 只开放给管理员 |
+| 插件安装与卸载 | `POST /plugins`、`DELETE /plugins/:id` | 当前身份恒为 admin，谁都能装；改为部署时预装（镜像内官方插件目录），成员保留启用/停用。写入未建表的 `admin_audit_events` 的问题已在本地模式修复（提交 `69c37d7`） |
+| 诊断包导出 | `/diagnostics/*` | 第一期对所有成员关闭（内核不知道平台角色）；以后需要时由网关传入管理员标记 |
+| BeefAPI 设备授权 | `POST /beefapi/connection/start`、`/cancel` | 会在服务器上调用系统浏览器；托管内核还把打开浏览器的函数换成直接报错 |
 
 存储迁移和桌面更新是 Wails 绑定（`cmd/desktop`），服务器形态本来就没有对应 HTTP 入口。功能开关接口要同步返回这些能力“不可用”，前端据此隐藏入口（侧栏的“存储设置”“MCP”等）。
 
@@ -203,14 +204,14 @@ flowchart LR
 公司已有可以按人发密钥的中转站，平台不再自建模型网关：
 
 1. 管理员在“用户”页给账号绑定中转站密钥。平台用 `/data/secrets` 里的密钥加密保存一份，界面只显示末四位。
-2. 打开或新建工作区时，平台把一个固定 ID 的“公司中转站”渠道写进这个工作区的模型配置：地址和可用模型由部署配置统一给出，密钥是此人自己的。模型配置本来就由工作区自己的 `.settings-key` 加密，读取时密钥自动脱敏（[provider_config.go](../backend/internal/workspace/provider_config.go#L19)），浏览器拿不到明文。
+2. 打开或新建工作区时，平台把一个固定 ID 的“公司中转站”渠道写进这个工作区的模型配置：地址和可用模型由部署配置统一给出，密钥是此人自己的。模型配置由工作区自己的 `.settings-key` 加密保存。**修订**：`GET /workspace/model-config` 会把普通渠道的密钥原样返回给当前界面（浏览器发起的部分请求需要它，见 [HTTP API](content/docs/backend/http-api.mdx)），所以第一期成员能看到自己被绑定的密钥。要让密钥只留在服务端，需要把 BeefAPI 的 `credentialRef` 服务端注入推广到公司渠道（涉及任务、中转代理、助手、工作流凭据等约 10 处），列入后续。
 3. 这个渠道在托管模式下由平台管理：成员能看到、能选用，不能改地址和密钥，也不能删除。内核保存模型配置时校验这一条（改动很小）。管理员换绑或吊销后，平台改写配置并重启这个人的助手进程，让新密钥生效。
 4. 成员是否还能添加自己的渠道：默认允许（现有产品能力），仍受上面的出站限制。需要强制只用公司渠道时，加一个部署开关。
 5. 停用账号时，平台作废会话、关闭内核，并提醒管理员到中转站吊销对应密钥。中转站有管理接口时可以改成自动吊销。
 
 用量、额度、按人记账都在中转站侧统计，平台不重复实现。平台只限制每人同时进行的任务数（4.6），防止一个人把服务器的上传、下载和转码资源占满。
 
-模型上游有时需要回拉本地参考素材（第 4.2 节的签名地址），部署时要确认中转站和它转发到的上游能访问到平台对外的地址。
+模型上游有时需要拉取参考素材的公网地址，这由平台下发的对象存储提供（第 12 节），部署时要确认上游能访问该对象存储的公网地址。
 
 ### 4.5 前端隔离与缓存
 
@@ -529,3 +530,46 @@ type WorkspaceKernel interface {
 **本方案补上的、初版没有指出的问题**：服务器形态完全无鉴权，且当前身份恒为管理员；Compose 部署下画布保存按代码推断会失败；私网出站默认开启（SSRF）；后端镜像缺 Node 和 ffmpeg；公开资源签名地址无法按工作区路由；媒体节点必须挂本工作区素材记录，复制时要一并重建；服务端打包只收集 `storageKey`；工作流配方绑定原工作区密钥；前端启动失败会回落到共享的 `local` 身份；React Query 切换身份不清空；项目封面存在不分用户的 `localStorage`；`?readonly=1` 并不真正只读；导出格式包含助手会话；项目列表在远程环境下的全量拉取；现有“创建副本”会丢掉时间线、导演台和画板；插件管理接口会写一张本地数据库里不存在的审计表。
 
 **初版判断正确、本方案沿用的部分**：审核绑定固定版本而不是私人画布上的公开开关；只读页面使用独立数据加载器；不能把 owner 令牌加到所有请求上；内核的 `local/admin` 不等于平台管理员；私人媒体缓存需要单独处理；公开附件不能同源执行；平台迁移绝不调用会删除托管表的 `MigrateLocalSchema`。初版提到“存储迁移、桌面更新接口需要关闭”，实际上它们是 Wails 绑定，服务器形态没有对应 HTTP 入口。
+
+## 12. 第一期实施记录与修订
+
+### 12.1 已实现
+
+| 项 | 位置 | 说明 |
+| --- | --- | --- |
+| 托管内核 | `backend/internal/bootstrap/hosted.go`、`runtime.go` | `ProfileHosted`：独占数据目录锁、回环随机端口 + 独有启动令牌、`GatewayHandler()`、内核层拒绝第 4.3 节的接口 |
+| 信任入口 | `internal/transport/http/token.go`、`internal/handler/agent_ops.go` 等 | 网关在 context 里标记工作区所有者；本机同源、owner、操作调用者、助手界面会话签发统一认它 |
+| 助手回调地址 | `internal/handler/runtime_dependencies.go` | 托管内核钉住回环地址与令牌，不再从浏览器请求的 Host 推导 |
+| 助手子进程 | `internal/assistantruntime` | 启动命令由部署固定；只继承白名单环境变量 |
+| 后台 panic | `internal/platform/worker_runtime.go` | 任务与事件循环捕获 panic，事件循环自动重启 |
+| 账号与会话 | `internal/accounts` | argon2id、会话哈希、滑动过期、登录限速、一次性邀请、操作记录、中转站密钥加密 |
+| 内核池 | `internal/kernelpool` | 按用户打开内核、并发去重、失败可重试、写入公司渠道与对象存储配置 |
+| 网关与平台接口 | `internal/teamserver` | 会话 → 工作区、Origin 校验、请求头剥离、管理员接口、前端静态文件 |
+| 入口 | `cmd/teamserver` | 环境检查、启动时打开所有活跃工作区、`admin create/reset-password` |
+| 前端 | `web/src/services/api/platform.ts`、`pages/login`、`pages/invite`、`pages/admin/users`、账号菜单 | 启动先探测模式；团队模式失败不回落 `local` 身份；缓存按“用户 ID:工作区 ID”隔离并在切换时清空查询缓存；401 统一回登录页；隐藏桌面专属入口 |
+| 部署 | `deploy/teamserver/` | 单镜像（Go + Node 24 + 助手依赖 + ffmpeg + 插件 + 前端）、Compose、Caddy |
+
+### 12.2 核对后修订的结论
+
+1. **公开资源路由不存在**：第 4.2 节按工作区改写签名地址的设计取消，改为平台下发对象存储配置（`TEAMSERVER_REFERENCE_STORAGE_FILE`）。
+2. **模型配置会把密钥交给浏览器**：第 4.4 节“成员读不到密钥明文”在第一期做不到，见上文修订；公司渠道已做到成员改不了、删不掉、伪造不了。
+3. **助手按浏览器请求推导回调地址**：`hostOpsURL` 原来用 `c.Request.Host`，经网关时会指向公网域名。已改为由组合根钉住。
+4. **全局状态比第 2 节列的多**：另有后台协程无 recover、助手子进程继承全部环境变量、`BEEFTV_AGENT_HOST_TOKEN` 等进程级变量会让所有内核共用一份凭据、BeefAPI 授权会在服务器上开浏览器。前三项已处理，最后一项靠拒绝接口和替换打开函数处理。
+5. **出站策略是进程级**：`internal/outbound` 每次连接读环境变量，没有按内核覆盖的入口。团队服务器在进程入口强制 `CANVAS_ALLOW_PRIVATE_UPSTREAMS=false`。
+6. **启动策略**：第一期在启动时打开所有活跃工作区，保证任务恢复；按需打开与空闲回收（第 10 节的 Node 进程内存风险）留到第四期。
+7. **代码落点**：网关与平台接口放在新包 `internal/teamserver`（HTTP 组合），`internal/kernelpool` 只管内核生命周期，`internal/accounts` 只管平台库，三者分开。
+8. **新发现的问题**：画布实时事件流原来只在 `http:` 页面用 `EventSource` 启用，HTTPS 部署下多标签页不会实时同步，401 也拿不到。团队模式已改用 `fetch` 读取事件流（`web/src/services/api/canvas-events.ts`，做法取自 `feat/team-server` 分支），本地模式不变。
+
+### 12.3 第一期验收状态
+
+| 验收项（第 9 节） | 状态 |
+| --- | --- |
+| A、B 各自建项目；互相猜 ID 读不到 | 自动化测试覆盖画布与工作区身份（`internal/teamserver/server_test.go`、`internal/bootstrap/hosted_test.go`） |
+| 同一浏览器 A 退出后 B 看不到 A 的缓存 | 查询缓存切换清空、localforage 按“用户:工作区”分键；无头浏览器实测了登录跳转、退出后换成员登录、成员缓存键为“用户 ID:工作区 ID”、成员进不了用户管理、团队模式隐藏 MCP 入口、公司渠道只读；未逐项比对 IndexedDB 内容 |
+| 服务重启后任务继续 | 启动时打开所有活跃工作区；未做重启实测 |
+| 停用账号立即失效 | 自动化测试覆盖 |
+| 自定义渠道指向 `127.0.0.1` 被拒绝 | 由进程级出站策略保证；未单独实测 |
+| 中转站按人计量；成员改不了、删不掉公司渠道 | 改删被还原有自动化测试；成员能读到自己的密钥（已知限制）；未接真实中转站 |
+| 上传、生成、助手、事件流全链路 | 未实测，需要部署后用真实模型验收 |
+| 项目封面改存服务器、项目列表改摘要加载 | 未做 |
+

@@ -1,0 +1,121 @@
+---
+title: 团队服务器
+---
+
+# 团队服务器
+
+团队服务器（`backend/cmd/teamserver`）用一个进程服务多名成员，每人一个独立工作区。它面向 10–30 人、账号由管理员分配的内部团队。架构取舍和后续分期见 [团队服务器与创意工坊方案](../../../team-server-and-workshop.md)。
+
+当前实现是方案的第一期“多人底座”：账号、会话、网关、内核池、公司中转站渠道和部署镜像。创意工坊、技能市场、配额与总并发不在本期范围内。
+
+## 运行结构
+
+```text
+浏览器 ──HTTPS──> Caddy ──> teamserver（一个进程）
+                              ├─ /api/platform/*   账号、会话、用户管理（platform.db）
+                              ├─ 其余 /api/*        会话 → 用户 → 工作区内核 → 内核路由
+                              └─ 其他路径           前端静态文件（TEAMSERVER_WEB_DIR）
+内核 = bootstrap.ProfileHosted 运行时；每人一份数据目录、一个 SQLite、一个按需启动的 Node 助手子进程
+```
+
+数据目录（`TEAMSERVER_DATA_DIR`，镜像内为 `/data`）：
+
+| 路径 | 内容 |
+| --- | --- |
+| `platform.db` | 账号、会话、邀请、工作区登记、管理员操作记录 |
+| `secrets/` | 平台加密密钥（加密中转站密钥），权限 0700 |
+| `workspaces/<工作区ID>/` | 与桌面版相同的单机数据目录：SQLite、资源、模型配置、助手数据 |
+
+服务启动时会打开所有启用中的工作区，让重启前排队或进行中的生成任务继续执行。停用账号会立即作废会话并关闭该工作区内核。
+
+## 信任边界
+
+- 目标工作区只由服务端会话决定。请求里的路径、请求头和 ID 都不能改变它。
+- 网关认证后，在进程内 context 里标记“本工作区所有者”（`httptransport.WithHostedOwner`）。内核原有的本机同源判断、owner 校验、助手界面会话签发都认这个标记。浏览器无法用请求头伪造它。
+- 网关转发前删除 `X-Desktop-Token` 和全部 `X-Beeftv-*` 请求头（保留 `X-Beeftv-Ui-Session`），并删除 Cookie。
+- 每个内核另开一个 `127.0.0.1` 随机端口，只供自己的助手子进程回调，要求该内核独有的启动令牌。助手回调地址由内核钉住，不从浏览器请求推导。
+- 托管内核不提供下列接口，内核和网关两层都会拒绝，返回 404 `hosted_unavailable`：`PUT /assistant/host/config`、`/agent-clients*`、`/ops/clients`、`/plugins/eagle/*`、`POST /plugins`、`DELETE /plugins/:id`、`POST /depth-captures`、`/diagnostics/*`、`POST /beefapi/connection/start|cancel`。
+- 助手子进程的启动命令由部署配置固定（`TEAMSERVER_AGENT_HOST_COMMAND`/`ARGS`），只继承白名单环境变量（PATH、HOME、语言、时区、临时目录、证书、代理）。
+- 写请求必须带本站 `Origin`（或 `Sec-Fetch-Site: same-origin`）；会话 Cookie 为 `HttpOnly`、`Secure`、`SameSite=Lax`。
+- 后台任务和事件循环的 panic 会被捕获并记录。一个工作区的任务出错不会让整个进程退出。
+
+### 进程级环境变量
+
+`internal/outbound` 在每次连接时读取私网出站开关，所以它对所有工作区生效。团队服务器启动时：
+
+- `CANVAS_ALLOW_PRIVATE_UPSTREAMS` 未设置时自动设为 `false`；显式设为其他值会拒绝启动。内网中转站用 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS` 按主机名精确放行。
+- 下列变量会让所有工作区共用同一凭据或信任，设置了就拒绝启动：`BEEFTV_AGENT_HOST_TOKEN`、`BEEFTV_OWNER_TOKEN`、`BEEFTV_UI_BOOTSTRAP`、`BEEFTV_ALLOWED_ORIGINS`、`BEEFTV_AGENT_BASE_URL`、`BEEFTV_AGENT_API_KEY`、`BEEFTV_AGENT_MODEL`、`BEEFTV_AGENT_PROTOCOL`、`BEEFTV_AGENT_HOST_URL`。
+
+## 部署
+
+部署文件在 `deploy/teamserver/`。镜像包含 Go 网关与内核、Node 24 助手宿主及依赖、ffmpeg、官方插件包和前端构建产物。
+
+```bash
+cd deploy/teamserver
+TEAMSERVER_DOMAIN=studio.example.com docker compose up -d --build
+# 创建首个管理员（密码从标准输入读一行，不进 shell 历史）
+read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver admin create --username admin --display-name 管理员
+```
+
+管理员登录后，在侧栏账号菜单进入“用户管理”，创建账号、发邀请链接、绑定中转站密钥。忘记管理员密码时运行 `teamserver admin reset-password --username admin`（同样从标准输入读密码），这会使该账号的所有会话失效。
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `TEAMSERVER_DATA_DIR` | `/data` | 数据根目录 |
+| `TEAMSERVER_ADDR` | `:8080` | 监听地址；只由反向代理访问，不要直接暴露到公网 |
+| `TEAMSERVER_WEB_DIR` | 镜像内 `/app/web` | 前端构建产物；为空时只提供 API |
+| `TEAMSERVER_COOKIE_SECURE` | `true` | 仅在本机 HTTP 试用时设为 `false` |
+| `TEAMSERVER_TRUSTED_PROXIES` | `127.0.0.1,::1`（Compose 中为 `172.16.0.0/12`） | 允许其 `X-Forwarded-For` / `X-Forwarded-Host` 生效的反向代理 |
+| `TEAMSERVER_ALLOWED_ORIGINS` | 空 | 除本站外允许发写请求的来源，逗号分隔 |
+| `TEAMSERVER_AGENT_HOST_COMMAND` / `TEAMSERVER_AGENT_HOST_ARGS` | 镜像内为 `node` 与 `["/app/agent-host/server.mjs"]` | 助手子进程命令；`ARGS` 是 JSON 字符串数组 |
+| `TEAMSERVER_RELAY_CHANNEL_FILE` | 空 | 公司中转站渠道定义文件，见下节 |
+| `TEAMSERVER_REFERENCE_STORAGE_FILE` | 空 | 参考素材对象存储配置（`referencestorage.Config` 的 JSON），写入每个工作区 |
+| `CANVAS_SHUTDOWN_TIMEOUT` | `2m` | 每个内核关闭时等待后台任务的上限 |
+
+团队模式下前端用 `fetch` 读取画布事件流（`web/src/services/api/canvas-events.ts`），能拿到 401 并在 HTTPS 下工作。Caddy 示例配置对流式响应设置了 `flush_interval -1`。改用 nginx 时，`/api/` 需要关闭缓冲（`proxy_buffering off`），并把读超时设到 1 小时，否则任务事件流和助手对话会被截断。
+
+### 公司中转站渠道
+
+`TEAMSERVER_RELAY_CHANNEL_FILE` 指向一个模型渠道 JSON 对象，格式与模型配置里的渠道相同，但不能包含 `apiKey`、`secretKey` 或 `credentialRef`。示例见 `deploy/teamserver/config/relay-channel.example.json`；Compose 把 `deploy/teamserver/config` 挂载到容器的 `/config`，因此可设为 `/config/relay-channel.json`。
+
+服务端会把它写进每个工作区的模型配置，渠道 ID 固定为 `company-relay`，密钥用管理员为该成员绑定的中转站密钥。规则如下：
+
+- 未绑定密钥时渠道处于停用状态；绑定、换绑或清除后立即改写配置。助手子进程在下次状态检查时用新密钥重启。
+- 成员保存模型配置时，这个渠道总会恢复成平台写入的样子，成员不能修改或删除它，也不能伪造同 ID 的渠道。
+- 中转站密钥在平台库里加密保存，管理界面只显示末四位。
+
+**已知限制**：模型配置接口会把渠道密钥返回给当前成员的浏览器（本地模式就是这样设计的，浏览器发起的部分请求需要它），所以成员能看到自己被绑定的中转站密钥。要做到密钥只留在服务端，需要把 BeefAPI 的 `credentialRef` 服务端注入机制推广到公司渠道，这一项在后续阶段处理。
+
+### 参考素材
+
+托管内核不注册匿名资源下载路由。需要公网地址的模型协议，通过 `TEAMSERVER_REFERENCE_STORAGE_FILE` 配置的 S3 兼容对象存储上传参考素材，其余协议沿用内嵌素材。
+
+## 平台接口
+
+信封与本地 API 相同：成功 `{ code: 0, data, msg }`；失败时 HTTP 状态与 `code` 一致，并带机器可读的 `reason`。未登录访问任何工作区接口都返回 401 `unauthenticated`。
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/platform/me` | 当前用户、角色、工作区、中转站绑定状态和能力开关。前端靠它区分团队模式（200/401）与本地模式（404） |
+| `POST /api/platform/login` | `{username, password}`；失败统一为 `invalid_credentials`，同一用户名+IP 15 分钟内失败 8 次后返回 429 `too_many_attempts` |
+| `POST /api/platform/logout` | 作废当前会话 |
+| `POST /api/platform/password` | `{currentPassword, newPassword}`；成功后其他设备的会话失效 |
+| `GET /api/platform/invitations/:token`、`POST .../accept` | 查看与接受邀请；接受时创建账号并登录，邀请只能用一次 |
+| `GET/POST /api/platform/admin/users` | 列出、创建用户（可同时绑定中转站密钥） |
+| `PATCH /api/platform/admin/users/:id` | 修改显示名、角色、状态；管理员不能停用自己或取消自己的管理员身份 |
+| `POST /api/platform/admin/users/:id/password` | 重置密码，并使该用户所有会话失效 |
+| `PUT/DELETE /api/platform/admin/users/:id/relay-key` | 绑定或清除中转站密钥 |
+| `POST /api/platform/admin/invitations` | `{role, expiresInHours}`，返回一次性邀请链接 |
+| `GET /api/platform/admin/audit` | 管理员操作记录，只增不改 |
+| `GET /api/health/live` | 进程存活，不需要登录 |
+
+## 备份
+
+备份时停止服务，或对 `platform.db` 和每个 `workspaces/*/open_ai_canvas.db` 用 SQLite 在线备份，再增量复制 `secrets/` 与各工作区的资源目录。`secrets/` 丢失后已绑定的中转站密钥无法解密，需要重新绑定。
+
+## 第一期未完成的部分
+
+- 没有存储配额和跨工作区的生成总并发上限：每个内核各自按默认并发 3 执行。
+- 助手子进程不会空闲回收。
+- 公司中转站密钥对本人可见（见上文）。
+- 镜像和 Compose 尚未在真实服务器上构建与压测。

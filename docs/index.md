@@ -34,7 +34,8 @@ hfp - all in one 是基于 BeefTV 的本地视频创作工作台。本页收录�
 
 ## 开发参考
 
-- [团队服务器与创意工坊方案（架构与产品方案，尚未实施）](team-server-and-workshop.md)
+- [团队服务器与创意工坊方案（第一期多人底座已实施，其余尚未实施）](team-server-and-workshop.md)
+- [团队服务器：运行结构、信任边界、部署与平台接口](content/docs/backend/team-server.mdx)
 - [多人服务器与公共创意工坊方案（初版草案，已由上一条取代）](server-workspaces-and-community.md)
 - [后端本地开发](content/docs/backend/local-development.mdx)
 - [HTTP API](content/docs/backend/http-api.mdx)

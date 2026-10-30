@@ -5,6 +5,7 @@
   "pages": [
     "local-development",
     "http-api",
+    "team-server",
     "storyboard-operations",
     "code-map",
     "backend-database",

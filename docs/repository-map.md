@@ -12,6 +12,7 @@
 | `plugin-packages/` | 各模型接口的声明式插件源码及打包脚本 | [build-packages.sh](../plugin-packages/build-packages.sh) |
 | `plugins/beeftv-skills/` | 面向外部 Agent 的技能包 | [README](../plugins/beeftv-skills/README.md) |
 | `scripts/` | 构建、发行和专项验收脚本 | [桌面发布说明](desktop-release.md) |
+| `deploy/teamserver/` | 团队服务器镜像、Compose 与 Caddy 示例 | [团队服务器](content/docs/backend/team-server.mdx) |
 | `tools/depth-capture/` | 可选的深度捕捉工具 | [README](../tools/depth-capture/README.md) |
 | `fixtures/`、`web/test/`、Go `*_test.go` | 合同样本、测试与回归用例 | 与改动模块相邻的测试 |
 | `docs/` | Markdown / MDX 文档和历史证据；当前没有独立文档站构建工程 | [文档索引](index.md) |
@@ -63,6 +64,7 @@
 | `backend/cmd/server/` | 浏览器开发服务入口、环境变量和进程退出 | 页面业务逻辑 |
 | `backend/cmd/desktop/` | Wails 原生窗口和桌面配置注入 | 另一套业务服务 |
 | `backend/cmd/beeftv/` | CLI / MCP 入口 | 绕过业务接口直接改数据库 |
+| `backend/cmd/teamserver/`、`internal/teamserver/`、`accounts/`、`kernelpool/` | 多人部署：登录网关、账号与会话、每人一个托管工作区内核 | 内核业务逻辑；内核不感知平台账号 |
 | `backend/internal/bootstrap/`、`localapp/` | 组合服务、生命周期和窄接口 | 新的巨型业务入口 |
 | `backend/internal/handler/` | 路由、输入、身份和响应 | 数据库查询与供应商私有协议 |
 | `backend/internal/operations/`、`agentops/` | 业务操作登记、调用者权限和重复请求处理 | 独立于页面的第二套业务实现 |
