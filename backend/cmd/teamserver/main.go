@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -27,6 +28,7 @@ import (
 	"infinite-canvas/backend/internal/referencestorage"
 	"infinite-canvas/backend/internal/skillmarket"
 	"infinite-canvas/backend/internal/teamserver"
+	"infinite-canvas/backend/internal/workshop"
 
 	"github.com/gin-gonic/gin"
 )
@@ -154,6 +156,18 @@ func run(ctx context.Context) error {
 		return err
 	}
 	defer marketListener.Close()
+	workshopMaxBytes := workshop.DefaultMaxBytes
+	if raw := strings.TrimSpace(os.Getenv("TEAMSERVER_WORKSHOP_MAX_MB")); raw != "" {
+		megabytes, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || megabytes <= 0 {
+			return errors.New("TEAMSERVER_WORKSHOP_MAX_MB 必须是正整数")
+		}
+		workshopMaxBytes = megabytes << 20
+	}
+	shop, err := workshop.Open(users.DB(), root, nil, users, workshopMaxBytes)
+	if err != nil {
+		return err
+	}
 	pool := kernelpool.New(kernelpool.Options{
 		Hosted:           bootstrap.HostedConfig{AssistantHostCommand: os.Getenv("TEAMSERVER_AGENT_HOST_COMMAND"), AssistantHostArgs: args},
 		RelayTemplate:    relayTemplate,
@@ -166,6 +180,7 @@ func run(ctx context.Context) error {
 		TrustedProxies: envListOrDefault("TEAMSERVER_TRUSTED_PROXIES", []string{"127.0.0.1", "::1"}),
 		AllowedOrigins: envList("TEAMSERVER_ALLOWED_ORIGINS"),
 		Market:         market,
+		Workshop:       shop,
 	})
 	if err != nil {
 		return err

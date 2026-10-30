@@ -19,6 +19,7 @@ const DefaultURL = ""
 
 // ErrNotConfigured is returned when no market URL is configured.
 var ErrNotConfigured = &Error{Status: 503, Reason: "market_not_configured", Message: "未配置技能市场：团队服务器部署会自动接入内置技能市场，其他环境请设置 BEEFTV_SKILLHUB_URL"}
+
 const MaxArchiveBytes = 10 << 20
 
 type File struct {

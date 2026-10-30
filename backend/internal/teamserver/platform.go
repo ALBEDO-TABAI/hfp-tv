@@ -24,6 +24,7 @@ func (s *Server) meView(principal *accounts.Principal) gin.H {
 			"hosted": true, "externalAgents": false, "storageSettings": false, "eagle": false,
 			"depthCapture": false, "pluginInstall": false, "diagnostics": false, "userAdmin": principal.IsAdmin(),
 			"skillReview": principal.IsAdmin() && s.opts.Market != nil,
+			"workshop":    s.opts.Workshop != nil, "workshopReview": principal.IsAdmin() && s.opts.Workshop != nil,
 		},
 	}
 }

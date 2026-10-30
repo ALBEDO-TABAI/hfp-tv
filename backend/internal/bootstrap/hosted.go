@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"infinite-canvas/backend/internal/assistantruntime"
+	"infinite-canvas/backend/internal/projectsnapshot"
 	httptransport "infinite-canvas/backend/internal/transport/http"
 
 	"github.com/gin-gonic/gin"
@@ -206,4 +207,17 @@ func hostedManagedChannels(cfg Config) []string {
 		return nil
 	}
 	return append([]string(nil), cfg.Hosted.ManagedChannelIDs...)
+}
+
+// ProjectSnapshots exposes project export/import for the team-server workshop.
+// It always acts as this workspace's owner.
+func (r *Runtime) ProjectSnapshots() (*projectsnapshot.Service, error) {
+	if r == nil || r.service == nil {
+		return nil, errors.New("工作区内核未打开")
+	}
+	owner, err := r.service.LocalWorkspaceOwner()
+	if err != nil {
+		return nil, err
+	}
+	return projectsnapshot.New(r.service.ProjectSnapshotWorkspace(), owner.ID), nil
 }

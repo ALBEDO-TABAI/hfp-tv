@@ -20,6 +20,7 @@ import (
 	"infinite-canvas/backend/internal/bootstrap"
 	"infinite-canvas/backend/internal/kernelpool"
 	"infinite-canvas/backend/internal/skillmarket"
+	"infinite-canvas/backend/internal/workshop"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,6 +50,8 @@ type Options struct {
 	AllowedOrigins []string
 	// Market is the in-house skill market; nil disables its platform routes.
 	Market *skillmarket.Service
+	// Workshop is the project workshop; nil disables its routes.
+	Workshop *workshop.Service
 }
 
 type Server struct {
@@ -78,6 +81,9 @@ func New(opts Options) (*Server, error) {
 		}
 	}
 	engine.Use(server.requireSameOrigin())
+	if opts.Workshop != nil {
+		opts.Workshop.UseKernels(server.snapshotKernel)
+	}
 	server.routes()
 	return server, nil
 }
@@ -276,6 +282,7 @@ func (s *Server) routes() {
 	admin := platform.Group("/admin", s.requireAdmin)
 	s.adminRoutes(admin)
 	s.marketRoutes(platform, admin)
+	s.workshopRoutes(admin)
 	s.engine.NoRoute(func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 		if requestPath == "/api" || strings.HasPrefix(requestPath, "/api/") {

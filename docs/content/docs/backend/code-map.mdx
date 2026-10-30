@@ -46,7 +46,7 @@ Wails / local dev
 | 远程 Skill 市场 | `backend/internal/skillhub`、`skillhubcli` | `beeftv skills` 直接访问统一市场，不发现或连接本地运行时；共享版本清单、完整性校验与专用投稿授权 |
 | 内置 Skill 接入 | `backend/internal/skills/market*.go`、`operations/skill*.go`、`assistantturns/skill_context.go` | Go 管理本地安装、确切版本、活动上下文和投稿确认；模型只获得查询、草稿和准备操作。详见 [接口交接](../../../refactor/skill-market-agent-access.md) |
 | 桌面更新发布 | `backend/cmd/update-release` | 生成更新密钥、打包 zip、签署 `desktop-update.json` |
-| 团队服务器 | `backend/cmd/teamserver`、`internal/teamserver`、`internal/accounts`、`internal/kernelpool`、`internal/skillmarket` | 多人部署入口：登录网关与平台接口、账号/会话/邀请/操作记录（`platform.db`）、按用户打开 `ProfileHosted` 内核并下发公司中转站渠道；`skillmarket` 是站内技能市场（SkillHub v1 兼容、审核、Ed25519 签名）。托管内核的信任入口、拒绝的接口和环境检查在 `internal/bootstrap/hosted.go`。详见 [团队服务器](/docs/backend/team-server) |
+| 团队服务器 | `backend/cmd/teamserver`、`internal/teamserver`、`internal/accounts`、`internal/kernelpool`、`internal/skillmarket`、`internal/workshop`、`internal/projectsnapshot` | 多人部署入口：登录网关与平台接口、账号/会话/邀请/操作记录（`platform.db`）、按用户打开 `ProfileHosted` 内核并下发公司中转站渠道；`skillmarket` 是站内技能市场（SkillHub v1 兼容、审核、Ed25519 签名）；`workshop` 是创意工坊（作品、版本、审核、复制），内核侧的项目快照导出导入在 `projectsnapshot`，由 `app/project_snapshot_workspace.go` 适配。托管内核的信任入口、拒绝的接口和环境检查在 `internal/bootstrap/hosted.go`。详见 [团队服务器](/docs/backend/team-server) |
 | 前端 | `web/src` | React 画布、项目、素材、模型配置与插件 UI |
 
 ## 硬边界

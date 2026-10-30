@@ -6,7 +6,7 @@ title: 团队服务器
 
 团队服务器（`backend/cmd/teamserver`）用一个进程服务多名成员，每人一个独立工作区。它面向 10–30 人、账号由管理员分配的内部团队。架构取舍和后续分期见 [团队服务器与创意工坊方案](../../../team-server-and-workshop.md)。
 
-当前实现了方案的第一期“多人底座”（账号、会话、网关、内核池、公司中转站渠道和部署镜像）和第三期“技能市场”（投稿、审核、签名与安装都在团队服务器内完成，不依赖上游服务）。创意工坊、配额与总并发尚未实现。
+当前实现了方案的第一期“多人底座”（账号、会话、网关、内核池、公司中转站渠道和部署镜像）、第二期“创意工坊”（项目投稿、审核、只读浏览与复制）和第三期“技能市场”（投稿、审核、签名与安装都在团队服务器内完成，不依赖上游服务）。配额与总并发等第四期加固尚未实现。
 
 ## 运行结构
 
@@ -25,6 +25,7 @@ title: 团队服务器
 | `platform.db` | 账号、会话、邀请、工作区登记、管理员操作记录 |
 | `secrets/` | 平台加密密钥（加密中转站密钥）和技能签名私钥 `skillhub-signing.key`，权限 0700 |
 | `market/archives/` | 技能市场的投稿与发布包，按 SHA-256 命名，只写一次 |
+| `community/blobs/sha256/` | 创意工坊的作品快照和媒体文件，按 SHA-256 命名，只写一次 |
 | `workspaces/<工作区ID>/` | 与桌面版相同的单机数据目录：SQLite、资源、模型配置、助手数据 |
 
 服务启动时会打开所有启用中的工作区，让重启前排队或进行中的生成任务继续执行。停用账号会立即作废会话并关闭该工作区内核。
@@ -72,6 +73,7 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 | `TEAMSERVER_RELAY_CHANNEL_FILE` | 空 | 公司中转站渠道定义文件，见下节 |
 | `TEAMSERVER_REFERENCE_STORAGE_FILE` | 空 | 参考素材对象存储配置（`referencestorage.Config` 的 JSON），写入每个工作区 |
 | `TEAMSERVER_MARKET_ADDR` | `127.0.0.1:18090` | 内置技能市场的内部监听地址，只能是本机回环；要保持固定，内核保存的投稿授权和这个地址绑定 |
+| `TEAMSERVER_WORKSHOP_MAX_MB` | `2048` | 单次创意工坊投稿的文件总大小上限 |
 | `CANVAS_SHUTDOWN_TIMEOUT` | `2m` | 每个内核关闭时等待后台任务的上限 |
 
 团队模式下前端用 `fetch` 读取画布事件流（`web/src/services/api/canvas-events.ts`），能拿到 401 并在 HTTPS 下工作。Caddy 示例配置对流式响应设置了 `flush_interval -1`。改用 nginx 时，`/api/` 需要关闭缓冲（`proxy_buffering off`），并把读超时设到 1 小时，否则任务事件流和助手对话会被截断。
@@ -91,6 +93,27 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 ### 参考素材
 
 托管内核不注册匿名资源下载路由。需要公网地址的模型协议，通过 `TEAMSERVER_REFERENCE_STORAGE_FILE` 配置的 S3 兼容对象存储上传参考素材，其余协议沿用内嵌素材。
+
+## 创意工坊
+
+成员把自己的项目投稿到创意工坊，管理员审核后，所有登录成员都能只读浏览，并一键复制到自己的工作区（`backend/internal/workshop`，内核侧快照在 `backend/internal/projectsnapshot`）。
+
+- **项目与快照**：一个项目是共用同一个 `workspaceProjectId` 的若干张画布。投稿时内核把整组画布、画板和全部引用的媒体导出成一份不可变快照：媒体按 SHA-256 存进 `community/blobs`，文档里的 `resource:<id>` 和资源地址改写成 `workshop:<sha256>` / `workshop://<sha256>`；素材记录 ID、任务 ID、助手对话、视口和项目归属都不进快照。
+- **预检**：只存在浏览器里的素材、缺失或未上传完成的文件、未保存的画板、超出大小上限会阻止投稿；外部链接、仍在生成的节点、疑似密钥或手机号只作提醒。
+- **审核**：同一项目的新投稿会替代还在待审的旧稿。管理员审核时看到的是只读画布、文件清单和与上一版的差异，通过时必须带上看到的快照摘要，作者在此期间更新或撤回会让审批失败。审核前除作者和管理员外没有人能读到快照和文件。
+- **浏览与文件**：文件只能经由“当前可见的版本”读取。图片、视频和音频在站内预览，其他类型（含 SVG、HTML）一律按附件下载并带 `sandbox` 安全头。作者可选择是否允许下载原文件；不允许时界面不提供下载按钮，但浏览器里能预览的内容在技术上仍可另存。
+- **复制**：复制在服务端完成：为每个文件在目标工作区建立资源（同一文件再次复制会复用），重建素材记录并改写节点的 `assetId`，用新 ID 写入画布和画板，失败时删除已建的画布和素材记录。同一个请求 ID 重复提交返回同一份副本。原作品更新、下架都不影响已有副本。
+- **改编**：从工坊复制来的项目再投稿时，会自动标注“改编自……”，作者不能去掉；来源下架后显示为“改编自（已下架作品）”。
+
+| 接口 | 说明 |
+| --- | --- |
+| `POST /api/community/submissions/preflight`、`POST /api/community/submissions` | 预检与投稿（需确认素材授权） |
+| `GET /api/community/submissions/mine`、`POST /api/community/versions/:vid/withdraw`、`POST /api/community/publications/:id/unlist` | 我的投稿、撤回待审稿件、作者下架 |
+| `GET /api/community/publications`、`GET /api/community/publications/:id` | 浏览列表（搜索、官方/同事、精选/最新/最多复制）与作品详情；下架返回 410 |
+| `GET /api/community/versions/:vid/snapshot`、`GET /api/community/files/:sha256?v=` | 只读快照与文件 |
+| `POST /api/community/publications/:id/copies`、`GET /api/community/copies/:requestId`、`GET /api/community/origins/:projectId` | 复制、复制结果、项目来源 |
+| `GET /api/platform/admin/workshop/versions?status=`、`POST …/:vid/approve\|reject` | 审核队列与审批 |
+| `GET /api/platform/admin/workshop/publications`、`POST …/:id/unlist\|relist\|feature\|unfeature\|official\|unofficial` | 已发布作品管理 |
 
 ## 技能市场
 
@@ -133,7 +156,7 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 
 ## 备份
 
-备份时停止服务，或对 `platform.db` 和每个 `workspaces/*/open_ai_canvas.db` 用 SQLite 在线备份，再增量复制 `secrets/`、`market/` 与各工作区的资源目录。`secrets/` 丢失后已绑定的中转站密钥无法解密，需要重新绑定；技能签名私钥也会变化，已发布的技能需要重新审核发布才能被内核信任。
+备份时停止服务，或对 `platform.db` 和每个 `workspaces/*/open_ai_canvas.db` 用 SQLite 在线备份，再增量复制 `secrets/`、`market/`、`community/` 与各工作区的资源目录。`secrets/` 丢失后已绑定的中转站密钥无法解密，需要重新绑定；技能签名私钥也会变化，已发布的技能需要重新审核发布才能被内核信任。
 
 ## 尚未完成的部分
 
@@ -141,4 +164,5 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 - 助手子进程不会空闲回收。
 - 公司中转站密钥对本人可见（见上文）。
 - 镜像和 Compose 尚未在真实服务器上构建与压测。
+- 创意工坊复制是同步请求，大作品需要等待；文件直接复制进目标工作区，没有用硬链接省空间；被替代或驳回的版本文件不会自动清理。复制前不检查目标工作区是否配置了作品用到的模型。
 - 技能市场没有上游的 MCP 查询端点和发布历史页（`GET /skills/:skillId`），现有客户端都不调用它们；审核结果只有站内状态，没有通知。

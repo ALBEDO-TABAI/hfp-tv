@@ -182,6 +182,10 @@ HTTPS 图片提交前读取同源 `/models` 元数据，仅成功响应明确声
 | `market_tokens` | 投稿授权令牌 | 只存 SHA-256；30 天过期；吊销对未知令牌也返回成功 |
 | `market_device_authorizations` | 设备授权码 | 设备码只存摘要，确认码 10 分钟有效；兑换令牌后删除 |
 | `market_idempotency` | 新建稿件与送审的重复请求结果 | 主键 `(user_id, key)`，同一 key 返回同一结果 |
+| `workshop_publications` | 创意工坊作品：作者、来源项目、状态（draft、listed、unlisted）、当前版本、标题简介标签封面、是否允许下载、官方、精选、复制次数、下架原因、改编来源 | `(author_user_id, source_project_id)` 唯一，同一项目再投稿成为新版本；只有审核通过的版本会成为当前版本 |
+| `workshop_versions` | 每次投稿：版本号、快照 SHA-256、文件数与大小、画布与节点数、拟公开的信息、改编来源、审核状态（pending、approved、rejected、withdrawn）、审核人与意见 | 审批按快照摘要条件更新；新投稿把同一作品仍待审的旧稿标为 withdrawn |
+| `workshop_version_files` | 版本包含的文件 | 主键 `(version_id, sha256)`；文件读取必须经由当前用户可见的版本 |
+| `workshop_copies` | 复制记录：用户、请求 ID、作品与版本、目标工作区与项目、状态 | `(user_id, request_id)` 唯一；用于复制幂等和识别改编来源 |
 
 ## 画布版本与快照
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"infinite-canvas/backend/internal/bootstrap"
+	"infinite-canvas/backend/internal/projectsnapshot"
 	"infinite-canvas/backend/internal/referencestorage"
 )
 
@@ -20,6 +21,7 @@ import (
 // container-per-user deployment would implement it over the network.
 type Kernel interface {
 	GatewayHandler() http.Handler
+	ProjectSnapshots() (*projectsnapshot.Service, error)
 	Close(ctx context.Context) error
 }
 
