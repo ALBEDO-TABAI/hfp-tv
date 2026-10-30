@@ -135,8 +135,8 @@ func Discover(dataDir string) (Info, bool) {
 }
 
 // DefaultDataDir 与桌面应用的 defaultDataDir（backend/cmd/desktop/main.go）保持同一套规则：
-// CANVAS_DESKTOP_DATA_DIR 覆盖优先，否则用户配置目录下的 BeefTV
-// （macOS ~/Library/Application Support/BeefTV，Windows %AppData%\BeefTV）。
+// CANVAS_DESKTOP_DATA_DIR 覆盖优先，否则由 desktopstorage.DefaultRoot
+// 选择用户配置目录下的新目录或现有旧目录。
 // 使用与桌面相同的已选存储目录指针，不依赖桌面 main 包。
 // BEEFTV_DATA_DIR 是 CLI 侧的显式指定，用来连非默认目录的工作区。
 func DefaultDataDir() (string, error) {
@@ -145,9 +145,9 @@ func DefaultDataDir() (string, error) {
 			return override, nil
 		}
 	}
-	root, err := os.UserConfigDir()
+	root, err := desktopstorage.DefaultRoot()
 	if err != nil {
 		return "", fmt.Errorf("定位用户应用数据目录: %w", err)
 	}
-	return desktopstorage.Resolve(filepath.Join(root, "BeefTV"))
+	return desktopstorage.Resolve(root)
 }

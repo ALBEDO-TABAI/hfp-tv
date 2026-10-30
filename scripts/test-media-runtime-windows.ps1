@@ -15,7 +15,7 @@ try {
     Copy-Item -LiteralPath $Runtime -Destination (Join-Path $scratch "agent-host\media-runtime") -Recurse
     Push-Location (Join-Path $root "backend")
     try {
-        & go test -c ./internal/playback -o (Join-Path $scratch "BeefTV.exe")
+        & go test -c ./internal/playback -o (Join-Path $scratch "hfp-allinone.exe")
         if ($LASTEXITCODE -ne 0) { throw "Playback acceptance build failed" }
         & go test -c ./internal/asset -o (Join-Path $scratch "cli\beeftv.exe")
         if ($LASTEXITCODE -ne 0) { throw "Asset acceptance build failed" }
@@ -26,7 +26,7 @@ try {
     $env:CANVAS_FFMPEG_PATH = $null
     $env:CANVAS_FFPROBE_PATH = $null
     $env:BEEFTV_TEST_BUNDLED_MEDIA = "1"
-    & (Join-Path $scratch "BeefTV.exe") '-test.run=^TestBundledWindowsHEVCWithoutSystemFFmpeg$' '-test.v'
+    & (Join-Path $scratch "hfp-allinone.exe") '-test.run=^TestBundledWindowsHEVCWithoutSystemFFmpeg$' '-test.v'
     if ($LASTEXITCODE -ne 0) { throw "Bundled Windows video acceptance failed" }
     & (Join-Path $scratch "cli\beeftv.exe") '-test.run=^TestBundledMediaMetadataWithoutSystemFFprobe$' '-test.v'
     if ($LASTEXITCODE -ne 0) { throw "Bundled Windows audio acceptance failed" }

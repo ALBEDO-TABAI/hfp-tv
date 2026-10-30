@@ -49,7 +49,7 @@ func writeCleanupJSON(t *testing.T, path string, value any) {
 
 func TestStartupCleansCompletedUpdate(t *testing.T) {
 	target, work, _, _ := completedUpdateFixture(t)
-	lock := filepath.Join(filepath.Dir(target.Path), ".BeefTV.update.lock")
+	lock := filepath.Join(filepath.Dir(target.Path), ".hfp-allinone.update.lock")
 	if err := os.WriteFile(lock, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestStartupPreservesUnconfirmedAndUnownedDirectories(t *testing.T) {
 
 func TestStartupWaitsForInstallingHelper(t *testing.T) {
 	target, work, _, _ := completedUpdateFixture(t)
-	unlock, err := lockInstall(filepath.Join(filepath.Dir(target.Path), ".BeefTV.update.lock"))
+	unlock, err := lockInstall(filepath.Join(filepath.Dir(target.Path), ".hfp-allinone.update.lock"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestStartupWaitsForInstallingHelper(t *testing.T) {
 }
 
 func TestInstallLockConcurrentRelease(t *testing.T) {
-	path := filepath.Join(t.TempDir(), ".BeefTV.update.lock")
+	path := filepath.Join(t.TempDir(), ".hfp-allinone.update.lock")
 	var active, overlaps, acquired atomic.Int32
 	var wg sync.WaitGroup
 	for range 8 {

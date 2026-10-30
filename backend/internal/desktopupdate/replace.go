@@ -88,7 +88,7 @@ func swapWindows(req HelperRequest) error {
 	return nil
 }
 
-// windowsSidecarEntries 是 BeefTV.exe 旁边随包发行的资源：升级要整组换，回滚要整组还原。
+// windowsSidecarEntries 是 hfp-allinone.exe 旁边随包发行的资源：升级要整组换，回滚要整组还原。
 var windowsSidecarEntries = []string{pluginDirName, "agent-host", cliDirName, "media-runtime"}
 
 func restoreWindows(req HelperRequest) error {
@@ -205,14 +205,14 @@ func relaunchTarget(req HelperRequest) error {
 	}
 	switch {
 	case req.Platform == "linux-amd64":
-		cmd := exec.Command(filepath.Join(req.TargetPath, "BeefTV"), args...)
+		cmd := exec.Command(filepath.Join(req.TargetPath, executableName), args...)
 		cmd.Dir = req.TargetPath
 		if err := cmd.Start(); err != nil {
 			return err
 		}
 		return cmd.Process.Release()
 	case strings.HasPrefix(req.Platform, "darwin"):
-		cmd := exec.Command(filepath.Join(req.TargetPath, "Contents", "MacOS", "BeefTV"), args...)
+		cmd := exec.Command(filepath.Join(req.TargetPath, "Contents", "MacOS", executableName), args...)
 		cmd.Dir = filepath.Dir(req.TargetPath)
 		if err := cmd.Start(); err != nil {
 			return err

@@ -118,7 +118,7 @@ func TestInvalidLayoutAndCanceledPreparationLeaveOldApplication(t *testing.T) {
 			if err != nil || len(entries) != 1 || entries[0].Name() != appBundleName {
 				t.Fatalf("left temporary payload: %v %v", entries, err)
 			}
-			old, err := os.ReadFile(filepath.Join(root, appBundleName, "Contents", "MacOS", "BeefTV"))
+			old, err := os.ReadFile(filepath.Join(root, appBundleName, "Contents", "MacOS", "hfp-allinone"))
 			if err != nil || !strings.Contains(string(old), "OLD") {
 				t.Fatal("old application changed")
 			}

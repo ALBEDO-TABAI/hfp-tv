@@ -117,7 +117,7 @@ hfp - all in one（`ALBEDO-TABAI/hfp-tv`）是基于 BeefTV（`glanderness/BeefT
 - 宿主机开发：按启动说明准备模型插件、助手依赖和启动配置；浏览器使用 Vite `43123`，后端使用 `43180`，配齐同源开发身份。只运行 `go run ./cmd/server` 不代表完整工作区可用。不要用 pnpm/npm 覆盖同一套 `node_modules`，也不要提交 `pnpm-lock.yaml` 或 `package-lock.json`。Docker 热更新使用 `docker-compose.dev.yml`；本地构建运行使用 `docker-compose.local.yml`，需另行验证。
 - 单机 Compose 使用 `docker-compose.yml`（SQLite 数据卷，backend、web），源码构建可叠加 `docker-compose.build.yml`。公网只暴露 web 的 `3000`，backend `8080` 留在 Compose 网络内。
 - 默认不启动 dev server；只有用户明确要求浏览器预览或联调时才启动，并先确认端口、数据目录和现有进程。
-- macOS 本机唯一正式应用路径是 `/Applications/BeefTV.app`。需要更新本机应用时只运行 `./scripts/update-local-beeftv-app.sh`；不将 `build/bin/BeefTV.app` 作为可使用版本保留，不复制、重命名或存档额外 `.app` 副本。
+- macOS 本机唯一正式应用路径是 `/Applications/hfp-allinone.app`。需要更新本机应用时只运行 `./scripts/update-local-beeftv-app.sh`；不将 `build/bin/hfp-allinone.app` 作为可使用版本保留，不复制、重命名或存档额外 `.app` 副本。
 - 健康检查只能证明入口可用，不能替代登录、SSE、任务生成和资源访问验证。
 
 ## 8. 验证纪律

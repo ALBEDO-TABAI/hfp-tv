@@ -1,4 +1,4 @@
-# BeefTV 桌面发布
+# hfp - all in one 桌面发布
 
 公开发布还须核对[媒体组件的许可与源码交付](media-source-distribution.md)。流水线会附带许可文件和 macOS ffprobe 源码包；预构建组件的完整源码材料仍需分发者落实，不能把构建成功视为已完成全部许可义务。
 
@@ -9,6 +9,11 @@
 本地合同检查仍由 `scripts/verify-beeftv-local-release.sh` 负责。macOS 发布脚本会先跑该门禁；Windows 发布脚本只做本机打包，不重复整套门禁。
 
 前端未压缩产物的默认体积上限为 105 MiB，可通过 `BEEFTV_WEB_BUDGET_MIB` 调整。包含 FFmpeg、MediaPipe 和预设资源的主线基线约为 99.24 MiB；自动更新增量约 25 KiB。此上限不是 zip 下载大小。
+
+首次安装 hfp-allinone 必须手动完成：旧 BeefTV.app 的更新器只接受 BeefTV.app 载荷。默认使用新的 hfp-allinone 数据目录；若新目录不存在且旧 BeefTV 数据目录存在，则继续使用旧目录，不移动或复制数据。两者都存在时使用新目录。
+
+
+本仓库保留的 `.github/workflows/release-desktop.yml`、`scripts/publish-desktop-r2.py` 及镜像发布工具仍属于上游 BeefTV 发布链，不用于发布改名后的 hfp-allinone；本次只调整本地打包和安装检查。
 
 ## macOS
 
@@ -35,14 +40,14 @@ BEEFTV_GO_DIR=/tmp/beeftv-go.rpIfVN/go ./scripts/build-beeftv-release.sh
 产物：
 
 ```text
-backend/cmd/desktop/build/bin/BeefTV.app
-backend/cmd/desktop/build/bin/BeefTV.app/Contents/Resources/plugin-packages/*.beeftv-plugin
+backend/cmd/desktop/build/bin/hfp-allinone.app
+backend/cmd/desktop/build/bin/hfp-allinone.app/Contents/Resources/plugin-packages/*.beeftv-plugin
 ```
 
 验收重点：
 
-- `backend/cmd/desktop/build/bin/BeefTV.app` 存在；
-- Wails 将 `frontend/dist` 编译进应用二进制；应用包内应存在 `Contents/MacOS/BeefTV`，并由构建日志确认完成 `Compiling frontend` 与 `Packaging application`；
+- `backend/cmd/desktop/build/bin/hfp-allinone.app` 存在；
+- Wails 将 `frontend/dist` 编译进应用二进制；应用包内应存在 `Contents/MacOS/hfp-allinone`，并由构建日志确认完成 `Compiling frontend` 与 `Packaging application`；
 - macOS `Info.plist` 的 `CFBundleShortVersionString` 和 `CFBundleVersion` 与根目录 `VERSION`（去掉 `v` 前缀）一致；
 - `/api/health/live` 与 `/api/system/version` 返回的版本信息来自同一份发布元数据；
 - 发布启动不需要 `127.0.0.1:3000` 的 Vite 开发服务器。
@@ -58,11 +63,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-beeftv-windo
 产物：
 
 ```text
-backend\cmd\desktop\build\bin\BeefTV.exe
+backend\cmd\desktop\build\bin\hfp-allinone.exe
 backend\cmd\desktop\build\bin\plugin-packages\*.beeftv-plugin
 ```
 
-官方插件必须和 `BeefTV.exe` 放在同一目录下的 `plugin-packages\`。从开始菜单、快捷方式或资源管理器启动时，工作目录不一定是仓库或 exe 所在目录；应用按可执行文件位置查找官方插件，不依赖当前工作目录。
+官方插件必须和 `hfp-allinone.exe` 放在同一目录下的 `plugin-packages\`。从开始菜单、快捷方式或资源管理器启动时，工作目录不一定是仓库或 exe 所在目录；应用按可执行文件位置查找官方插件，不依赖当前工作目录。
 
 ### 本机前提
 
@@ -86,27 +91,27 @@ backend\cmd\desktop\build\bin\plugin-packages\*.beeftv-plugin
 
 构建使用与 macOS 相同的 Wails 模块 `github.com/wailsapp/wails/v2/cmd/wails@v2.16.0`，并显式传入 `-platform windows/amd64`、`-webview2 download`。Wails 把生产二进制写到 `build/bin`。缺少 WebView2 时，下载策略会提示安装官方 bootstrapper。
 
-本脚本不生成 NSIS 安装包。Wails 的 `-nsis` 需要另装 NSIS，且默认安装脚本是否包含 `plugin-packages\` 未经本仓库验证。当前支持的发布形态是：把 `BeefTV.exe` 和旁边的 `plugin-packages\` 一起分发。
+本脚本不生成 NSIS 安装包。Wails 的 `-nsis` 需要另装 NSIS，且默认安装脚本是否包含 `plugin-packages\` 未经本仓库验证。当前支持的发布形态是：把 `hfp-allinone.exe` 和旁边的 `plugin-packages\` 一起分发。
 
 ### NSIS 安装包
 
-`scripts/package-desktop-installer.py --platform windows-amd64` 调用 `scripts/installers/windows.nsi`，把 `BeefTV.exe`、`plugin-packages\`、`agent-host\`、`cli\`、`media-runtime\` 等载荷打成 `BeefTV-vX.Y.Z-windows-amd64-setup.exe`。
+`scripts/package-desktop-installer.py --platform windows-amd64` 调用 `scripts/installers/windows.nsi`，把 `hfp-allinone.exe`、`plugin-packages\`、`agent-host\`、`cli\`、`media-runtime\` 等载荷打成 `hfp-allinone-vX.Y.Z-windows-amd64-setup.exe`。
 
-- 安装位置可选。默认 `%LOCALAPPDATA%\Programs\BeefTV`；覆盖安装默认沿用上一次的安装位置（读取注册表 `InstallLocation`），用户仍可另选。静默安装用 `/D=<目录>` 指定。
-- 无论选择哪个文件夹，安装包都装入其下名为 `BeefTV` 的子目录：选择 `D:\Apps` 会安装到 `D:\Apps\BeefTV`。
-- 安装器以当前用户权限运行（`RequestExecutionLevel user`）。它会拒绝盘符根目录、非空的非 BeefTV 目录（避免覆盖用户数据）以及当前用户无写权限的目录（例如 `Program Files`，需改用其他文件夹），并在目录页给出提示。
+- 安装位置可选。默认 `%LOCALAPPDATA%\Programs\hfp-allinone`；覆盖安装默认沿用上一次的安装位置（读取注册表 `InstallLocation`），用户仍可另选。静默安装用 `/D=<目录>` 指定。
+- 无论选择哪个文件夹，安装包都装入其下名为 `hfp-allinone` 的子目录：选择 `D:\Apps` 会安装到 `D:\Apps\hfp-allinone`。
+- 安装器以当前用户权限运行（`RequestExecutionLevel user`）。它会拒绝盘符根目录、非空的非 hfp-allinone 目录（避免覆盖用户数据）以及当前用户无写权限的目录（例如 `Program Files`，需改用其他文件夹），并在目录页给出提示。
 - 卸载只删除随包文件、`agent-host`、`plugin-packages`、`cli`、`media-runtime` 和根目录清单内的文件；未知用户文件保留。安装位置的临时暂存和备份目录与被替换目录同卷，替换完成前不删除旧程序。
 
 在非 Windows 主机交叉编译出来的 exe，不能当作 Windows 验收通过。
 
 ## 启动目录与数据目录
 
-桌面进程默认数据目录来自 Go 的 `os.UserConfigDir()`，再拼 `BeefTV`：
+桌面进程默认数据目录来自 Go 的 `os.UserConfigDir()`，再拼 `hfp-allinone`：
 
 | 系统 | 默认数据目录 |
 | --- | --- |
-| Windows | `%AppData%\BeefTV`（Roaming） |
-| macOS | `~/Library/Application Support/BeefTV` |
+| Windows | `%AppData%\hfp-allinone`（Roaming） |
+| macOS | `~/Library/Application Support/hfp-allinone` |
 
 其中包含 SQLite、本地资源和迁移备份。隔离调试时设置 `CANVAS_DESKTOP_DATA_DIR`，或启动桌面程序时传入 `--data-dir=/绝对路径/独立测试目录`；启动参数优先于环境变量，拒绝相对路径和文件系统根目录。`CANVAS_BACKEND_DATA_DIR` 只作用于 `cmd/server`，不会改桌面数据目录。
 
@@ -114,7 +119,7 @@ backend\cmd\desktop\build\bin\plugin-packages\*.beeftv-plugin
 
 需要知道的限制：
 
-- 未签名的 `BeefTV.exe` 可能被 SmartScreen 拦截；本脚本不签名。
+- 未签名的 `hfp-allinone.exe` 可能被 SmartScreen 拦截；本脚本不签名。
 - 构建机没有 C 编译器时，脚本会失败。常见 MSYS2/MinGW 路径若存在但不在 PATH，脚本会指出路径，不会自动加入 PATH。
 - 数据库连接串目前把数据目录与 `/open_ai_canvas.db` 直接拼接。Windows 一般接受正斜杠；数据目录名里如果出现 `?` 或 `#`，可能被当成 DSN 参数。
 
@@ -136,12 +141,12 @@ backend\cmd\desktop\build\bin\plugin-packages\*.beeftv-plugin
 
 | 系统 | 被替换 | 不会进更新包、也不会被替换 |
 | --- | --- | --- |
-| macOS | `BeefTV.app` | `~/Library/Application Support/BeefTV` |
-| Windows | `BeefTV.exe` 和旁边的 `plugin-packages\*.beeftv-plugin` | `%AppData%\BeefTV` |
+| macOS | `hfp-allinone.app` | `~/Library/Application Support/hfp-allinone` |
+| Windows | `hfp-allinone.exe` 和旁边的 `plugin-packages\*.beeftv-plugin` | `%AppData%\hfp-allinone` |
 
-应用包身份和可执行文件路径保持不变，所以前端 IndexedDB 会继续可用。官方插件随应用包更新；用户自己装的插件如果放在数据目录里，会留下来。
+本次改名会改变应用包身份和可执行文件路径，系统管理的浏览器缓存不会自动迁移；请先保存工作区。官方插件随应用包更新；用户自己装的插件如果放在数据目录里，会留下来。
 
-程序与数据必须使用独立目录。尤其不要把 Windows zip 解压到 `%AppData%\BeefTV`，也不要将 `CANVAS_DESKTOP_DATA_DIR` 指向 exe 所在目录。更新器会在退出前拒绝这类目录重叠。
+程序与数据必须使用独立目录。尤其不要把 Windows zip 解压到 `%AppData%\hfp-allinone`，也不要将 `CANVAS_DESKTOP_DATA_DIR` 指向 exe 所在目录。更新器会在退出前拒绝这类目录重叠。
 
 更新包禁止带上 `.env`、SQLite 数据库和 `.settings-key`。打包工具遇到用户数据目录会直接拒绝。
 
@@ -203,10 +208,10 @@ export BEEFTV_UPDATER_PUBLIC_KEY="$(tr -d '[:space:]' < /path/to/beeftv-updater.
 正式文件名固定为：
 
 ```text
-BeefTV-vX.Y.Z-darwin-arm64.zip
-BeefTV-vX.Y.Z-darwin-amd64.zip
-BeefTV-vX.Y.Z-windows-amd64.zip
-BeefTV-vX.Y.Z-linux-amd64.zip
+hfp-allinone-vX.Y.Z-darwin-arm64.zip
+hfp-allinone-vX.Y.Z-darwin-amd64.zip
+hfp-allinone-vX.Y.Z-windows-amd64.zip
+hfp-allinone-vX.Y.Z-linux-amd64.zip
 desktop-update.json
 ```
 
@@ -214,9 +219,9 @@ Actions 中的 `desktop-*` 临时安装包保留 7 天，用于发布任务之�
 
 zip 里的布局：
 
-- macOS：`BeefTV.app/...`，保留可执行权限；内部安全符号链接会被解成普通文件，不会写成 zip 符号链接项。
-- Windows：根目录的 `BeefTV.exe` 和 `plugin-packages/*.beeftv-plugin`。
-- Linux x64：`BeefTV-linux/` 内包含 `BeefTV`、`cli/beeftv`、`agent-host/` 和 `plugin-packages/`。在 Ubuntu 24.04 原生构建，使用 GTK3 和 WebKitGTK 4.1；安装依赖和启动方法见 [Linux 安装说明](linux-install.md)。更新和回滚替换整个程序目录，用户数据留在配置目录。
+- macOS：`hfp-allinone.app/...`，保留可执行权限；内部安全符号链接会被解成普通文件，不会写成 zip 符号链接项。
+- Windows：根目录的 `hfp-allinone.exe` 和 `plugin-packages/*.beeftv-plugin`。
+- Linux x64：`hfp-allinone-linux/` 内包含 `hfp-allinone`、`cli/beeftv`、`agent-host/` 和 `plugin-packages/`。在 Ubuntu 24.04 原生构建，使用 GTK3 和 WebKitGTK 4.1；安装依赖和启动方法见 [Linux 安装说明](linux-install.md)。更新和回滚替换整个程序目录，用户数据留在配置目录。
 
 新版本更新清单和安装包使用 Cloudflare R2：
 
@@ -324,8 +329,8 @@ Apple 公证不在这条工作流里。macOS 作业沿用现有脚本的 ad hoc 
 cd backend
 go run ./cmd/update-release package \
   --platform darwin-arm64 \
-  --input cmd/desktop/build/bin/BeefTV.app \
-  --output /tmp/BeefTV-vX.Y.Z-darwin-arm64.zip
+  --input cmd/desktop/build/bin/hfp-allinone.app \
+  --output /tmp/hfp-allinone-vX.Y.Z-darwin-arm64.zip
 go run ./cmd/update-release sign \
   --version vX.Y.Z \
   --commit "$(git rev-parse HEAD)" \
@@ -333,16 +338,16 @@ go run ./cmd/update-release sign \
   --private-key /path/to/beeftv-updater.private \
   --expect-public-key "$(tr -d '[:space:]' < /path/to/beeftv-updater.public)" \
   --require-platforms darwin-arm64,darwin-amd64,windows-amd64,linux-amd64 \
-  --asset darwin-arm64=/tmp/BeefTV-vX.Y.Z-darwin-arm64.zip \
-  --asset darwin-amd64=/tmp/BeefTV-vX.Y.Z-darwin-amd64.zip \
-  --asset windows-amd64=/tmp/BeefTV-vX.Y.Z-windows-amd64.zip \
-  --asset linux-amd64=/tmp/BeefTV-vX.Y.Z-linux-amd64.zip \
+  --asset darwin-arm64=/tmp/hfp-allinone-vX.Y.Z-darwin-arm64.zip \
+  --asset darwin-amd64=/tmp/hfp-allinone-vX.Y.Z-darwin-amd64.zip \
+  --asset windows-amd64=/tmp/hfp-allinone-vX.Y.Z-windows-amd64.zip \
+  --asset linux-amd64=/tmp/hfp-allinone-vX.Y.Z-linux-amd64.zip \
   --output /tmp/desktop-update.json
 ```
 
 ### 回滚
 
-客户端在退出前校验并把更新准备到程序所在磁盘；无写入权限、磁盘空间不足或签名错误时保留当前运行的应用。替换/启动失败会尝试恢复旧程序。程序旁的 `.beeftv-update-*` 目录暂存旧程序和恢复记录；本地后端启动、界面挂载、素材与画布缓存成功加载，且本地工作区与两类资源列表读取成功后，客户端自动清理同一安装位置已成功升级的目录（包括旧版本遗留目录）。失败、回滚、记录不完整或含额外文件的目录继续保留。Windows 升级锁随句柄关闭删除；macOS 保留零字节 `.BeefTV.update.lock`，防止仍使用旧版锁协议的助手并发替换应用，它不存储升级包或旧程序。清理失败不阻塞使用，下次启动重试。已启动的新进程不会自动降级，以免把迁移后的数据库交给旧程序；恢复旧程序时需另行确认数据库兼容或还原匹配的数据备份。
+客户端在退出前校验并把更新准备到程序所在磁盘；无写入权限、磁盘空间不足或签名错误时保留当前运行的应用。替换/启动失败会尝试恢复旧程序。程序旁的 `.beeftv-update-*` 目录暂存旧程序和恢复记录；本地后端启动、界面挂载、素材与画布缓存成功加载，且本地工作区与两类资源列表读取成功后，客户端自动清理同一安装位置已成功升级的目录（包括旧版本遗留目录）。失败、回滚、记录不完整或含额外文件的目录继续保留。Windows 升级锁随句柄关闭删除；macOS 保留零字节 `.hfp-allinone.update.lock`，防止更新助手并发替换应用，它不存储升级包或旧程序。清理失败不阻塞使用，下次启动重试。已启动的新进程不会自动降级，以免把迁移后的数据库交给旧程序；恢复旧程序时需另行确认数据库兼容或还原匹配的数据备份。
 
 已经发布的版本不能收回。已经更新成功的用户，不会因为删除 GitHub Release 而回到旧包。
 

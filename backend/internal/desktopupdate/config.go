@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
+
+	"infinite-canvas/backend/internal/desktopidentity"
 )
 
 // Link-time variables. Release builds inject an HTTPS feed and a base64 raw
@@ -16,14 +18,16 @@ var (
 )
 
 const (
-	helperFlag      = "--beeftv-update-helper"
-	appBundleName   = "BeefTV.app"
-	linuxBundleName = "BeefTV-linux"
-	windowsExeName  = "BeefTV.exe"
-	pluginDirName   = "plugin-packages"
+	executableName   = desktopidentity.Name
+	updateHelperName = executableName + "-update-helper"
+	installLockName  = "." + executableName + ".update.lock"
+	helperFlag       = "--beeftv-update-helper"
+	appBundleName    = desktopidentity.AppBundleName
+	linuxBundleName  = desktopidentity.LinuxBundleName
+	windowsExeName   = desktopidentity.WindowsExeName
+	pluginDirName    = "plugin-packages"
 	// 随包 CLI：外部 Agent 的接入入口，升级包里必须带上，否则升级一次就断了接入。
-	// 它必须待在自己的 cli 目录里：macOS 与 Windows 的文件名都不分大小写，
-	// beeftv 直接放在主程序旁边会和 BeefTV / BeefTV.exe 撞成同一个文件。
+	// 保留独立的 cli 目录，确保外部客户端的接入路径稳定。
 	cliDirName      = "cli"
 	darwinCLIName   = "beeftv"
 	windowsCLIName  = "beeftv.exe"

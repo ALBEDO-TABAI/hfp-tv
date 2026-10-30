@@ -106,3 +106,5 @@ Wails 桌面入口是 `backend/cmd/desktop`，会通过原生绑定提供启动�
 `scripts/beeftv-shared-dev.sh` 当前启动 Vite 的端口为 `3000`，而 `backend/cmd/desktop/wails.json` 的前端地址为 `43123`。原生联调前必须对齐，不能直接套用旧说明中的已验证结论。桌面构建、安装和打包依赖见[桌面开发](desktop-local-development.md)与[桌面发布](desktop-release.md)。
 
 仓库还保留 Compose 配置；它们与本页的浏览器开发入口不同。使用前核对 Dockerfile、数据卷、插件与助手的装配，不把已有配置文件视为当前环境的成功部署证明。
+
+原生桌面的正式安装位置是 `/Applications/hfp-allinone.app`，更新使用 `scripts/update-local-beeftv-app.sh`。默认数据目录使用系统配置目录下的 `hfp-allinone`；新目录不存在且旧 `BeefTV` 目录存在时沿用旧目录，不搬迁数据。浏览器开发继续使用 `.local/project-workbench-debug`。

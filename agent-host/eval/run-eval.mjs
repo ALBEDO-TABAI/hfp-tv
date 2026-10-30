@@ -23,7 +23,7 @@ export function resolveNodeRuntime() {
     if (fs.existsSync(candidate)) return candidate;
   }
   const candidates = [
-    '/Applications/BeefTV.app/Contents/Resources/agent-host/runtime/bin/node',
+    '/Applications/hfp-allinone.app/Contents/Resources/agent-host/runtime/bin/node',
     '/Users/sunny/.local/bin/node',
   ];
   for (const c of candidates) {

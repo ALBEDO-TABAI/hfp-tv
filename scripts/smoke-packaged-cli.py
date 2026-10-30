@@ -18,8 +18,8 @@ import zipfile
 
 def smoke(archive, platform):
     relative = ("cli/beeftv.exe" if platform == "windows-amd64" else
-                "BeefTV-linux/cli/beeftv" if platform == "linux-amd64" else
-                "BeefTV.app/Contents/MacOS/cli/beeftv")
+                "hfp-allinone-linux/cli/beeftv" if platform == "linux-amd64" else
+                "hfp-allinone.app/Contents/MacOS/cli/beeftv")
     with tempfile.TemporaryDirectory(prefix="beeftv-package-smoke-") as directory:
         root = Path(directory)
         cli = root / relative

@@ -12,7 +12,7 @@ import (
 
 func TestCleanupWindowsRetriesBusyHelper(t *testing.T) {
 	target, work, _, _ := completedUpdateFixture(t)
-	helper := filepath.Join(work, "BeefTV-update-helper.exe")
+	helper := filepath.Join(work, "hfp-allinone-update-helper.exe")
 	file, err := os.OpenFile(helper, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +35,7 @@ func TestCleanupWindowsRetriesBusyHelper(t *testing.T) {
 }
 
 func TestWindowsInstallLockExcludesLegacyHelper(t *testing.T) {
-	path := filepath.Join(t.TempDir(), ".BeefTV.update.lock")
+	path := filepath.Join(t.TempDir(), ".hfp-allinone.update.lock")
 	legacy, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		t.Fatal(err)

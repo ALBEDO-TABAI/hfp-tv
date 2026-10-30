@@ -141,11 +141,8 @@ func clientView(item agentops.ClientRegistration) gin.H {
 // bundledCLIPath 给出随包 CLI 的绝对路径。
 //
 // 安装版里 CLI 在主程序旁边的 cli 目录里：macOS 是
-// BeefTV.app/Contents/MacOS/cli/beeftv，Windows 是 BeefTV.exe 旁边的 cli\beeftv.exe。
-// 它不能直接放在主程序同一层：macOS 与 Windows 的文件名都不分大小写，beeftv 会和
-// BeefTV / BeefTV.exe 变成同一个文件，把主程序覆盖掉。
-//
-// 缺失时不回退 PATH：Windows 会把 beeftv.exe 解析成桌面主程序 BeefTV.exe。
+// hfp-allinone.app/Contents/MacOS/cli/beeftv，Windows 是 hfp-allinone.exe 旁边的 cli\beeftv.exe。
+// 保留 cli 子目录供已有外部客户端使用；缺失时不回退 PATH，避免连接其他安装。
 func bundledCLIPath() (string, bool) {
 	name := "beeftv"
 	if runtime.GOOS == "windows" {

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"infinite-canvas/backend/internal/desktopidentity"
 	"infinite-canvas/backend/internal/desktopstorage"
 	"infinite-canvas/backend/internal/desktopupdate"
 
@@ -58,7 +59,7 @@ func runDesktopApp(app *DesktopApp, run func(*options.App) error) error {
 
 func desktopAppOptions(app *DesktopApp) *options.App {
 	return &options.App{
-		Title:            "hfp - all in one",
+		Title:            desktopidentity.DisplayName,
 		Width:            1440,
 		Height:           960,
 		BackgroundColour: &options.RGBA{R: 13, G: 15, B: 18, A: 255},

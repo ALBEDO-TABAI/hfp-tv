@@ -61,7 +61,7 @@ func WriteDarwinLayout(root, marker string) error {
 	if err := writeAgentLayout(filepath.Join(root, appBundleName, "Contents", "Resources", "agent-host"), "runtime/bin/node", marker); err != nil {
 		return err
 	}
-	exe := filepath.Join(root, appBundleName, "Contents", "MacOS", "BeefTV")
+	exe := filepath.Join(root, appBundleName, "Contents", "MacOS", "hfp-allinone")
 	plist := filepath.Join(root, appBundleName, "Contents", "Info.plist")
 	plugin := filepath.Join(root, appBundleName, "Contents", "Resources", pluginDirName, "official.beeftv-plugin")
 	if err := os.MkdirAll(filepath.Dir(exe), 0o755); err != nil {
@@ -81,7 +81,7 @@ func WriteDarwinLayout(root, marker string) error {
 	if err := os.WriteFile(cli, []byte(script), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(plist, []byte(`<plist><dict><key>CFBundleIdentifier</key><string>app.beeftv.desktop</string></dict></plist>`), 0o644); err != nil {
+	if err := os.WriteFile(plist, []byte(`<plist><dict><key>CFBundleIdentifier</key><string>com.wails.hfp-allinone</string></dict></plist>`), 0o644); err != nil {
 		return err
 	}
 	return os.WriteFile(plugin, []byte("official-"+marker), 0o644)
@@ -111,22 +111,22 @@ func WriteWindowsLayout(root, marker string) error {
 
 func DarwinZipFiles(marker string) (map[string][]byte, map[string]bool) {
 	files := map[string][]byte{
-		"BeefTV.app/Contents/MacOS/BeefTV":                                     []byte("#!/bin/sh\necho " + marker + "\n"),
-		"BeefTV.app/Contents/Info.plist":                                       []byte("<plist></plist>"),
-		"BeefTV.app/Contents/Resources/plugin-packages/official.beeftv-plugin": []byte("official-" + marker),
+		"hfp-allinone.app/Contents/MacOS/hfp-allinone":                               []byte("#!/bin/sh\necho " + marker + "\n"),
+		"hfp-allinone.app/Contents/Info.plist":                                       []byte("<plist></plist>"),
+		"hfp-allinone.app/Contents/Resources/plugin-packages/official.beeftv-plugin": []byte("official-" + marker),
 	}
-	files["BeefTV.app/Contents/MacOS/cli/beeftv"] = []byte("#!/bin/sh\necho cli-" + marker + "\n")
-	execFiles := map[string]bool{"BeefTV.app/Contents/MacOS/BeefTV": true, "BeefTV.app/Contents/MacOS/cli/beeftv": true}
+	files["hfp-allinone.app/Contents/MacOS/cli/beeftv"] = []byte("#!/bin/sh\necho cli-" + marker + "\n")
+	execFiles := map[string]bool{"hfp-allinone.app/Contents/MacOS/hfp-allinone": true, "hfp-allinone.app/Contents/MacOS/cli/beeftv": true}
 	for name, body := range agentFiles("runtime/bin/node", marker) {
-		files["BeefTV.app/Contents/Resources/agent-host/"+name] = body
+		files["hfp-allinone.app/Contents/Resources/agent-host/"+name] = body
 	}
-	execFiles["BeefTV.app/Contents/Resources/agent-host/runtime/bin/node"] = true
+	execFiles["hfp-allinone.app/Contents/Resources/agent-host/runtime/bin/node"] = true
 	return files, execFiles
 }
 
 func WindowsZipFiles(marker string) (map[string][]byte, map[string]bool) {
 	files := map[string][]byte{
-		"BeefTV.exe":                             []byte("MZ-" + marker),
+		"hfp-allinone.exe":                       []byte("MZ-" + marker),
 		"cli/beeftv.exe":                         []byte("MZ-cli-" + marker),
 		"plugin-packages/official.beeftv-plugin": []byte("official-" + marker),
 	}

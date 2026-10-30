@@ -26,7 +26,7 @@ func TestPackageManagedBlocksAllUpdaterActions(t *testing.T) {
 
 func TestPackageMarkerDoesNotDisablePortableBundle(t *testing.T) {
 	dir := t.TempDir()
-	exe := filepath.Join(dir, "BeefTV")
+	exe := filepath.Join(dir, "hfp-allinone")
 	if isPackageManaged(exe) {
 		t.Fatal("portable updater disabled")
 	}

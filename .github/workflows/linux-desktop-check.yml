@@ -59,14 +59,14 @@ jobs:
           sh plugin-packages/build-packages.sh
           ./scripts/build-beeftv-release.sh
           cd backend
-          go run ./cmd/update-release package --platform linux-amd64 --input cmd/desktop/build/bin/BeefTV-linux --output ../dist/BeefTV-linux-check.zip
+          go run ./cmd/update-release package --platform linux-amd64 --input cmd/desktop/build/bin/hfp-allinone-linux --output ../dist/hfp-allinone-linux-check.zip
       - name: Verify shipped CLI and native desktop window
         run: |
-          python3 scripts/smoke-packaged-cli.py --platform linux-amd64 --archive dist/BeefTV-linux-check.zip
-          xvfb-run -a dbus-run-session -- python3 scripts/smoke-linux-desktop.py --archive dist/BeefTV-linux-check.zip
+          python3 scripts/smoke-packaged-cli.py --platform linux-amd64 --archive dist/hfp-allinone-linux-check.zip
+          xvfb-run -a dbus-run-session -- python3 scripts/smoke-linux-desktop.py --archive dist/hfp-allinone-linux-check.zip
       - uses: actions/upload-artifact@v4
         with:
           name: linux-desktop-check
-          path: dist/BeefTV-linux-check.zip
+          path: dist/hfp-allinone-linux-check.zip
           retention-days: 7
           if-no-files-found: error

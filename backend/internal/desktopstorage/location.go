@@ -7,9 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"infinite-canvas/backend/internal/desktopidentity"
 )
 
-const locationFile = "storage-location.json"
+const (
+	locationFile   = "storage-location.json"
+	legacyRootName = "BeefTV"
+)
 
 type Location struct {
 	DataDir       string            `json:"dataDir"`
@@ -22,7 +27,25 @@ func DefaultRoot() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(root, "BeefTV"), nil
+	return defaultRoot(root)
+}
+
+func defaultRoot(configDir string) (string, error) {
+	root := filepath.Join(configDir, desktopidentity.Name)
+	if _, err := os.Stat(root); err == nil {
+		return root, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	legacy := filepath.Join(configDir, legacyRootName)
+	if info, err := os.Stat(legacy); err == nil {
+		if info.IsDir() {
+			return legacy, nil
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	return root, nil
 }
 
 // The pointer stays in the system profile, independent of the selected data volume.
@@ -92,7 +115,7 @@ func saveLocation(root string, location Location) error {
 func canonical(path string) (string, error) {
 	path = strings.TrimSpace(path)
 	if !filepath.IsAbs(path) || filepath.Dir(filepath.Clean(path)) == filepath.Clean(path) {
-		return "", errors.New("请选择磁盘中的文件夹，例如 D:\\BeefTV")
+		return "", errors.New("请选择磁盘中的文件夹，例如 D:\\" + desktopidentity.Name)
 	}
 	path = filepath.Clean(path)
 	missing := []string{}

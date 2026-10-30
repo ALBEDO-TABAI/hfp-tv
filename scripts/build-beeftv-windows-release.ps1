@@ -1,11 +1,11 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Native Windows amd64 release entrypoint for the BeefTV Wails desktop app.
+    Native Windows amd64 release entrypoint for the hfp - all in one Wails desktop app.
 
 .DESCRIPTION
     Builds the same desktop source as scripts/build-beeftv-release.sh, packages
-    official *.beeftv-plugin archives next to BeefTV.exe, and fails loudly when
+    official *.beeftv-plugin archives next to hfp-allinone.exe, and fails loudly when
     CGO/go-sqlite3 compiler prerequisites are missing.
 
     This script does not install compilers, Bun, Go, Git, WebView2, or NSIS.
@@ -21,7 +21,7 @@
     - Go 1.25+ Windows CGO DWARF 5 / binutils 2.37+: https://go.dev/wiki/MinimumRequirements#cgo
 
 .OUTPUTS
-    backend\cmd\desktop\build\bin\BeefTV.exe
+    backend\cmd\desktop\build\bin\hfp-allinone.exe
     backend\cmd\desktop\build\bin\plugin-packages\*.beeftv-plugin
 #>
 [CmdletBinding()]
@@ -41,7 +41,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $desktopDir = Join-Path $repoRoot "backend\cmd\desktop"
 $pluginSourceDir = Join-Path $repoRoot "plugin-packages"
 $binDir = Join-Path $desktopDir "build\bin"
-$exePath = Join-Path $binDir "BeefTV.exe"
+$exePath = Join-Path $binDir "hfp-allinone.exe"
 $pluginResourceDir = Join-Path $binDir "plugin-packages"
 $versionFile = Join-Path $repoRoot "VERSION"
 $wailsModule = "github.com/wailsapp/wails/v2/cmd/wails@v2.16.0"
@@ -168,7 +168,7 @@ function Test-PluginZipEntries([string]$ZipPath) {
         }
         foreach ($name in $names) {
             if ($name.Contains("\")) {
-                throw "Plugin package $ZipPath entry '$name' uses backslash paths. BeefTV rejects those archives; zip entries must use forward slashes."
+                throw "Plugin package $ZipPath entry '$name' uses backslash paths. hfp-allinone rejects those archives; zip entries must use forward slashes."
             }
         }
     }
@@ -391,7 +391,7 @@ if (-not [string]::IsNullOrWhiteSpace($env:BEEFTV_EXTRA_LDFLAGS)) {
     $ldflags = "$ldflags $($env:BEEFTV_EXTRA_LDFLAGS.Trim())"
 }
 
-Write-Step "Building BeefTV $versionValue ($commitValue) for windows/amd64"
+Write-Step "Building hfp - all in one $versionValue ($commitValue) for windows/amd64"
 $appIconSource = Join-Path $repoRoot "assets\app-icon.png"
 $buildDir = Join-Path $desktopDir "build"
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
@@ -447,8 +447,7 @@ Invoke-NativeExecutable -FilePath "bun" -ArgumentList @((Join-Path $repoRoot "sc
 # Cursor) connect through it with their own client credential, so the installed
 # app must carry it; it is not expected on the user PATH.
 #
-# It goes in a cli subdirectory, not directly next to BeefTV.exe: Windows file
-# names are case-insensitive, so beeftv.exe beside BeefTV.exe is the same name.
+# Keep the cli subdirectory stable for existing external client configurations.
 $cliDir = Join-Path $binDir "cli"
 New-Item -ItemType Directory -Force -Path $cliDir | Out-Null
 $cliPath = Join-Path $cliDir "beeftv.exe"
@@ -466,7 +465,7 @@ if (-not (Test-Path -LiteralPath $cliPath -PathType Leaf)) {
 Write-Host "Release executable: $exePath"
 Write-Host "Bundled agent CLI: $cliPath"
 Write-Host "Official plugins: $pluginResourceDir ($($copied.Count) packages)"
-Write-Host "Launch data directory (unless CANVAS_DESKTOP_DATA_DIR is set): %AppData%\BeefTV"
+Write-Host "Launch data directory (unless CANVAS_DESKTOP_DATA_DIR is set): %AppData%\hfp-allinone (existing BeefTV data is reused when the new directory is absent)"
 Write-Host "Official plugins are loaded from the executable directory, not from the process working directory."
 Write-Host "WebView2 is required at runtime; Windows 11 usually already has it. Missing runtimes use Wails -webview2 download. See https://wails.io/docs/guides/windows"
-Write-Host "This machine still has to launch BeefTV.exe before the Windows build is accepted. NSIS installer output is not produced."
+Write-Host "This machine still has to launch hfp-allinone.exe before the Windows build is accepted. NSIS installer output is not produced."

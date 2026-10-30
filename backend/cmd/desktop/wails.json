@@ -1,8 +1,8 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "hfp - all in one",
-  "outputfilename": "hfp-all-in-one",
-  "info": { "protocols": [{ "scheme": "hfp-tv", "description": "hfp - all in one skill link", "role": "Viewer" }, { "scheme": "beeftv", "description": "hfp - all in one compatibility skill link", "role": "Viewer" }] },
+  "name": "hfp-allinone",
+  "outputfilename": "hfp-allinone",
+  "info": { "productName": "hfp - all in one", "protocols": [{ "scheme": "hfp-tv", "description": "hfp - all in one skill link", "role": "Viewer" }, { "scheme": "beeftv", "description": "hfp - all in one compatibility skill link", "role": "Viewer" }] },
   "frontend:dir": "../../../web",
   "frontend:install": "bun install --frozen-lockfile",
   "frontend:build": "bun run build:desktop",

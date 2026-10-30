@@ -4,6 +4,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DESKTOP_DIR="$ROOT_DIR/backend/cmd/desktop"
+APP_NAME="$(bun -p 'require(process.argv[1]).name' "$DESKTOP_DIR/wails.json")"
+APP_EXECUTABLE="$(bun -p 'require(process.argv[1]).outputfilename' "$DESKTOP_DIR/wails.json")"
 GO_DIR="${BEEFTV_GO_DIR:-/tmp/beeftv-go.rpIfVN/go}"
 
 HOST_OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -81,7 +83,7 @@ if [[ -n "${BEEFTV_WAILS_PLATFORM:-}" ]]; then
   esac
 fi
 
-echo "Building BeefTV $VERSION_VALUE ($COMMIT_VALUE)"
+echo "Building hfp - all in one $VERSION_VALUE ($COMMIT_VALUE)"
 
 # The frontend embeds the source index, so the native packet must exist before
 # Wails builds it. Keep the runtime outside Wails' -clean output directory.
@@ -121,9 +123,9 @@ cp "$ROOT_DIR/assets/app-icon.png" "$DESKTOP_DIR/build/appicon.png"
 )
 
 if [[ "$AGENT_TARGET" == linux/amd64 ]]; then
-  LINUX_BUNDLE="$DESKTOP_DIR/build/bin/BeefTV-linux"
+  LINUX_BUNDLE="$DESKTOP_DIR/build/bin/$APP_NAME-linux"
   mkdir -p "$LINUX_BUNDLE/plugin-packages" "$LINUX_BUNDLE/cli"
-  mv "$DESKTOP_DIR/build/bin/BeefTV" "$LINUX_BUNDLE/BeefTV"
+  mv "$DESKTOP_DIR/build/bin/$APP_EXECUTABLE" "$LINUX_BUNDLE/$APP_EXECUTABLE"
   cp "$ROOT_DIR/plugin-packages/"*.beeftv-plugin "$LINUX_BUNDLE/plugin-packages/"
   cp "$ROOT_DIR/docs/linux-install.md" "$LINUX_BUNDLE/README.md"
   bun "$ROOT_DIR/scripts/package-agent-host.mjs" "$AGENT_TARGET" "$LINUX_BUNDLE/agent-host"
@@ -132,14 +134,14 @@ if [[ "$AGENT_TARGET" == linux/amd64 ]]; then
     cd "$ROOT_DIR/backend"
     go build -trimpath -ldflags "$LDFLAGS" -o "$LINUX_BUNDLE/cli/beeftv" ./cmd/beeftv
   )
-  chmod 755 "$LINUX_BUNDLE/BeefTV" "$LINUX_BUNDLE/cli/beeftv"
+  chmod 755 "$LINUX_BUNDLE/$APP_EXECUTABLE" "$LINUX_BUNDLE/cli/beeftv"
   echo "Release bundle: $LINUX_BUNDLE"
   exit 0
 fi
 
 # Official protocol packages are runtime dependencies. Finder launches use the
 # bundle Resources directory and must never depend on the caller's cwd.
-APP_BUNDLE="$DESKTOP_DIR/build/bin/BeefTV.app"
+APP_BUNDLE="$DESKTOP_DIR/build/bin/$APP_NAME.app"
 PLUGIN_RESOURCE_DIR="$APP_BUNDLE/Contents/Resources/plugin-packages"
 mkdir -p "$PLUGIN_RESOURCE_DIR"
 cp "$ROOT_DIR/plugin-packages/"*.beeftv-plugin "$PLUGIN_RESOURCE_DIR/"
@@ -151,7 +153,7 @@ bun "$ROOT_DIR/scripts/distribution-notices.mjs" "${AGENT_TARGET/\//-}" \
   "$APP_BUNDLE/Contents/Resources/agent-host/licenses" "$VERSION_VALUE"
 # Reuse the explicitly supplied (or already installed) encoder, including its
 # license. The native workflow adapter must not rely on a Finder-launched PATH.
-ENCODER_SOURCE="${BEEFTV_FFMPEG_RUNTIME:-/Applications/BeefTV.app/Contents/Resources/agent-host/media-runtime/ffmpeg}"
+ENCODER_SOURCE="${BEEFTV_FFMPEG_RUNTIME:-/Applications/hfp-allinone.app/Contents/Resources/agent-host/media-runtime/ffmpeg}"
 if [[ -x "$ENCODER_SOURCE" ]]; then
   ENCODER_LICENSE="${BEEFTV_FFMPEG_LICENSE:-$(dirname "$ENCODER_SOURCE")/ffmpeg.LICENSE}"
   [[ -f "$ENCODER_LICENSE" ]] || { echo "Encoder license missing: $ENCODER_LICENSE" >&2; exit 1; }
@@ -176,9 +178,7 @@ fi
 # Cursor) connect through it with their own client credential, so the installed
 # app must carry it -- PATH is not a prerequisite.
 #
-# It goes in Contents/MacOS/cli, not directly next to the app binary: macOS
-# volumes are case-insensitive by default, so a file named beeftv beside BeefTV
-# is the same file and would overwrite the app binary.
+# Keep Contents/MacOS/cli stable for existing external client configurations.
 CLI_BINARY="$APP_BUNDLE/Contents/MacOS/cli/beeftv"
 mkdir -p "$(dirname "$CLI_BINARY")"
 (

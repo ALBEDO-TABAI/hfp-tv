@@ -9,7 +9,7 @@ import (
 func linuxFixture(t *testing.T, root, version string) string {
 	t.Helper()
 	bundle := filepath.Join(root, linuxBundleName)
-	for _, name := range []string{"BeefTV", "cli/beeftv", "plugin-packages/core.beeftv-plugin", "agent-host/server.mjs", "agent-host/session-identity.mjs", "agent-host/canvas-turn.mjs", "agent-host/request-budget.mjs", "agent-host/package.json", "agent-host/node_modules/@earendil-works/pi-coding-agent/package.json", "agent-host/runtime/bin/node"} {
+	for _, name := range []string{"hfp-allinone", "cli/beeftv", "plugin-packages/core.beeftv-plugin", "agent-host/server.mjs", "agent-host/session-identity.mjs", "agent-host/canvas-turn.mjs", "agent-host/request-budget.mjs", "agent-host/package.json", "agent-host/node_modules/@earendil-works/pi-coding-agent/package.json", "agent-host/runtime/bin/node"} {
 		file := filepath.Join(bundle, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 			t.Fatal(err)
@@ -30,14 +30,14 @@ func TestLinuxWholeBundleReplacementAndRollback(t *testing.T) {
 	if err := validateHelperRequest(req); err != nil {
 		t.Fatal(err)
 	}
-	target, err := locateLinux("linux-amd64", filepath.Join(installed, "BeefTV"))
+	target, err := locateLinux("linux-amd64", filepath.Join(installed, "hfp-allinone"))
 	if err != nil || target.Path != installed {
 		t.Fatalf("invalid Linux target: %+v %v", target, err)
 	}
 	if err := SwapInstall(req); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"BeefTV", "cli/beeftv", "agent-host/runtime/bin/node", "plugin-packages/core.beeftv-plugin"} {
+	for _, name := range []string{"hfp-allinone", "cli/beeftv", "agent-host/runtime/bin/node", "plugin-packages/core.beeftv-plugin"} {
 		data, err := os.ReadFile(filepath.Join(installed, name))
 		if err != nil || string(data) != "new" {
 			t.Fatalf("incomplete replacement of %s", name)
@@ -46,7 +46,7 @@ func TestLinuxWholeBundleReplacementAndRollback(t *testing.T) {
 	if err := RestoreBackup(req); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"BeefTV", "cli/beeftv", "agent-host/runtime/bin/node", "plugin-packages/core.beeftv-plugin"} {
+	for _, name := range []string{"hfp-allinone", "cli/beeftv", "agent-host/runtime/bin/node", "plugin-packages/core.beeftv-plugin"} {
 		data, err := os.ReadFile(filepath.Join(installed, name))
 		if err != nil || string(data) != "old" {
 			t.Fatalf("incomplete rollback of %s", name)

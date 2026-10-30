@@ -19,7 +19,7 @@ description: 签名清单、打包布局、密钥、发布工作流、回滚和�
 
 新安装可使用 Windows Setup、macOS DMG 或 Ubuntu 24.04 DEB，旧版本仍保留 ZIP 下载。详见仓库的 `docs/desktop-install.md`。Windows 安装器按当前用户安装，macOS 将应用拖到 Applications；两者沿用现有 ZIP 更新器。Linux DEB 通过安装新版 DEB 升级，应用内更新入口会提示使用安装包，避免替换包管理器维护的系统文件。
 
-下载时，侧栏显示目标版本、百分比、速度和预计剩余时间。下载不设总时长上限：60 秒内一个字节都没收到才算一次中断。中断后会按 1、2、4、8 秒退避自动重连，并用 HTTP Range 从已下载的位置继续；连续 5 次尝试都没有新进度时停止，侧栏显示「继续下载」。已下载的部分按包的 SHA-256 保存在缓存目录的 `BeefTV/updates/downloads/` 下，再次点击或重启应用后仍从断点继续；新版本发布后，旧版本的残留文件会被清掉。续传不降低校验强度：完整文件仍按签名清单核对大小和 SHA-256，续传的文件校验失败时，会自动从头重下一次。
+下载时，侧栏显示目标版本、百分比、速度和预计剩余时间。下载不设总时长上限：60 秒内一个字节都没收到才算一次中断。中断后会按 1、2、4、8 秒退避自动重连，并用 HTTP Range 从已下载的位置继续；连续 5 次尝试都没有新进度时停止，侧栏显示「继续下载」。已下载的部分按包的 SHA-256 保存在缓存目录的 `hfp-allinone/updates/downloads/` 下，再次点击或重启应用后仍从断点继续；新版本发布后，旧版本的残留文件会被清掉。续传不降低校验强度：完整文件仍按签名清单核对大小和 SHA-256，续传的文件校验失败时，会自动从头重下一次。
 
 失败提示会区分代理连不上、网络不通、安全连接失败、服务器暂时不可用和网络不稳定。原始网络错误、每次重试，以及请求是直连还是经过哪个代理地址，都写入数据目录下的 `update.log`（超过 256 KB 时轮转为 `update.log.1`），不记录代理账号密码。
 
@@ -35,11 +35,14 @@ description: 签名清单、打包布局、密钥、发布工作流、回滚和�
 
 | 系统 | 更新包内容 | 数据目录（不会进包、不会被替换） |
 | --- | --- | --- |
-| macOS | `BeefTV.app` | `~/Library/Application Support/BeefTV` |
-| Windows | `BeefTV.exe`、官方插件、Agent 和 CLI | `%AppData%\BeefTV` |
-| Linux | `BeefTV-linux` 整个程序目录 | `~/.config/BeefTV`（遵循 `XDG_CONFIG_HOME`） |
+| macOS | `hfp-allinone.app` | `~/Library/Application Support/hfp-allinone` |
+| Windows | `hfp-allinone.exe`、官方插件、Agent 和 CLI | `%AppData%\hfp-allinone` |
+| Linux | `hfp-allinone-linux` 整个程序目录 | `~/.config/hfp-allinone`（遵循 `XDG_CONFIG_HOME`） |
 
-应用包身份和可执行文件名称保持稳定。Windows WebView2 默认缓存仍在 `%AppData%\BeefTV.exe`，不会因从解压目录移到安装目录而更名。安装、覆盖安装和卸载不会删除用户数据目录；自定义数据目录需要继续使用原配置。官方插件随应用包更新；装在数据目录里的自定义插件会留下来。ZIP 打包时遇到 `.env`、数据库或用户数据目录会失败。
+改名后的 Windows WebView2 默认缓存位于 `%AppData%\hfp-allinone.exe`；旧 BeefTV.exe 缓存不会自动迁移。安装、覆盖安装和卸载不会删除用户数据目录；自定义数据目录需要继续使用原配置。官方插件随应用包更新；装在数据目录里的自定义插件会留下来。ZIP 打包时遇到 `.env`、数据库或用户数据目录会失败。
+
+
+本仓库保留的 `.github/workflows/release-desktop.yml`、`scripts/publish-desktop-r2.py` 及镜像发布工具仍属于上游 BeefTV 发布链，不用于发布改名后的 hfp-allinone；本次只调整本地打包和安装检查。
 
 ## 两种签名
 
@@ -122,9 +125,9 @@ GitHub 仓库需配置 `BEEFTV_CNB_TRIGGER_TOKEN`，仅授权 `beeftv-downloads/
 固定文件名：
 
 ```text
-BeefTV-vX.Y.Z-darwin-arm64.zip
-BeefTV-vX.Y.Z-darwin-amd64.zip
-BeefTV-vX.Y.Z-windows-amd64.zip
+hfp-allinone-vX.Y.Z-darwin-arm64.zip
+hfp-allinone-vX.Y.Z-darwin-amd64.zip
+hfp-allinone-vX.Y.Z-windows-amd64.zip
 desktop-update.json
 ```
 
@@ -135,7 +138,7 @@ desktop-update.json
 ```bash
 cd backend
 go test ./cmd/update-release
-go run ./cmd/update-release package --platform windows-amd64 --input cmd/desktop/build/bin --output /tmp/BeefTV-vX.Y.Z-windows-amd64.zip
+go run ./cmd/update-release package --platform windows-amd64 --input cmd/desktop/build/bin --output /tmp/hfp-allinone-vX.Y.Z-windows-amd64.zip
 ```
 
 ## 回滚
@@ -147,3 +150,5 @@ go run ./cmd/update-release package --platform windows-amd64 --input cmd/desktop
 客户端在退出前重新验包，并在程序所在磁盘准备安装文件。数据目录和程序目录重叠时会拒绝安装，避免覆盖自定义插件。替换只使用同磁盘重命名，安装锁防止多个实例同时替换。安装或进程启动失败时尝试恢复旧程序；若应用未退出、安装程序已经停止，界面会恢复可重试状态。成功启动后仍保留程序旁 `.beeftv-update-*` 目录中的备份和恢复记录；确认新版本正常后可清理该次目录。
 
 启动了进程不等于 SQLite 迁移或界面正常，因此不会在新进程启动后自动降级。恢复旧程序前需确认数据库兼容，必要时使用匹配的数据备份。此更新器不会复制或还原全部用户素材。
+
+默认数据目录优先使用 `hfp-allinone`；仅当新目录不存在、旧 `BeefTV` 目录存在时沿用旧目录，不搬迁数据。两者都存在时使用新目录。首次改名需手动安装，见[桌面发布说明](../../../desktop-release.md)。

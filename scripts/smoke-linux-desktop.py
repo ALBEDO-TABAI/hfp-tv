@@ -21,7 +21,7 @@ def smoke(archive):
                 bundle.extract(item, root)
                 if target.is_file():
                     target.chmod((item.external_attr >> 16) & 0o777)
-        app = root / "BeefTV-linux" / "BeefTV"
+        app = root / "hfp-allinone-linux" / "hfp-allinone"
         data = root / "isolated data"
         env = {k: v for k, v in os.environ.items() if not k.startswith(("CANVAS_", "BEEFTV_"))}
         # CI has no GPU; the WebView uses software rendering under Xvfb.
@@ -35,7 +35,7 @@ def smoke(archive):
                         log.seek(0)
                         raise RuntimeError("desktop exited: " + log.read()[-4000:])
                     descriptor = data / "runtime.json"
-                    window = subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "^BeefTV$"], capture_output=True, text=True)
+                    window = subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "^hfp - all in one$"], capture_output=True, text=True)
                     if descriptor.exists() and window.returncode == 0:
                         info = json.loads(descriptor.read_text())
                         if info["pid"] != process.pid:

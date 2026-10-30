@@ -22,6 +22,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"infinite-canvas/backend/internal/desktopidentity"
 	"infinite-canvas/backend/internal/runtimeinfo"
 )
 
@@ -149,7 +150,7 @@ func (c *client) currentBaseURL() string {
 func (c *client) do(ctx context.Context, method, path string, body any) (json.RawMessage, error) {
 	base := c.currentBaseURL()
 	if base == "" {
-		return nil, &cliError{code: exitTransportFailure, reason: "runtime_not_found", msg: "未发现运行中的 BeefTV 工作区。请先打开 BeefTV；若使用自定义目录，请检查 BEEFTV_DATA_DIR；独立服务请显式设置 BEEFTV_BASE_URL"}
+		return nil, &cliError{code: exitTransportFailure, reason: "runtime_not_found", msg: "未发现运行中的桌面工作区。请先打开应用；若使用自定义目录，请检查 BEEFTV_DATA_DIR；独立服务请显式设置 BEEFTV_BASE_URL"}
 	}
 	var payload io.Reader
 	if body != nil {
@@ -384,7 +385,7 @@ func run(args []string) error {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `beeftv — BeefTV 业务操作命令行（连接正在运行的本地工作区）
+	fmt.Fprint(os.Stderr, "beeftv — ", desktopidentity.DisplayName, ` 业务操作命令行（连接正在运行的本地工作区）
 
   beeftv skills help  （远程技能市场，无需运行桌面应用）
   beeftv diagnostics analyze --file <diagnostics.zip>  （离线分析，无需运行桌面应用）
@@ -404,11 +405,11 @@ func usage() {
   beeftv client register --label <label> [--kind codex|claude|cursor|other] [--mode read-only|read-write]
   beeftv mcp serve [--read-only]
 
-连接哪个工作区：不设 BEEFTV_BASE_URL 时自动连正在运行的 BeefTV 桌面应用，端口是动态的。
-BEEFTV_DATA_DIR 可以指向非默认数据目录。Windows 从用户目录下 .beeftv/runtime 读取对应
-工作区的运行信息，其他平台读取数据目录里的 runtime.json。升级后请重新打开 BeefTV。
+连接哪个工作区：不设 BEEFTV_BASE_URL 时自动连正在运行的桌面应用，端口是动态的。
+BEEFTV_DATA_DIR 可以指向非默认数据目录。Windows 从用户目录下 .`, desktopidentity.Name, `/runtime 读取对应
+工作区的运行信息，其他平台读取数据目录里的 runtime.json。升级后请重新打开应用。
 
-凭据：在 BeefTV 的设置里新建一个客户端，把它给出的 BEEFTV_CLIENT_ID 与 BEEFTV_CLIENT_TOKEN
+凭据：在应用的设置里新建一个客户端，把它给出的 BEEFTV_CLIENT_ID 与 BEEFTV_CLIENT_TOKEN
 填进环境变量即可，不需要桌面令牌。新连接默认开放全部业务工具，操作审批由外部 Agent 管理。
 历史只读凭据继续保持只读；CLI 仍支持显式签发只读凭据。
 
@@ -702,7 +703,7 @@ func runMCP(c *client, args []string) error {
 	timedOut := errors.Is(startupCtx.Err(), context.DeadlineExceeded)
 	cancel()
 	if timedOut {
-		return &cliError{code: exitTransportFailure, reason: "mcp_startup_timeout", msg: "连接 BeefTV 工作区超过 5 秒，请确认 BeefTV 已启动且工作区可以访问"}
+		return &cliError{code: exitTransportFailure, reason: "mcp_startup_timeout", msg: "连接桌面工作区超过 5 秒，请确认应用已启动且工作区可以访问"}
 	}
 	if err != nil {
 		return err

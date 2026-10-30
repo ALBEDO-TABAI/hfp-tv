@@ -3,8 +3,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STAGED_APP="$ROOT_DIR/backend/cmd/desktop/build/bin/BeefTV.app"
-INSTALLED_APP="/Applications/BeefTV.app"
+STAGED_APP="$ROOT_DIR/backend/cmd/desktop/build/bin/hfp-allinone.app"
+INSTALLED_APP="/Applications/hfp-allinone.app"
 
 cleanup_staged_app() {
   if [[ -d "$STAGED_APP" && ! -L "$STAGED_APP" ]]; then
@@ -14,13 +14,13 @@ cleanup_staged_app() {
 trap cleanup_staged_app EXIT
 
 quit_installed_app() {
-  osascript -e 'tell application id "com.wails.beeftv" to quit' 2>/dev/null || true
+  osascript -e 'tell application id "com.wails.hfp-allinone" to quit' 2>/dev/null || true
   for _ in 1 2 3 4 5; do
-    pgrep -f '^/Applications/BeefTV.app/Contents/MacOS/BeefTV$' >/dev/null || return 0
+    pgrep -f '^/Applications/hfp-allinone[.]app/Contents/MacOS/hfp-allinone$' >/dev/null || return 0
     sleep 1
   done
-  pgrep -f '^/Applications/BeefTV.app/Contents/MacOS/BeefTV$' >/dev/null || return 0
-  echo "BeefTV is still running. Save your work and quit before updating." >&2
+  pgrep -f '^/Applications/hfp-allinone[.]app/Contents/MacOS/hfp-allinone$' >/dev/null || return 0
+  echo "hfp - all in one is still running. Save your work and quit before updating." >&2
   return 1
 }
 
@@ -28,14 +28,14 @@ quit_installed_app() {
 quit_installed_app
 "$ROOT_DIR/scripts/build-beeftv-release.sh"
 
-if [[ ! -x "$STAGED_APP/Contents/MacOS/BeefTV" ]]; then
-  echo "Built BeefTV.app is incomplete: $STAGED_APP" >&2
+if [[ ! -x "$STAGED_APP/Contents/MacOS/hfp-allinone" ]]; then
+  echo "Built hfp-allinone.app is incomplete: $STAGED_APP" >&2
   exit 1
 fi
 # External agents connect through the bundled CLI, so an install without it is
 # incomplete even though the GUI would start.
 if [[ ! -x "$STAGED_APP/Contents/MacOS/cli/beeftv" ]]; then
-  echo "Built BeefTV.app has no bundled beeftv CLI: $STAGED_APP/Contents/MacOS/cli/beeftv" >&2
+  echo "Built hfp-allinone.app has no bundled beeftv CLI: $STAGED_APP/Contents/MacOS/cli/beeftv" >&2
   exit 1
 fi
 codesign --verify --deep --strict "$STAGED_APP"

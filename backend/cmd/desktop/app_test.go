@@ -128,13 +128,13 @@ func TestDefaultDataDirLaunchArgumentUsesIsolatedProfile(t *testing.T) {
 	t.Cleanup(func() { os.Args = original })
 	want := filepath.Join(t.TempDir(), "isolated profile")
 	t.Setenv("CANVAS_DESKTOP_DATA_DIR", filepath.Join(t.TempDir(), "other-profile"))
-	os.Args = []string{"BeefTV", "--data-dir=" + want}
+	os.Args = []string{"hfp-allinone", "--data-dir=" + want}
 	got, err := defaultDataDir()
 	if err != nil || got != want {
 		t.Fatalf("isolated profile: got %q, err %v", got, err)
 	}
 	for _, invalid := range []string{"", "relative", string(filepath.Separator)} {
-		os.Args = []string{"BeefTV", "--data-dir=" + invalid}
+		os.Args = []string{"hfp-allinone", "--data-dir=" + invalid}
 		if _, err := defaultDataDir(); err == nil {
 			t.Fatalf("accepted unsafe profile %q", invalid)
 		}

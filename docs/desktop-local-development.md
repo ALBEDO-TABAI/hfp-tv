@@ -1,25 +1,25 @@
-# BeefTV 本地桌面开发与验收
+# hfp - all in one 本地桌面开发与验收
 
 本文保留原生 Wails 开发与上游验收资料。hfp - all in one 当前的浏览器启动与重启以[本地开发指南](local-development.md)为准。
 
-BeefTV 的桌面版是 Wails 应用：前端运行在 WebView，Go 后端在同一进程内启动一个仅监听 `127.0.0.1` 的 loopback API。桌面 profile 不注册交互式登录路由，首次启动通过 `/api/workspace/bootstrap` 创建或读取本地工作区。
+hfp - all in one 的桌面版是 Wails 应用：前端运行在 WebView，Go 后端在同一进程内启动一个仅监听 `127.0.0.1` 的 loopback API。桌面 profile 不注册交互式登录路由，首次启动通过 `/api/workspace/bootstrap` 创建或读取本地工作区。
 
 ## 数据位置
 
-默认数据目录由 Go 的 `os.UserConfigDir()` 决定，最终目录为 `<系统用户配置目录>/BeefTV`。Windows 上是 `%AppData%\BeefTV`，macOS 上是 `~/Library/Application Support/BeefTV`。
+默认数据目录由 Go 的 `os.UserConfigDir()` 决定，最终目录为 `<系统用户配置目录>/hfp-allinone`。Windows 上是 `%AppData%\hfp-allinone`，macOS 上是 `~/Library/Application Support/hfp-allinone`。
 
 其中包含本地 SQLite 数据库、资源文件和迁移备份。验收或调试时可通过环境变量指定隔离目录：
 
 ```bash
 CANVAS_DESKTOP_DATA_DIR="$(mktemp -d /tmp/beeftv-data.XXXXXX)" \
-  backend/cmd/desktop/build/bin/BeefTV.app/Contents/MacOS/BeefTV
+  backend/cmd/desktop/build/bin/hfp-allinone.app/Contents/MacOS/hfp-allinone
 ```
 
 Windows：
 
 ```powershell
 $env:CANVAS_DESKTOP_DATA_DIR = Join-Path $env:TEMP "beeftv-data"
-backend\cmd\desktop\build\bin\BeefTV.exe
+backend\cmd\desktop\build\bin\hfp-allinone.exe
 ```
 
 这个变量只改变数据目录，不改变应用的本地工作区和无登录行为。官方插件仍然从可执行文件旁边的 `plugin-packages\` 加载，不跟数据目录走。
@@ -59,7 +59,7 @@ go run github.com/wailsapp/wails/v2/cmd/wails@v2.16.0 build -clean -m -nosyncgom
 产物位于：
 
 ```text
-backend/cmd/desktop/build/bin/BeefTV.app
+backend/cmd/desktop/build/bin/hfp-allinone.app
 ```
 
 ## 手工验收清单
@@ -76,9 +76,11 @@ backend/cmd/desktop/build/bin/BeefTV.app
 
 Wails 2.16 生产包只把 `/` 和 `index.html` 交给前端运行时；深路径（例如 `/canvas/:id`）会落到资源 handler 并返回 404。原生窗口因此使用 hash 路由：刷新仍请求 `/`，画布地址形如 `/#/canvas/<id>`。浏览器部署继续使用 History 路径，`/api` 与媒体地址不进入 hash。
 
+默认数据目录优先使用 `hfp-allinone`；仅当新目录不存在、旧 `BeefTV` 目录存在时沿用旧目录，不搬迁数据。两者都存在时使用新目录。首次改名需手动安装，见[桌面发布说明](desktop-release.md)。
+
 ## 上游历史验收记录
 
-以下是继承的验收记录，不是 hfp - all in one 当前分支的发布或安装证明。当前 Wails 配置中的应用名为 `hfp - all in one`，输出文件名为 `hfp-all-in-one`，部分发行脚本仍使用 `BeefTV`；打包前必须核对实际产物路径。
+以下是继承的验收记录，不是 hfp - all in one 当前分支的发布或安装证明。当前应用包为 `hfp-allinone.app`，可执行文件为 `hfp-allinone`，显示名为 `hfp - all in one`；下方旧名称仅属于历史记录。
 
 - 统一开发脚本已验证：Wails 日志显示 `Frontend DevServer URL: http://127.0.0.1:3000`；浏览器代理和后端直连的 `/api/health/live` 返回相同 `dev` 构建信息；`/api/workspace/bootstrap` 经浏览器代理返回 HTTP 200。
 

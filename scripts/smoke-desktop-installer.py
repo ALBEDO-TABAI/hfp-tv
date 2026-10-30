@@ -55,7 +55,7 @@ def launch(exe, env, data, log_path, cleanup):
                     result = json.load(response)
                     if result.get('code') == 0 and result.get('data', {}).get('ready') is True and (data / 'open_ai_canvas.db').is_file():
                         if os.name == 'nt':
-                            process.webview_profile = Path(env['APPDATA']) / 'BeefTV.exe'
+                            process.webview_profile = Path(env['APPDATA']) / 'hfp-allinone.exe'
                             deadline_webview = time.monotonic() + 45
                             while not webview_profile_running(process.webview_profile, process.pid):
                                 if time.monotonic() >= deadline_webview:
@@ -161,23 +161,23 @@ def probe_self_test():
         print('PASS: isolated WebView probe writes, closes fully, reopens and reads committed IndexedDB')
         # Exercise the real NSIS failure branch with a tiny payload before the
         # expensive desktop build. This fixture is never a published artifact.
-        installed = Path(os.environ['LOCALAPPDATA']) / 'Programs/BeefTV'
+        installed = Path(os.environ['LOCALAPPDATA']) / 'Programs/hfp-allinone'
         if installed.exists():
             raise RuntimeError('Unexpected existing app on disposable CI runner')
         payload = root / 'fixture-payload'
         payload.mkdir()
-        (payload / 'BeefTV.exe').write_bytes(b'installer fixture payload')
+        (payload / 'hfp-allinone.exe').write_bytes(b'installer fixture payload')
         version = (Path(__file__).resolve().parent.parent / 'VERSION').read_text().strip()
-        installer = root / 'fixture-output' / f'BeefTV-{version}-windows-amd64-setup.exe'
+        installer = root / 'fixture-output' / f'hfp-allinone-{version}-windows-amd64-setup.exe'
         subprocess.run(['python', str(Path(__file__).with_name('package-desktop-installer.py')), '--platform', 'windows-amd64',
                         '--input', str(payload), '--output-dir', str(installer.parent)], check=True, timeout=90)
         try:
             subprocess.run([str(installer), '/S'], check=True, timeout=90)
-            (installed / 'BeefTV.exe').write_bytes(b'previous app must survive failed replacement')
+            (installed / 'hfp-allinone.exe').write_bytes(b'previous app must survive failed replacement')
             locked_windows_upgrade(installer, installed)
             concurrent_windows_install(installer, installed)
             locked_windows_upgrade(installer, installed, release_after_failure=True)
-            assert (installed / 'BeefTV.exe').read_bytes() == b'installer fixture payload'
+            assert (installed / 'hfp-allinone.exe').read_bytes() == b'installer fixture payload'
         finally:
             if (installed / 'Uninstall.exe').is_file():
                 subprocess.run([str(installed / 'Uninstall.exe'), '/S'], check=True, timeout=90)
@@ -190,9 +190,9 @@ def probe_self_test():
 
 def windows_custom_install_dir(installer, root):
     import winreg
-    key = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV'
+    key = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone'
     custom = root / 'Custom'
-    installed = custom / 'BeefTV'
+    installed = custom / 'hfp-allinone'
 
     def install_location():
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
@@ -204,42 +204,42 @@ def windows_custom_install_dir(installer, root):
 
     result = run('/S', '/D=' + str(custom))
     assert result.returncode == 0, f'chosen-location install failed with {result.returncode}'
-    assert (installed / 'BeefTV.exe').is_file()
+    assert (installed / 'hfp-allinone.exe').is_file()
     assert (installed / '.installed-root-files.txt').is_file()
     assert install_location() == str(installed), install_location()
 
     # An upgrade without /D must reuse the registered location.
     result = run('/S')
     assert result.returncode == 0, f'upgrade without /D failed with {result.returncode}'
-    assert (installed / 'BeefTV.exe').is_file()
+    assert (installed / 'hfp-allinone.exe').is_file()
     assert install_location() == str(installed), install_location()
 
     # Choosing a folder that already holds other files installs into its own
-    # BeefTV subfolder and leaves those files alone.
+    # hfp-allinone subfolder and leaves those files alone.
     apps = root / 'Apps'
     apps.mkdir()
     (apps / 'other.txt').write_bytes(b'other app')
     result = run('/S', '/D=' + str(apps))
     assert result.returncode == 0, f'install under a shared folder failed with {result.returncode}'
-    assert (apps / 'BeefTV' / 'BeefTV.exe').is_file()
+    assert (apps / 'hfp-allinone' / 'hfp-allinone.exe').is_file()
     assert (apps / 'other.txt').read_bytes() == b'other app'
-    assert install_location() == str(apps / 'BeefTV'), install_location()
-    assert not (installed / 'BeefTV.exe').exists(), 'moving the install left the old executable behind'
+    assert install_location() == str(apps / 'hfp-allinone'), install_location()
+    assert not (installed / 'hfp-allinone.exe').exists(), 'moving the install left the old executable behind'
     assert not (installed / 'Uninstall.exe').exists(), 'moving the install left a stale uninstaller behind'
-    subprocess.run([str(apps / 'BeefTV' / 'Uninstall.exe'), '/S'], check=True, timeout=90)
+    subprocess.run([str(apps / 'hfp-allinone' / 'Uninstall.exe'), '/S'], check=True, timeout=90)
     deadline = time.monotonic() + 90
-    while (apps / 'BeefTV').exists() and time.monotonic() < deadline:
+    while (apps / 'hfp-allinone').exists() and time.monotonic() < deadline:
         time.sleep(.5)
-    assert not (apps / 'BeefTV').exists(), 'uninstall under a shared folder left files behind'
+    assert not (apps / 'hfp-allinone').exists(), 'uninstall under a shared folder left files behind'
     assert (apps / 'other.txt').read_bytes() == b'other app'
     result = run('/S', '/D=' + str(custom))
     assert result.returncode == 0, f'reinstall into the chosen folder failed with {result.returncode}'
 
-    # A portable BeefTV folder (with BeefTV.exe but no installer manifest yet)
+    # A portable hfp-allinone folder (with hfp-allinone.exe but no installer manifest yet)
     # can be upgraded in place while keeping unknown user files inside it.
-    portable_dir = root / 'PortableUpgrade' / 'BeefTV'
+    portable_dir = root / 'PortableUpgrade' / 'hfp-allinone'
     portable_dir.mkdir(parents=True)
-    (portable_dir / 'BeefTV.exe').write_bytes(b'old portable exe')
+    (portable_dir / 'hfp-allinone.exe').write_bytes(b'old portable exe')
     (portable_dir / 'user-note.txt').write_bytes(b'keep user note')
     result = run('/S', '/D=' + str(portable_dir))
     assert result.returncode == 0, f'portable folder upgrade failed with {result.returncode}'
@@ -248,12 +248,12 @@ def windows_custom_install_dir(installer, root):
     assert install_location() == str(portable_dir), install_location()
     result = run('/S', '/D=' + str(custom))
     assert result.returncode == 0, f'reinstall into the chosen folder failed with {result.returncode}'
-    assert not (portable_dir / 'BeefTV.exe').exists(), 'moving from portable upgrade left old executable behind'
+    assert not (portable_dir / 'hfp-allinone.exe').exists(), 'moving from portable upgrade left old executable behind'
     assert (portable_dir / 'user-note.txt').read_bytes() == b'keep user note'
 
-    # A non-empty BeefTV folder that is not a BeefTV install must be refused
+    # A non-empty hfp-allinone folder that is not a hfp-allinone install must be refused
     # without touching its files.
-    foreign = root / 'Foreign' / 'BeefTV'
+    foreign = root / 'Foreign' / 'hfp-allinone'
     foreign.mkdir(parents=True)
     (foreign / 'keep.txt').write_bytes(b'keep foreign file')
     result = run('/S', '/D=' + str(foreign))
@@ -272,7 +272,7 @@ def windows_custom_install_dir(installer, root):
     except FileNotFoundError:
         pass
     else:
-        raise AssertionError('uninstall left the BeefTV registry key')
+        raise AssertionError('uninstall left the hfp-allinone registry key')
     print('PASS: chosen install folder, upgrade reuse, portable upgrade, foreign-folder refusal and custom uninstall')
 
 
@@ -291,16 +291,16 @@ def concurrent_windows_install(installer, installed):
     kernel.CreateMutexW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR]
     kernel.CreateMutexW.restype = wintypes.HANDLE
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-    handle = kernel.CreateMutexW(None, False, r'Local\BeefTV.Installation')
+    handle = kernel.CreateMutexW(None, False, r'Local\hfp-allinone.Installation')
     if not handle:
         raise ctypes.WinError(ctypes.get_last_error())
-    before = digest(installed / 'BeefTV.exe')
+    before = digest(installed / 'hfp-allinone.exe')
     try:
         result = subprocess.run([str(installer), '/S'], timeout=60)
         assert result.returncode == 2, 'a second installer bypassed installation mutex'
         result = subprocess.run([str(installed / 'Uninstall.exe'), '/S', '_?=' + str(installed)], timeout=60)
         assert result.returncode == 2, 'uninstaller bypassed installation mutex'
-        assert digest(installed / 'BeefTV.exe') == before
+        assert digest(installed / 'hfp-allinone.exe') == before
     finally:
         kernel.CloseHandle(handle)
     print('PASS: installer and uninstaller refuse concurrent changes')
@@ -318,7 +318,7 @@ def locked_windows_upgrade(installer, installed, release_after_failure=False):
     if handle == ctypes.c_void_p(-1).value:
         raise ctypes.WinError(ctypes.get_last_error())
     before = {str(path.relative_to(installed)): digest(path) for path in installed.rglob('*') if path.is_file()}
-    logs = Path(os.environ['LOCALAPPDATA']) / 'BeefTV/Installer'
+    logs = Path(os.environ['LOCALAPPDATA']) / 'hfp-allinone/Installer'
     previous_logs = set(logs.glob('*.log'))
     process = None
     try:
@@ -383,22 +383,22 @@ def smoke(args):
         env['LIBGL_ALWAYS_SOFTWARE'] = '1'
         if args.platform == 'windows-amd64':
             env['APPDATA'] = str(home / 'AppData/Roaming')
-            data = Path(env['APPDATA']) / 'BeefTV'
-            installed = Path(os.environ['LOCALAPPDATA']) / 'Programs/BeefTV'
-            relative_exe = Path('BeefTV.exe')
-            profile = Path(env['APPDATA']) / 'BeefTV.exe'
+            data = Path(env['APPDATA']) / 'hfp-allinone'
+            installed = Path(os.environ['LOCALAPPDATA']) / 'Programs/hfp-allinone'
+            relative_exe = Path('hfp-allinone.exe')
+            profile = Path(env['APPDATA']) / 'hfp-allinone.exe'
             helper = root / 'webview-cache-probe.exe'
             build_cache_probe(helper)
             windows_custom_install_dir(installer, root)
             def install():
                 subprocess.run([str(installer), '/S'], check=True, timeout=180)
                 import winreg
-                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV') as key:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone') as key:
                     assert winreg.QueryValueEx(key, 'InstallLocation')[0] == str(installed)
-                menu = Path(os.environ['APPDATA']) / 'Microsoft/Windows/Start Menu/Programs/BeefTV'
-                assert (menu / 'BeefTV.lnk').is_file()
+                menu = Path(os.environ['APPDATA']) / 'Microsoft/Windows/Start Menu/Programs/hfp-allinone'
+                assert (menu / 'hfp-allinone.lnk').is_file()
                 assert (menu / 'Uninstall.lnk').is_file()
-                desktop = Path(os.environ['USERPROFILE']) / 'Desktop/BeefTV.lnk'
+                desktop = Path(os.environ['USERPROFILE']) / 'Desktop/hfp-allinone.lnk'
                 assert desktop.is_file()
             def uninstall():
                 # Normal NSIS uninstall runs a temporary copy so it can delete itself.
@@ -408,9 +408,9 @@ def smoke(args):
                     time.sleep(.5)
                 assert not installed.exists(), 'uninstall left shipped files or runtime directories'
         elif args.platform.startswith('darwin-'):
-            data = home / 'Library/Application Support/BeefTV'
-            installed = root / 'Applications/BeefTV.app'
-            relative_exe = Path('Contents/MacOS/BeefTV')
+            data = home / 'Library/Application Support/hfp-allinone'
+            installed = root / 'Applications/hfp-allinone.app'
+            relative_exe = Path('Contents/MacOS/hfp-allinone')
             def install():
                 mount = root / 'mounted'
                 subprocess.run(['hdiutil', 'attach', '-readonly', '-nobrowse', '-mountpoint', str(mount), str(installer)], check=True)
@@ -419,7 +419,7 @@ def smoke(args):
                     assert os.readlink(mount / 'Applications') == '/Applications'
                     if installed.exists():
                         shutil.rmtree(installed)
-                    subprocess.run(['ditto', str(mount / 'BeefTV.app'), str(installed)], check=True)
+                    subprocess.run(['ditto', str(mount / 'hfp-allinone.app'), str(installed)], check=True)
                     subprocess.run(['codesign', '--verify', '--deep', '--strict', str(installed)], check=True)
                 finally:
                     subprocess.run(['hdiutil', 'detach', str(mount)], check=True)
@@ -427,9 +427,9 @@ def smoke(args):
                 shutil.rmtree(installed)
         else:
             env['XDG_CONFIG_HOME'] = str(home / '.config')
-            data = home / '.config/BeefTV'
-            installed = Path('/opt/beeftv/BeefTV-linux')
-            relative_exe = Path('BeefTV')
+            data = home / '.config/hfp-allinone'
+            installed = Path('/opt/beeftv/hfp-allinone-linux')
+            relative_exe = Path('hfp-allinone')
             def install():
                 subprocess.run(['sudo', 'apt-get', 'install', '-y', '--reinstall', str(installer)], check=True, timeout=240)
                 assert (installed / '.package-managed').read_text() == 'deb\n'
@@ -439,7 +439,7 @@ def smoke(args):
                 subprocess.run(['sudo', 'dpkg', '--remove', 'beeftv'], check=True)
                 assert not (installed / relative_exe).exists()
 
-        portable = root / ('BeefTV.app' if args.platform.startswith('darwin-') else 'portable')
+        portable = root / ('hfp-allinone.app' if args.platform.startswith('darwin-') else 'portable')
         shutil.copytree(payload, portable, symlinks=True)
         process = launch(portable / relative_exe, env, data, root / 'portable.log', cleanup)
         stop(process)
@@ -453,7 +453,7 @@ def smoke(args):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b'preserve installer data')
         # Existing WebView draft storage must also survive installer operations.
-        cache = Path(env.get('APPDATA', str(home))) / 'BeefTV.exe/cache-sentinel'
+        cache = Path(env.get('APPDATA', str(home))) / 'hfp-allinone.exe/cache-sentinel'
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_bytes(b'keep webview cache')
         install()
@@ -464,7 +464,7 @@ def smoke(args):
                     assert digest(source) == digest(installed / source.relative_to(payload)), str(source)
             process = launch(installed / relative_exe, env, data, root / f'installed-{iteration}.log', cleanup)
             if iteration == 0 and args.platform == 'windows-amd64':
-                # Installing while BeefTV is open must automatically close the
+                # Installing while hfp-allinone is open must automatically close the
                 # running instance and complete the upgrade cleanly.
                 install()
                 process.wait(timeout=30)

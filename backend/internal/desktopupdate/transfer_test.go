@@ -70,7 +70,7 @@ func newTransferFixture(t *testing.T, idle time.Duration, serve func(w http.Resp
 	files, execFiles := DarwinZipFiles("NEW")
 	padding := make([]byte, 384*1024)
 	rand.New(rand.NewSource(7)).Read(padding)
-	files["BeefTV.app/Contents/Resources/padding.bin"] = padding
+	files["hfp-allinone.app/Contents/Resources/padding.bin"] = padding
 	zipPath := filepath.Join(t.TempDir(), "app.zip")
 	if err := WriteZip(zipPath, files, execFiles); err != nil {
 		t.Fatal(err)
@@ -92,7 +92,7 @@ func newTransferFixture(t *testing.T, idle time.Duration, serve func(w http.Resp
 				return
 			}
 			_, _ = w.Write(body)
-		case "/BeefTV.zip":
+		case "/hfp-allinone.zip":
 			f.mu.Lock()
 			calls++
 			call := calls
@@ -122,7 +122,7 @@ func newTransferFixture(t *testing.T, idle time.Duration, serve func(w http.Resp
 }
 
 func serveRange(w http.ResponseWriter, r *http.Request, zip []byte) {
-	http.ServeContent(w, r, "BeefTV.zip", time.Time{}, bytes.NewReader(zip))
+	http.ServeContent(w, r, "hfp-allinone.zip", time.Time{}, bytes.NewReader(zip))
 }
 
 func abortAfter(w http.ResponseWriter, body []byte, n int) {

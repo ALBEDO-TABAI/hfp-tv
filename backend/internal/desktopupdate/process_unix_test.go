@@ -10,7 +10,7 @@ import (
 )
 
 func TestInstallLockPreservesPendingLegacyHelper(t *testing.T) {
-	path := filepath.Join(t.TempDir(), ".BeefTV.update.lock")
+	path := filepath.Join(t.TempDir(), ".hfp-allinone.update.lock")
 	legacy, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		t.Fatal(err)

@@ -6,13 +6,13 @@
 !include "FileFunc.nsh"
 ${StrStr}
 ${UnStrStr}
-Name "BeefTV"
+Name "hfp - all in one"
 OutFile "${OUTPUT}"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
-InstallDir "$LOCALAPPDATA\Programs\BeefTV"
+InstallDir "$LOCALAPPDATA\Programs\hfp-allinone"
 # Upgrades default to the previous location; the user can still choose another folder.
-InstallDirRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "InstallLocation"
+InstallDirRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "InstallLocation"
 Var BackupDir
 Var CleanDir
 Var InstallParent
@@ -28,28 +28,28 @@ Var MoveError
 Var MoveAttempt
 Var OldMoved
 VIProductVersion "${VERSION}.0"
-VIAddVersionKey "ProductName" "BeefTV"
+VIAddVersionKey "ProductName" "hfp - all in one"
 VIAddVersionKey "FileVersion" "${VERSION}"
-VIAddVersionKey "FileDescription" "BeefTV Setup"
+VIAddVersionKey "FileDescription" "hfp - all in one Setup"
 VIAddVersionKey "LegalCopyright" "BeefTV"
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE DirectoryPageLeave
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_RUN "$INSTDIR\BeefTV.exe"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\hfp-allinone.exe"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
 !insertmacro MUI_LANGUAGE "SimpChinese"
 
-LangString BEEFTV_DIR_FOREIGN ${LANG_ENGLISH} "This folder already holds other files and is not a BeefTV installation. Choose an empty folder or the current BeefTV location."
-LangString BEEFTV_DIR_FOREIGN ${LANG_SIMPCHINESE} "这个文件夹里已有其他文件，不是 BeefTV 安装位置。请选择一个空文件夹，或当前的 BeefTV 安装位置。"
-LangString BEEFTV_DIR_WRITE ${LANG_ENGLISH} "BeefTV cannot write here. Administrator rights are required, so choose another folder."
+LangString BEEFTV_DIR_FOREIGN ${LANG_ENGLISH} "This folder already holds other files and is not a hfp - all in one installation. Choose an empty folder or the current hfp - all in one location."
+LangString BEEFTV_DIR_FOREIGN ${LANG_SIMPCHINESE} "这个文件夹里已有其他文件，不是 hfp - all in one 安装位置。请选择一个空文件夹，或当前的 hfp - all in one 安装位置。"
+LangString BEEFTV_DIR_WRITE ${LANG_ENGLISH} "hfp - all in one cannot write here. Administrator rights are required, so choose another folder."
 LangString BEEFTV_DIR_WRITE ${LANG_SIMPCHINESE} "需要管理员权限，请选择其他文件夹。"
-LangString BEEFTV_BUSY ${LANG_ENGLISH} "Another BeefTV installer or uninstaller is running. Close it and try again."
-LangString BEEFTV_BUSY ${LANG_SIMPCHINESE} "另一个 BeefTV 安装或卸载程序正在运行。请先关闭它，再试一次。"
-LangString BEEFTV_CLOSE ${LANG_ENGLISH} "Please close BeefTV and its CLI, then choose Retry."
-LangString BEEFTV_CLOSE ${LANG_SIMPCHINESE} "请退出 BeefTV 及其命令行程序，然后点击“重试”。"
+LangString BEEFTV_BUSY ${LANG_ENGLISH} "Another hfp - all in one installer or uninstaller is running. Close it and try again."
+LangString BEEFTV_BUSY ${LANG_SIMPCHINESE} "另一个 hfp - all in one 安装或卸载程序正在运行。请先关闭它，再试一次。"
+LangString BEEFTV_CLOSE ${LANG_ENGLISH} "Please close hfp - all in one and its CLI, then choose Retry."
+LangString BEEFTV_CLOSE ${LANG_SIMPCHINESE} "请退出 hfp - all in one 及其命令行程序，然后点击“重试”。"
 LangString BEEFTV_RETRY ${LANG_ENGLISH} "Windows could not move this application folder (error $MoveError):$\r$\n$MoveFrom$\r$\n$\r$\nClose programs or terminal windows using it, then choose Retry. Cancel stops this installation.$\r$\nLog: $InstallLog"
 LangString BEEFTV_RETRY ${LANG_SIMPCHINESE} "Windows 无法移动以下程序文件夹（错误 $MoveError）：$\r$\n$MoveFrom$\r$\n$\r$\n请关闭正在使用它的程序或终端窗口，然后点击“重试”。点击“取消”将停止安装。$\r$\n安装日志：$InstallLog"
 LangString BEEFTV_PRESERVED ${LANG_ENGLISH} "Installation stopped. The previous application is still at $INSTDIR. Your projects are preserved.$\r$\nLog: $InstallLog"
@@ -63,7 +63,7 @@ LangString BEEFTV_RESTORE_FAILED ${LANG_SIMPCHINESE} "Windows 未能恢复原程
 # race while moving folders or updating the per-user registration.
 !macro InstallerLock PREFIX
 Function ${PREFIX}AcquireInstallerLock
-  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Local\BeefTV.Installation") p .r0 ?e'
+  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Local\hfp-allinone.Installation") p .r0 ?e'
   Pop $1
   StrCpy $InstallerMutex $0
   ${If} $0 == 0
@@ -114,15 +114,15 @@ Function MoveInstallFolder
   StrCpy $0 0
 FunctionEnd
 
-# Appends a dedicated BeefTV subfolder to the chosen location (including drive
+# Appends a dedicated hfp-allinone subfolder to the chosen location (including drive
 # roots like D:\ or E:\), then validates that final folder. Choosing E:\ or
-# D:\Apps therefore installs to E:\BeefTV or D:\Apps\BeefTV and never mixes the
+# D:\Apps therefore installs to E:\hfp-allinone or D:\Apps\hfp-allinone and never mixes the
 # payload with the user's other files. Sets $0 to 0 when valid, or 2 (foreign
 # folder), 3 (not writable).
 Function PrepareInstallDir
   StrCpy $0 0
   ${If} $INSTDIR == ""
-    StrCpy $INSTDIR "$LOCALAPPDATA\Programs\BeefTV"
+    StrCpy $INSTDIR "$LOCALAPPDATA\Programs\hfp-allinone"
   ${EndIf}
   # Drop trailing separators so the last component is a real name.
   StrCpy $1 "$INSTDIR"
@@ -138,19 +138,19 @@ Function PrepareInstallDir
     ${EndIf}
   ${GetRoot} "$1" $2
   ${If} $2 == "$1"
-    StrCpy $1 "$1\BeefTV"
+    StrCpy $1 "$1\hfp-allinone"
   ${Else}
     ${GetFileName} "$1" $2
-    ${If} $2 != "BeefTV"
-      StrCpy $1 "$1\BeefTV"
+    ${If} $2 != "hfp-allinone"
+      StrCpy $1 "$1\hfp-allinone"
     ${EndIf}
   ${EndIf}
-  # An existing final folder is only reused when it is a previous BeefTV
-  # install (or portable BeefTV directory) or empty.
+  # An existing final folder is only reused when it is a previous hfp-allinone
+  # install (or portable hfp-allinone directory) or empty.
   StrCpy $5 ""
   ${If} ${FileExists} "$1\*.*"
     ${IfNot} ${FileExists} "$1\.installed-root-files.txt"
-    ${AndIfNot} ${FileExists} "$1\BeefTV.exe"
+    ${AndIfNot} ${FileExists} "$1\hfp-allinone.exe"
       StrCpy $3 ""
       FindFirst $2 $4 "$1\*"
       PrepareInstallDir_scan:
@@ -216,13 +216,13 @@ Function ${PREFIX}RequireClosed
   retry_closed_${PREFIX}:
   StrCpy $3 0
   check_closed_${PREFIX}:
-  nsExec::ExecToStack '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq BeefTV.exe" /NH'
+  nsExec::ExecToStack '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq hfp-allinone.exe" /NH'
   Pop $0
   Pop $1
 !if "${PREFIX}" == "un."
-  ${UnStrStr} $2 $1 "BeefTV.exe"
+  ${UnStrStr} $2 $1 "hfp-allinone.exe"
 !else
-  ${StrStr} $2 $1 "BeefTV.exe"
+  ${StrStr} $2 $1 "hfp-allinone.exe"
 !endif
   ${If} $2 == ""
 !if "${PREFIX}" == "un."
@@ -241,9 +241,9 @@ Function ${PREFIX}RequireClosed
   ${EndIf}
   IntOp $3 $3 + 1
   ${If} $3 == 1
-    # Ask BeefTV's main window to close cleanly first so SQLite and WebView2
+    # Ask hfp-allinone's main window to close cleanly first so SQLite and WebView2
     # flush state before exiting.
-    nsExec::Exec '"$SYSDIR\taskkill.exe" /IM BeefTV.exe'
+    nsExec::Exec '"$SYSDIR\taskkill.exe" /IM hfp-allinone.exe'
     Pop $0
     Sleep 500
     Goto check_closed_${PREFIX}
@@ -251,8 +251,8 @@ Function ${PREFIX}RequireClosed
     Sleep 500
     Goto check_closed_${PREFIX}
   ${ElseIf} $3 == 11
-    # Force-terminate any remaining BeefTV or CLI process tree.
-    nsExec::Exec '"$SYSDIR\taskkill.exe" /F /IM BeefTV.exe /T'
+    # Force-terminate any remaining hfp-allinone or CLI process tree.
+    nsExec::Exec '"$SYSDIR\taskkill.exe" /F /IM hfp-allinone.exe /T'
     Pop $0
     nsExec::Exec '"$SYSDIR\taskkill.exe" /F /IM beeftv.exe /T'
     Pop $0
@@ -302,7 +302,7 @@ Function ${PREFIX}RemovePayload
     done_${PREFIX}:
     FileClose $0
   ${EndIf}
-  Delete "$CleanDir\BeefTV.exe"
+  Delete "$CleanDir\hfp-allinone.exe"
   Delete "$CleanDir\.installed-root-files.txt"
   Delete "$CleanDir\Uninstall.exe"
   RMDir /r "$CleanDir\agent-host"
@@ -319,8 +319,8 @@ Function .onInit
   SetShellVarContext current
   Call AcquireInstallerLock
   ClearErrors
-  CreateDirectory "$LOCALAPPDATA\BeefTV\Installer"
-  GetTempFileName $InstallLog "$LOCALAPPDATA\BeefTV\Installer"
+  CreateDirectory "$LOCALAPPDATA\hfp-allinone\Installer"
+  GetTempFileName $InstallLog "$LOCALAPPDATA\hfp-allinone\Installer"
   ${If} ${Errors}
     ClearErrors
     GetTempFileName $InstallLog "$TEMP"
@@ -335,7 +335,7 @@ Function .onInit
   StrCpy $InstallPhase "startup"
   StrCpy $LogLine 'version=${VERSION} destination="$INSTDIR"'
   Call WriteInstallLog
-  ReadRegStr $PreviousInstallDir HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "InstallLocation"
+  ReadRegStr $PreviousInstallDir HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "InstallLocation"
   Call RequireClosed
   # Interactive runs validate on the directory page; /D= needs the same checks here.
   ${If} ${Silent}
@@ -359,7 +359,7 @@ Function .onInstFailed
   Call WriteInstallLog
 FunctionEnd
 
-Section "BeefTV (required)" SEC_APP
+Section "hfp - all in one (required)" SEC_APP
   SectionIn RO
   Call RequireClosed
   StrCpy $InstallPhase "prepare"
@@ -471,21 +471,21 @@ Section "BeefTV (required)" SEC_APP
   Abort
   install_registered:
   SetOutPath "$INSTDIR"
-  CreateDirectory "$SMPROGRAMS\BeefTV"
-  CreateShortcut "$SMPROGRAMS\BeefTV\BeefTV.lnk" "$INSTDIR\BeefTV.exe"
-  CreateShortcut "$SMPROGRAMS\BeefTV\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$DESKTOP\BeefTV.lnk" "$INSTDIR\BeefTV.exe"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "DisplayName" "BeefTV"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "DisplayVersion" "${VERSION}"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "QuietUninstallString" '$\"$INSTDIR\Uninstall.exe$\" /S'
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "DisplayIcon" "$INSTDIR\BeefTV.exe"
-  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "NoModify" 1
-  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "NoRepair" 1
-  WriteRegStr HKCU "Software\Classes\beeftv" "" "URL:BeefTV skill link"
+  CreateDirectory "$SMPROGRAMS\hfp-allinone"
+  CreateShortcut "$SMPROGRAMS\hfp-allinone\hfp-allinone.lnk" "$INSTDIR\hfp-allinone.exe"
+  CreateShortcut "$SMPROGRAMS\hfp-allinone\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
+  CreateShortcut "$DESKTOP\hfp-allinone.lnk" "$INSTDIR\hfp-allinone.exe"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "DisplayName" "hfp - all in one"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "DisplayVersion" "${VERSION}"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "QuietUninstallString" '$\"$INSTDIR\Uninstall.exe$\" /S'
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "InstallLocation" "$INSTDIR"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "DisplayIcon" "$INSTDIR\hfp-allinone.exe"
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "NoModify" 1
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "NoRepair" 1
+  WriteRegStr HKCU "Software\Classes\beeftv" "" "URL:hfp-allinone skill link"
   WriteRegStr HKCU "Software\Classes\beeftv" "URL Protocol" ""
-  WriteRegStr HKCU "Software\Classes\beeftv\shell\open\command" "" '$\"$INSTDIR\BeefTV.exe$\" $\"%1$\"'
+  WriteRegStr HKCU "Software\Classes\beeftv\shell\open\command" "" '$\"$INSTDIR\hfp-allinone.exe$\" $\"%1$\"'
   # A successful move replaces the registered install; remove only the old
   # installer's shipped payload. Unknown user files remain in that directory.
   ${If} $PreviousInstallDir != ""
@@ -513,16 +513,16 @@ Section "Uninstall"
   Call un.RemovePayload
   # A stale uninstaller copied from an older location must not unregister
   # or remove shortcuts for the current installation.
-  ReadRegStr $RegisteredInstallDir HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "InstallLocation"
+  ReadRegStr $RegisteredInstallDir HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone" "InstallLocation"
   ${If} $RegisteredInstallDir == $INSTDIR
     ReadRegStr $0 HKCU "Software\Classes\beeftv\shell\open\command" ""
-    ${If} $0 == '$\"$INSTDIR\BeefTV.exe$\" $\"%1$\"'
+    ${If} $0 == '$\"$INSTDIR\hfp-allinone.exe$\" $\"%1$\"'
       DeleteRegKey HKCU "Software\Classes\beeftv"
     ${EndIf}
-    Delete "$DESKTOP\BeefTV.lnk"
-    Delete "$SMPROGRAMS\BeefTV\BeefTV.lnk"
-    Delete "$SMPROGRAMS\BeefTV\Uninstall.lnk"
-    RMDir "$SMPROGRAMS\BeefTV"
-    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV"
+    Delete "$DESKTOP\hfp-allinone.lnk"
+    Delete "$SMPROGRAMS\hfp-allinone\hfp-allinone.lnk"
+    Delete "$SMPROGRAMS\hfp-allinone\Uninstall.lnk"
+    RMDir "$SMPROGRAMS\hfp-allinone"
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\hfp-allinone"
   ${EndIf}
 SectionEnd

@@ -46,7 +46,7 @@ func LocateTarget(executable string) (Target, error) {
 
 func locateLinux(platform, executable string) (Target, error) {
 	bundle := filepath.Dir(executable)
-	if filepath.Base(executable) != "BeefTV" || filepath.Base(bundle) != linuxBundleName {
+	if filepath.Base(executable) != executableName || filepath.Base(bundle) != linuxBundleName {
 		return Target{}, fmt.Errorf("当前运行方式不支持自动安装更新")
 	}
 	if err := requireRegularFile(executable, true); err != nil {

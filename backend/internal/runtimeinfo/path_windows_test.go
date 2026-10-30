@@ -11,8 +11,8 @@ import (
 func TestWindowsCanonicalDescriptorIgnoresAppDataShadows(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("USERPROFILE", home)
-	dataDir := filepath.Join(home, "AppData", "Roaming", "BeefTV")
-	shadowDir := filepath.Join(home, "AppData", "Local", "Packages", "fixture", "LocalCache", "Roaming", "BeefTV")
+	dataDir := filepath.Join(home, "AppData", "Roaming", "hfp-allinone")
+	shadowDir := filepath.Join(home, "AppData", "Local", "Packages", "fixture", "LocalCache", "Roaming", "hfp-allinone")
 	t.Setenv("APPDATA", filepath.Dir(shadowDir))
 	t.Setenv("BEEFTV_DATA_DIR", dataDir)
 	for _, dir := range []string{dataDir, shadowDir} {
@@ -34,7 +34,7 @@ func TestWindowsCanonicalDescriptorIgnoresAppDataShadows(t *testing.T) {
 			t.Fatal(err)
 		}
 		path := testPath(t, dataDir)
-		if !strings.HasPrefix(path, filepath.Join(home, ".beeftv", "runtime")+string(os.PathSeparator)) {
+		if !strings.HasPrefix(path, filepath.Join(home, ".hfp-allinone", "runtime")+string(os.PathSeparator)) {
 			t.Fatalf("descriptor remained inside AppData: %s", path)
 		}
 		info, found := Discover("")

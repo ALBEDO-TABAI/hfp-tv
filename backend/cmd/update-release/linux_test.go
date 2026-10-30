@@ -15,7 +15,7 @@ func TestPackageLinuxBundleAndExecutableModes(t *testing.T) {
 		t.Skip("Linux archives require Unix executable modes")
 	}
 	bundle := filepath.Join(t.TempDir(), linuxBundleName)
-	for _, name := range []string{"BeefTV", "cli/beeftv", "plugin-packages/core.beeftv-plugin"} {
+	for _, name := range []string{"hfp-allinone", "cli/beeftv", "plugin-packages/core.beeftv-plugin"} {
 		file := filepath.Join(bundle, name)
 		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 			t.Fatal(err)
@@ -25,7 +25,7 @@ func TestPackageLinuxBundleAndExecutableModes(t *testing.T) {
 		}
 	}
 	writeFakeAgentHost(t, filepath.Join(bundle, "agent-host"), "runtime/bin/node")
-	out := filepath.Join(t.TempDir(), "BeefTV-v1.7.15-linux-amd64.zip")
+	out := filepath.Join(t.TempDir(), "hfp-allinone-v1.7.15-linux-amd64.zip")
 	if err := packageBundle(platformLinuxAMD64, bundle, out); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestPackageLinuxBundleAndExecutableModes(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer reader.Close()
-	for _, name := range []string{"BeefTV-linux/BeefTV", "BeefTV-linux/cli/beeftv", "BeefTV-linux/agent-host/runtime/bin/node"} {
+	for _, name := range []string{"hfp-allinone-linux/hfp-allinone", "hfp-allinone-linux/cli/beeftv", "hfp-allinone-linux/agent-host/runtime/bin/node"} {
 		found := false
 		for _, entry := range reader.File {
 			if entry.Name == name {

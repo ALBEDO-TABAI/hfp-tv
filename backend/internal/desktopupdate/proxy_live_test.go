@@ -25,7 +25,7 @@ func TestLiveSystemProxyUpdateDownload(t *testing.T) {
 			}
 		})
 	}
-	engine := NewWithOptions(Options{CurrentVersion: "v1.5.3", FeedURL: "https://github.com/glanderness/BeefTV/releases/latest/download/desktop-update.json", PublicKey: key, StagingRoot: t.TempDir()})
+	engine := NewWithOptions(Options{CurrentVersion: "v1.5.3", FeedURL: "https://github.com/glanderness/hfp-allinone/releases/latest/download/desktop-update.json", PublicKey: key, StagingRoot: t.TempDir()})
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	state, err := engine.CheckForUpdate(ctx)
