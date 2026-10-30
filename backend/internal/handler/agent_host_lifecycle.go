@@ -9,7 +9,6 @@ import (
 
 	"infinite-canvas/backend/internal/app"
 	"infinite-canvas/backend/internal/assistantruntime"
-	httptransport "infinite-canvas/backend/internal/transport/http"
 )
 
 func missingAssistantHost(c *gin.Context, host *assistantruntime.Host) bool {
@@ -82,7 +81,8 @@ func RegisterAgentHostLifecycleRoutes(r gin.IRouter, svc *app.Service, host *ass
 				"msg": "助手模型或凭据还没准备好"})
 			return
 		}
-		if err := host.Launch(provider, "http://"+c.Request.Host+"/api", strings.TrimSpace(c.GetHeader(httptransport.LaunchTokenHeader))); err != nil {
+		opsURL, launchToken := assistantOpsEndpoint(c)
+		if err := host.Launch(provider, opsURL, launchToken); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"code": http.StatusServiceUnavailable, "reason": "host_start_failed", "msg": err.Error()})
 			return
 		}

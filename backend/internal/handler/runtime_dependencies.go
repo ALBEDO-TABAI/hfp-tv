@@ -4,6 +4,7 @@ import (
 	"context"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 
 	"infinite-canvas/backend/internal/app"
@@ -18,6 +19,7 @@ import (
 	localproject "infinite-canvas/backend/internal/project"
 	localtask "infinite-canvas/backend/internal/task"
 	"infinite-canvas/backend/internal/textreplay"
+	httptransport "infinite-canvas/backend/internal/transport/http"
 	"infinite-canvas/backend/internal/workspace"
 
 	"github.com/gin-gonic/gin"
@@ -62,6 +64,22 @@ type RuntimeDependencies struct {
 	// DesktopTrust verifies both the launch token and the separate Wails UI bootstrap credential.
 	// 桌面形态用它代替开发引导开关签发 UI 会话；服务端形态为 nil。
 	DesktopTrust func(*http.Request) bool
+	// AssistantOpsEndpoint pins the loopback ops URL and launch token the
+	// assistant child calls back to. Hosted kernels receive browser requests
+	// through the gateway, so the request Host is the public site, not this kernel.
+	AssistantOpsEndpoint func() (opsURL string, launchToken string)
+	// ManagedChannelIDs are model channels the team server writes into this
+	// workspace. Members may select them but every save restores them as stored.
+	ManagedChannelIDs []string
+}
+
+// assistantOpsEndpoint returns where the assistant child must call back. Without a
+// pinned endpoint the request itself landed on this backend's loopback listener.
+func assistantOpsEndpoint(c *gin.Context) (string, string) {
+	if dependencies, ok := runtimeDependencies(c); ok && dependencies.AssistantOpsEndpoint != nil {
+		return dependencies.AssistantOpsEndpoint()
+	}
+	return "http://" + c.Request.Host + "/api", strings.TrimSpace(c.GetHeader(httptransport.LaunchTokenHeader))
 }
 
 type serviceRuntimeAdapter struct {

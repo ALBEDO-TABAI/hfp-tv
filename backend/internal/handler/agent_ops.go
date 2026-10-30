@@ -176,6 +176,9 @@ func resolveCaller(c *gin.Context, svc *app.Service, clients *agentops.ClientReg
 	if agentops.OwnerTokenMatches(svc.DataDir(), strings.TrimSpace(c.GetHeader("X-Beeftv-Owner"))) {
 		return agentops.Caller{Kind: agentops.CallerManual}, "owner", nil
 	}
+	if httptransport.HostedOwner(c.Request) {
+		return agentops.Caller{Kind: agentops.CallerManual}, "hosted-ui", nil
+	}
 	if trustedDesktopUI(c) {
 		return agentops.Caller{Kind: agentops.CallerManual}, "desktop-ui", nil
 	}
@@ -259,6 +262,10 @@ func isLoopbackHost(host string) bool {
 // isLoopbackRequest 精确校验来源：Host、Origin 与 RemoteAddr 都必须是本机。
 // 不用子串匹配，避免 localhost.attacker.example 或任意 loopback 端口被误当成同源。
 func isLoopbackRequest(r *http.Request) bool {
+	// 团队服务器网关已在进程内认证为本工作区所有者：等同本机同源界面。
+	if httptransport.HostedOwner(r) {
+		return true
+	}
 	if !isLoopbackHost(r.Host) {
 		return false
 	}

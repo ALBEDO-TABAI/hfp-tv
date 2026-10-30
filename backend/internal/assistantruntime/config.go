@@ -19,6 +19,11 @@ type HostConfig struct {
 
 func (h *Host) EffectiveConfig() (HostConfig, bool) {
 	config, configured := readHostConfig(h.dataDir())
+	if h != nil && h.opts.PinnedCommand != nil {
+		config.HostCommand = h.opts.PinnedCommand.HostCommand
+		config.HostArgs = append([]string(nil), h.opts.PinnedCommand.HostArgs...)
+		return config, strings.TrimSpace(config.HostCommand) != ""
+	}
 	if strings.TrimSpace(config.HostCommand) == "" {
 		if bundled := BundledConfig(h.executablePath(), h.goos()); bundled.HostCommand != "" {
 			config.HostCommand = bundled.HostCommand

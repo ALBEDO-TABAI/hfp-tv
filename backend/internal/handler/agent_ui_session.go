@@ -14,6 +14,7 @@ import (
 
 	"infinite-canvas/backend/internal/agentops"
 	"infinite-canvas/backend/internal/app"
+	httptransport "infinite-canvas/backend/internal/transport/http"
 )
 
 // 内置 UI 会话：短期限、限定 scope 的独立凭据，由后端签发给可信 UI。
@@ -104,7 +105,7 @@ func RegisterAgentUISessionRoutes(r gin.IRouter, svc *app.Service, ui *uiSession
 			failService(c, err)
 			return
 		}
-		ownerOK := agentops.OwnerTokenMatches(svc.DataDir(), strings.TrimSpace(c.GetHeader("X-Beeftv-Owner")))
+		ownerOK := agentops.OwnerTokenMatches(svc.DataDir(), strings.TrimSpace(c.GetHeader("X-Beeftv-Owner"))) || httptransport.HostedOwner(c.Request)
 		devBootstrap := strings.TrimSpace(os.Getenv("BEEFTV_UI_BOOTSTRAP")) == "1"
 		// The UI bootstrap secret comes through the Wails binding, separately from entry credentials.
 		desktopShell := desktopTrust != nil && desktopTrust(c.Request)

@@ -22,7 +22,6 @@ import (
 	"infinite-canvas/backend/internal/assistantruntime"
 	"infinite-canvas/backend/internal/assistantturns"
 	"infinite-canvas/backend/internal/skills"
-	httptransport "infinite-canvas/backend/internal/transport/http"
 )
 
 // agentProxyMaxBody 限制转发体积；解析失败或超限都按真实失败返回。
@@ -98,8 +97,9 @@ func RegisterAgentProxyRoutes(r gin.IRouter, svc *app.Service, clients *agentops
 	}
 
 	// hostOpsURL 用请求自身的 Host 推导操作层基址：桌面形态监听随机端口，猜端口会指向别处。
-	hostOpsURL := func(c *gin.Context) string { return "http://" + c.Request.Host + "/api" }
-	launchToken := func(c *gin.Context) string { return strings.TrimSpace(c.GetHeader(httptransport.LaunchTokenHeader)) }
+	// 托管内核由组合根钉住回环地址与启动令牌。
+	hostOpsURL := func(c *gin.Context) string { url, _ := assistantOpsEndpoint(c); return url }
+	launchToken := func(c *gin.Context) string { _, token := assistantOpsEndpoint(c); return token }
 
 	unavailable := func(c *gin.Context, reason string) {
 		ok(c, gin.H{"available": false, "reason": reason})

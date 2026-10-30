@@ -11,6 +11,8 @@ type Profile string
 const (
 	ProfileServer  Profile = "server"
 	ProfileDesktop Profile = "desktop"
+	// ProfileHosted is one workspace kernel inside the team server process.
+	ProfileHosted Profile = "hosted"
 )
 
 // DefaultServerListenAddr 是服务端 profile 未设置监听地址时的回环地址。
@@ -27,6 +29,8 @@ type Config struct {
 	AutoMigrate      bool
 	ShutdownTimeout  time.Duration
 	RouterMiddleware []gin.HandlerFunc
+	// Hosted is read only by ProfileHosted.
+	Hosted HostedConfig
 }
 
 func (c Config) withDefaults() Config {
@@ -37,7 +41,7 @@ func (c Config) withDefaults() Config {
 		c.DatabaseDriver = "sqlite"
 	}
 	if c.ListenAddr == "" {
-		if c.Profile == ProfileDesktop {
+		if c.Profile == ProfileDesktop || c.Profile == ProfileHosted {
 			c.ListenAddr = "127.0.0.1:0"
 		} else {
 			c.ListenAddr = DefaultServerListenAddr

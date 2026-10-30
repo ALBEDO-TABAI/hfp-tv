@@ -19,6 +19,25 @@ func DesktopAuthenticated(r *http.Request) bool {
 	return trusted
 }
 
+type hostedOwnerKey struct{}
+
+// WithHostedOwner marks a request the team-server gateway has already bound to
+// this workspace's owner. Only in-process code can set a context value, so a
+// browser cannot forge it with headers, Host or Origin.
+func WithHostedOwner(r *http.Request) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), hostedOwnerKey{}, true))
+}
+
+// HostedOwner reports whether the gateway authenticated this request as the
+// workspace owner. It replaces the loopback same-origin rule for hosted kernels.
+func HostedOwner(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	trusted, _ := r.Context().Value(hostedOwnerKey{}).(bool)
+	return trusted
+}
+
 func NewLaunchToken() (string, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {

@@ -8,11 +8,15 @@ import (
 
 	"infinite-canvas/backend/internal/agentops"
 	"infinite-canvas/backend/internal/app"
+	httptransport "infinite-canvas/backend/internal/transport/http"
 )
 
 // requireOwner 是所有 owner 级入口的唯一准入判断：本机同源 + owner 凭据。
 // 统一在这里，避免每个文件各写一份表达式。
 func requireOwner(c *gin.Context, svc *app.Service) bool {
+	if httptransport.HostedOwner(c.Request) {
+		return true
+	}
 	if !isLoopbackRequest(c.Request) {
 		fail(c, http.StatusForbidden, app.BadAuthRequest("只接受本机同源请求"))
 		return false

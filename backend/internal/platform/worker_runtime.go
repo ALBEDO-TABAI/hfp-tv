@@ -2,8 +2,11 @@ package platform
 
 import (
 	"context"
+	"log"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type Worker struct {
@@ -41,7 +44,14 @@ func (r *Worker) GoLoop(fn func(context.Context)) bool {
 	r.mu.Unlock()
 	go func() {
 		defer r.wg.Done()
-		fn(ctx)
+		// A panic must not take down the process: the team server runs many
+		// workspaces in one process. Restart the loop until the worker drains.
+		for recoverWorkerPanic("loop", func() { fn(ctx) }) && ctx.Err() == nil {
+			select {
+			case <-ctx.Done():
+			case <-time.After(time.Second):
+			}
+		}
 	}()
 	return true
 }
@@ -58,9 +68,22 @@ func (r *Worker) GoTask(fn func()) bool {
 	go func() {
 		defer r.wg.Done()
 		defer r.activeTasks.Add(-1)
-		fn()
+		// The task's lease expires and restart recovery settles its state.
+		recoverWorkerPanic("task", fn)
 	}()
 	return true
+}
+
+// recoverWorkerPanic reports whether fn panicked.
+func recoverWorkerPanic(kind string, fn func()) (panicked bool) {
+	defer func() {
+		if value := recover(); value != nil {
+			panicked = true
+			log.Printf("background %s panic recovered: %v\n%s", kind, value, debug.Stack())
+		}
+	}()
+	fn()
+	return false
 }
 
 func (r *Worker) BeginDrain() {

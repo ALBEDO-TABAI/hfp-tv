@@ -170,6 +170,9 @@ func preserveManagedModelConfig(c *gin.Context, svc *app.Service, raw json.RawMe
 	} else {
 		beefapi.PreserveManagedChannel(incoming, existing, managed)
 	}
+	if dependencies, ok := runtimeDependencies(c); ok {
+		preservePlatformChannels(incoming, existing, dependencies.ManagedChannelIDs)
+	}
 	encoded, err := json.Marshal(incoming)
 	if err != nil {
 		return raw
@@ -185,4 +188,41 @@ func workspaceForLocalRequest(c *gin.Context, svc *app.Service) (workspace.Conte
 		return workspace.Context{ID: "local"}, nil
 	}
 	return workspace.Context{}, errors.New("本地工作区未初始化")
+}
+
+// preservePlatformChannels restores team-server channels exactly as stored: a
+// member can neither edit, delete nor forge one with the same ID.
+func preservePlatformChannels(incoming, existing map[string]any, ids []string) {
+	if incoming == nil || len(ids) == 0 {
+		return
+	}
+	incomingChannels, _ := incoming["channels"].([]any)
+	existingChannels, _ := existing["channels"].([]any)
+	for _, id := range ids {
+		var stored map[string]any
+		for _, raw := range existingChannels {
+			if channel, ok := raw.(map[string]any); ok && channel["id"] == id {
+				stored = channel
+				break
+			}
+		}
+		next := make([]any, 0, len(incomingChannels)+1)
+		replaced := false
+		for _, raw := range incomingChannels {
+			channel, ok := raw.(map[string]any)
+			if !ok || channel["id"] != id {
+				next = append(next, raw)
+				continue
+			}
+			if stored != nil && !replaced {
+				next = append(next, stored)
+				replaced = true
+			}
+		}
+		if stored != nil && !replaced {
+			next = append([]any{stored}, next...)
+		}
+		incomingChannels = next
+	}
+	incoming["channels"] = incomingChannels
 }

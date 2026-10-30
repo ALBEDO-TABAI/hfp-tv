@@ -26,6 +26,9 @@ type Options struct {
 	Executable      func() (string, error)
 	GOOS            string
 	ReadyTimeout    time.Duration
+	// PinnedCommand fixes the child command for hosted kernels. The workspace
+	// file may still choose the model, but never the executable.
+	PinnedCommand *HostConfig
 }
 
 // Host 是一个助手宿主监督器实例。bootstrap 为每个运行时持有一个；

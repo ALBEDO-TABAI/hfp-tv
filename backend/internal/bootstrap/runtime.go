@@ -41,6 +41,7 @@ type Runtime struct {
 	service          *app.Service
 	localApp         *localapp.App
 	handler          http.Handler
+	gateway          http.Handler
 	status           *systemStatus
 	launchToken      string
 	uiBootstrapToken string
@@ -58,20 +59,22 @@ type Runtime struct {
 
 func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 	cfg := raw.withDefaults()
-	if cfg.Profile != ProfileServer && cfg.Profile != ProfileDesktop {
+	if cfg.Profile != ProfileServer && cfg.Profile != ProfileDesktop && cfg.Profile != ProfileHosted {
 		return nil, fmt.Errorf("不支持的运行模式：%s", cfg.Profile)
 	}
+	hosted := cfg.Profile == ProfileHosted
 	if strings.TrimSpace(cfg.DataDir) == "" {
 		return nil, errors.New("后端数据目录不能为空")
 	}
-	if cfg.Profile == ProfileDesktop && !strings.HasPrefix(cfg.ListenAddr, "127.0.0.1:") {
+	if (cfg.Profile == ProfileDesktop || hosted) && !strings.HasPrefix(cfg.ListenAddr, "127.0.0.1:") {
 		return nil, errors.New("桌面运行时只能监听 127.0.0.1")
 	}
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		return nil, err
 	}
 	var workspaceLock *os.File
-	if cfg.Profile == ProfileDesktop {
+	// 托管内核与桌面一样独占数据目录：内核池重复打开同一工作区必须失败。
+	if cfg.Profile == ProfileDesktop || hosted {
 		var err error
 		workspaceLock, err = runtimeinfo.LockWorkspace(cfg.DataDir)
 		if err != nil {
@@ -127,8 +130,13 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 		cleanupService()
 		return nil, configErr
 	}
+	var openURL func(string) error
+	if cfg.Profile == ProfileHosted {
+		// 托管内核不在服务器上打开浏览器；设备授权入口也不对托管成员开放。
+		openURL = func(string) error { return errors.New("团队服务器不打开系统浏览器") }
+	}
 	beefAPIConnection, beefAPIErr := beefapi.New(beefapi.Options{
-		DataDir: cfg.DataDir, Provider: providerConfig, ClientVersion: buildinfo.Current().Version,
+		DataDir: cfg.DataDir, Provider: providerConfig, ClientVersion: buildinfo.Current().Version, OpenURL: openURL,
 		FetchCatalog: func(apiKey, baseURL string) ([]beefapi.CatalogModel, error) {
 			owner, ownerErr := svc.LocalWorkspaceOwner()
 			if ownerErr != nil {
@@ -184,11 +192,13 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 	// 的判据（内置助手签发 UI 会话时使用）。服务端形态没有它，DesktopTrust 为 nil。
 	launchToken := ""
 	uiBootstrapToken := ""
-	if cfg.Profile == ProfileDesktop {
-		uiBootstrapToken, err = httptransport.NewLaunchToken()
-		if err != nil {
-			cleanupService()
-			return nil, err
+	if cfg.Profile == ProfileDesktop || hosted {
+		if !hosted {
+			uiBootstrapToken, err = httptransport.NewLaunchToken()
+			if err != nil {
+				cleanupService()
+				return nil, err
+			}
 		}
 		launchToken = strings.TrimSpace(cfg.LaunchToken)
 		if launchToken == "" {
@@ -211,29 +221,48 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 	if cfg.Profile == ProfileDesktop {
 		router.Use(desktopCORSMiddleware())
 	}
+	if hosted {
+		router.Use(hostedRouteGuard())
+	}
 	router.Use(canvasHandler.WorkspaceMiddleware(scope))
 	// 本机可信凭据在组合根生成：owner 凭据与宿主凭据只在本机数据目录，0600。
 	agentops.EnsureAgentCredentials(svc.DataDir())
-	assistantHost := assistantruntime.New(assistantruntime.OptionsFromService(svc))
+	assistantOptions := assistantruntime.OptionsFromService(svc)
+	// 托管内核的助手回调只走本内核的回环监听；Start 之后才知道端口。
+	var hostedRuntime *Runtime
+	var assistantOpsEndpoint func() (string, string)
+	if hosted {
+		assistantOptions.PinnedCommand = hostedAssistantCommand(cfg.Hosted)
+		assistantOptions.Environ = hostedAssistantEnviron
+		assistantOpsEndpoint = func() (string, string) {
+			if hostedRuntime == nil {
+				return "", ""
+			}
+			return hostedRuntime.BaseURL(), launchToken
+		}
+	}
+	assistantHost := assistantruntime.New(assistantOptions)
 	svc.SetAssistantContinuationSubmitter(canvasHandler.AssistantContinuationSubmitter(svc, assistantHost))
 	api := router.Group("/api")
 	status := newSystemStatus(db, svc, true)
 	registerSystemStatusRoutes(api, status)
 	canvasHandler.RegisterDesktopCanvasAPIWithDependencies(api, svc, canvasHandler.RuntimeDependencies{
-		RequestCoordinator: localKernel,
-		ProviderConfig:     localRoot.ProviderConfig,
-		Assets:             localRoot.Assets,
-		Projects:           localRoot.Projects,
-		Tasks:              localRoot.Tasks,
-		Generation:         localRoot.Generation,
-		BeefAPI:            beefAPIConnection,
-		AssistantHost:      assistantHost,
-		Conversations:      conversation.New(conversation.NewStore(repo)),
-		TextReplay:         svc.TextReplay(),
-		Appearance:         svc.AppearanceDomain(),
-		Diagnostics:        svc.DiagnosticsDomain(),
-		Eagle:              eagle.New(),
-		DesktopTrust:       desktopTrust(launchToken, uiBootstrapToken),
+		RequestCoordinator:   localKernel,
+		ProviderConfig:       localRoot.ProviderConfig,
+		Assets:               localRoot.Assets,
+		Projects:             localRoot.Projects,
+		Tasks:                localRoot.Tasks,
+		Generation:           localRoot.Generation,
+		BeefAPI:              beefAPIConnection,
+		AssistantHost:        assistantHost,
+		Conversations:        conversation.New(conversation.NewStore(repo)),
+		TextReplay:           svc.TextReplay(),
+		Appearance:           svc.AppearanceDomain(),
+		Diagnostics:          svc.DiagnosticsDomain(),
+		Eagle:                eagle.New(),
+		DesktopTrust:         desktopTrust(launchToken, uiBootstrapToken),
+		AssistantOpsEndpoint: assistantOpsEndpoint,
+		ManagedChannelIDs:    hostedManagedChannels(cfg),
 	})
 	businessCatalog := canvasHandler.NewBusinessCatalog(router.Routes())
 	canvasHandler.RegisterBusinessDiscovery(api, businessCatalog, svc)
@@ -245,6 +274,15 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 	protected := rootHandler
 	if launchToken != "" {
 		protected = httptransport.RequireLaunchToken(launchToken)(rootHandler)
+	}
+	if hosted {
+		// 托管内核没有外部客户端与 owner 直连：浏览器只经网关，回环监听只给助手宿主。
+		hostedRuntime = &Runtime{
+			workspaceLock: workspaceLock, cfg: cfg, db: db, service: svc, localApp: localRoot,
+			handler: protected, gateway: hostedGateway(router), status: status, launchToken: launchToken,
+			beefAPI: beefAPIConnection, assistantHost: assistantHost, serveErr: make(chan error, 1),
+		}
+		return hostedRuntime, nil
 	}
 	clients := agentops.NewClientRegistry(svc.DataDir())
 	rootHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
