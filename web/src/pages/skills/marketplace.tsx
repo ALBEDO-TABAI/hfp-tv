@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { PageHeader, WorkspacePage } from "@/components/layout/workspace-page";
 import { AppModal } from "@/components/ui/product/app-modal";
+import { ApiError } from "@/services/api/request";
+import { platformErrorMessage } from "@/lib/platform-account";
 import { addSkill, deleteSkill, getSkill, listSkills, removeSkill, type Skill } from "@/services/api/skills";
 import { forkSkill, getInstalledVersions, getMarketRelease, installMarketRelease, rollbackSkill, searchSkillMarket, type InstalledVersion, type MarketItem, type MarketRelease } from "@/services/api/skill-market";
 import { SkillEditorDrawer } from "./skill-editor-drawer";
@@ -25,6 +27,7 @@ export default function SkillMarketplace() {
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [marketNotice, setMarketNotice] = useState("");
     const [revision, setRevision] = useState(0);
     const [busy, setBusy] = useState(false);
     const [release, setRelease] = useState<MarketRelease | null>(null);
@@ -39,12 +42,16 @@ export default function SkillMarketplace() {
     useEffect(() => {
         if (tab === "publish") return;
         let stale = false;
-        setLoading(true); setError("");
+        setLoading(true); setError(""); setMarketNotice("");
         const timer = setTimeout(() => {
             const work = tab === "market"
                 ? searchSkillMarket(query, page).then(value => { if (!stale) { setItems(value.items || []); setTotal(value.total); } })
                 : listSkills({ scope: "mine", page, pageSize: 20, search: query }).then(value => { if (!stale) { setLocal(value.skills); setTotal(value.totalCount); } });
-            void work.catch(e => { if (!stale) setError(e.message || "暂时无法读取技能"); }).finally(() => { if (!stale) setLoading(false); });
+            void work.catch(e => {
+                if (stale) return;
+                if (e instanceof ApiError && e.reason === "market_not_configured") setMarketNotice(platformErrorMessage(e));
+                else setError(e instanceof Error ? e.message : "暂时无法读取技能");
+            }).finally(() => { if (!stale) setLoading(false); });
         }, 200);
         return () => { stale = true; clearTimeout(timer); };
     }, [tab, page, query, revision]);
@@ -54,13 +61,20 @@ export default function SkillMarketplace() {
         let stale = false;
         setBusy(true); setRelease(null);
         void getMarketRelease(skillId, releaseId).then(value => { if (!stale) setRelease(value); })
-            .catch(e => { if (!stale) message.error(e.message || "该技能版本暂时不可用"); })
+            .catch(e => {
+                if (stale) return;
+                if (e instanceof ApiError && e.reason === "market_not_configured") setMarketNotice(platformErrorMessage(e));
+                else message.error(e instanceof Error ? e.message : "该技能版本暂时不可用");
+            })
             .finally(() => { if (!stale) setBusy(false); });
         return () => { stale = true; };
     }, [params, message]);
     const action = async (work: () => Promise<unknown>, done: string) => {
         setBusy(true);
-        try { await work(); message.success(done); reload(); } catch (e) { message.error(e instanceof Error ? e.message : "操作未完成"); } finally { setBusy(false); }
+        try { await work(); message.success(done); setMarketNotice(""); reload(); } catch (e) {
+            if (e instanceof ApiError && e.reason === "market_not_configured") { setMarketNotice(platformErrorMessage(e)); setRelease(null); }
+            else message.error(e instanceof Error ? e.message : "操作未完成");
+        } finally { setBusy(false); }
     };
     const openLocal = async (skill: Skill) => action(async () => { setDetail((await getSkill(skill.skillId)).skill); }, "已读取技能文件");
     const openEditor = (skill?: Skill) => { setDetail(null); setEdit(skill || null); setEditorOpen(true); };
@@ -72,8 +86,9 @@ export default function SkillMarketplace() {
         <PageHeader title="技能" description="把创作方法带进助手。安装和私人改写无需审核，公开分享时再投稿。" actions={<><Button onClick={() => openEditor()}>创建技能</Button><Button onClick={() => setInstallOpen(true)}>导入文件</Button></>} />
         <Tabs activeKey={tab} onChange={changeTab} items={[{ key: "market", label: "技能市场" }, { key: "mine", label: "我的技能" }, { key: "publish", label: "我的投稿" }]} />
         {tab === "publish" ? <SkillPublishingPanel planId={params.get("planId") || undefined} /> : <>
+            {marketNotice ? <Alert type="info" title={marketNotice} className="mb-4" /> : null}
             <div className="skill-market-toolbar"><Input.Search aria-label="搜索技能" placeholder="搜索名称或用途" allowClear value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} /><Button onClick={reload}>刷新</Button></div>
-            {error ? <Alert type="error" showIcon title={error} action={<Button size="small" onClick={reload}>重试</Button>} /> : loading ? <Skeleton active paragraph={{ rows: 6 }} /> : <>
+            {marketNotice && tab === "market" ? null : error ? <Alert type="error" showIcon title={error} action={<Button size="small" onClick={reload}>重试</Button>} /> : loading ? <Skeleton active paragraph={{ rows: 6 }} /> : <>
                 {tab === "market" ? items.map(item => <article className="skill-market-row" key={`${item.skillId}/${item.releaseId}`}>
                     <div className="skill-market-copy"><h2>{item.name} <span>{item.versionLabel}</span></h2><p>{item.description}</p><div className="skill-market-meta"><span>{item.author?.replace(/BeefTV/g, "hfp - all in one")}</span><span>{item.license}</span><span>{item.verification === "tested" ? "有实测记录" : "效果尚未验证"}</span></div>{item.compatibility?.status === "unsupported" ? <p className="skill-market-warning">当前环境不满足：{item.compatibility.reasons?.join("、")}</p> : null}</div>
                     <Button onClick={() => openRelease(item.skillId, item.releaseId)} loading={busy}>查看与安装</Button>

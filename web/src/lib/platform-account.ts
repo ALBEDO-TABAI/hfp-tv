@@ -15,6 +15,11 @@ export function platformErrorMessage(error: unknown) {
         cannot_modify_self: "不能停用自己或降低自己的权限",
         invalid_relay_key: "中转密钥无效，请检查后重试",
         forbidden: "没有操作权限",
+        authorization_invalid: "授权码无效或已过期，请回到投稿页重新连接",
+        submission_changed: "作者已更新稿件，请刷新后重新审核",
+        submission_not_found: "稿件不存在，请刷新列表",
+        reason_required: "请填写驳回原因",
+        market_not_configured: "未配置技能市场。团队服务器部署会自动接入内置技能市场。",
     };
     return error instanceof ApiError && error.reason && messages[error.reason] || "操作失败，请稍后重试";
 }

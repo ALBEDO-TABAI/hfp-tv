@@ -14,6 +14,8 @@ import { platformLoginPath } from "@/lib/platform-navigation";
 const LoginPage = lazy(() => import("@/pages/login"));
 const InvitePage = lazy(() => import("@/pages/invite"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/users"));
+const AdminSkillReviewsPage = lazy(() => import("@/pages/admin/skill-reviews"));
+const SkillAuthorizePage = lazy(() => import("@/pages/skills/authorize"));
 
 function PlatformRoute({ children, publicPage = false }: { children: ReactNode; publicPage?: boolean }) {
     const { mode, me } = usePlatformSession();
@@ -25,7 +27,7 @@ function PlatformRoute({ children, publicPage = false }: { children: ReactNode; 
 
 function CapabilityRoute({ capability, children }: { capability: keyof PlatformMe["capabilities"]; children: ReactNode }) {
     const { mode, me } = usePlatformSession();
-    const allowed = capability === "userAdmin" ? mode === "hosted" && me?.user.role === "admin" && me.capabilities.userAdmin : hostedCapability(capability);
+    const allowed = capability === "userAdmin" || capability === "skillReview" ? mode === "hosted" && me?.user.role === "admin" && me.capabilities[capability] : hostedCapability(capability);
     return allowed ? children : <Navigate to="/" replace />;
 }
 
@@ -108,6 +110,7 @@ export const router = createWorkspaceRouter([
             },
             { path: "/assets", element: deferred(<AssetsPage />) },
             { path: "/skills", element: deferred(<SkillsPage />) },
+            { path: "/skills/authorize", element: deferred(<SkillAuthorizePage />) },
             { path: "/skill", element: <Navigate to="/skills" replace /> },
             { path: "/skills/reference", element: <Navigate to="/" replace /> },
             {
@@ -121,6 +124,7 @@ export const router = createWorkspaceRouter([
             { path: "/settings", element: deferred(<SettingsPage />) },
             { path: "/agents", element: <CapabilityRoute capability="externalAgents">{deferred(<AgentsPage />)}</CapabilityRoute> },
             { path: "/admin/users", element: <CapabilityRoute capability="userAdmin">{deferred(<AdminUsersPage />)}</CapabilityRoute> },
+            { path: "/admin/skill-reviews", element: <CapabilityRoute capability="skillReview">{deferred(<AdminSkillReviewsPage />)}</CapabilityRoute> },
             { path: "/test-voice-recording", element: deferred(<TestVoiceRecording />) },
             {
                 path: "/projects",

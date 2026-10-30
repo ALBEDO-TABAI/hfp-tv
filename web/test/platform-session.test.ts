@@ -9,7 +9,7 @@ import { hostedCapability, usePlatformSession } from "../src/stores/use-platform
 const me: PlatformMe = {
     user: { id: "alice", username: "alice", displayName: "Alice", role: "admin" },
     workspace: { id: "workspace", status: "active" }, relay: { bound: false, hint: "" },
-    capabilities: { hosted: true, externalAgents: false, storageSettings: false, eagle: false, depthCapture: false, pluginInstall: false, diagnostics: false, userAdmin: true },
+    capabilities: { hosted: true, externalAgents: false, storageSettings: false, eagle: false, depthCapture: false, pluginInstall: false, diagnostics: false, userAdmin: true, skillReview: true },
 };
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
 const originalScope = getActiveUserScope();

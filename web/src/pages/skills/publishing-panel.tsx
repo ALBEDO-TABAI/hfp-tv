@@ -2,11 +2,19 @@ import { Alert, App, Button, Checkbox, Form, Input, Select, Skeleton } from "ant
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { getDesktopAppBinding } from "@/services/desktop-runtime";
+import { appHref } from "@/lib/app-routing";
+import { platformErrorMessage } from "@/lib/platform-account";
+import { skillWebsiteTarget } from "@/lib/skill-market";
+import { ApiError } from "@/services/api/request";
 import { getSkill, listSkills, type Skill } from "@/services/api/skills";
 import { disconnectMarketAuthorization, getMarketAuthorization, listPublishPlans, preparePublication, refreshPublication, startMarketAuthorization, submitPublication, uploadPublication, type MarketAuthorization, type PublishPlan, type SkillMetadata, type PublicationTarget } from "@/services/api/skill-market";
 import { canSubmitPublication, capabilityOptions, needsPublicationTargetCorrection, publicationStatus, requirementLabel, unsupportedRequirements } from "./market-copy";
 
 export async function openSkillWebsite(url: string) {
+    if (skillWebsiteTarget(url) === "app") {
+        window.open(appHref(url), "_blank", "noopener");
+        return;
+    }
     const binding = getDesktopAppBinding()?.OpenSkillMarketURL;
     if (binding) await binding(url);
     else window.open(url, "_blank", "noopener,noreferrer");
@@ -22,6 +30,7 @@ export function SkillPublishingPanel({ planId }: { planId?: string }) {
     const [busy, setBusy] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [marketUnavailable, setMarketUnavailable] = useState(false);
     const [confirmed, setConfirmed] = useState(false);
     const [creating, setCreating] = useState(false);
     const [preparingFrom, setPreparingFrom] = useState<PublishPlan | null>(null);
@@ -29,18 +38,23 @@ export function SkillPublishingPanel({ planId }: { planId?: string }) {
     const formRequirements = Form.useWatch("requirements", form) || [];
     const publicationTarget = Form.useWatch("publicationTarget", form);
     const current = plans.find(item => item.planId === selected);
-    const website = auth.websiteUrl || "https://beeftv.app/skills";
+    const showError = useCallback((error: unknown) => {
+        if (error instanceof ApiError && error.reason === "market_not_configured") {
+            setMarketUnavailable(true);
+            setError(platformErrorMessage(error));
+        } else setError(error instanceof Error ? error.message : "操作未完成，请保留此草稿后重试");
+    }, []);
     const replace = (next: PublishPlan) => { setPlans(items => [next, ...items.filter(item => item.planId !== next.planId)]); setSelected(next.planId); setConfirmed(false); setParams({ tab: "publish", planId: next.planId }); };
     const reload = useCallback(async () => {
-        setLoading(true); setError("");
+        setLoading(true); setError(""); setMarketUnavailable(false);
         try {
-            const [drafts, installed] = await Promise.all([listPublishPlans(), listSkills({ scope: "created", pageSize: 100 })]);
-            setPlans(drafts.items); setSkills(installed.skills);
+            const [drafts, installed, authorization] = await Promise.all([listPublishPlans(), listSkills({ scope: "created", pageSize: 100 }), getMarketAuthorization()]);
+            setPlans(drafts.items); setSkills(installed.skills); setAuth(authorization);
             setSelected(previous => planId || previous || drafts.items[0]?.planId || "");
-        } catch (e) { setError(e instanceof Error ? e.message : "投稿记录读取失败"); }
+        } catch (e) { showError(e); }
         finally { setLoading(false); }
-    }, [planId]);
-    useEffect(() => { void reload(); void getMarketAuthorization().then(setAuth).catch(() => setAuth({ connected: false })); }, [reload]);
+    }, [planId, showError]);
+    useEffect(() => { void reload(); }, [reload]);
     useEffect(() => {
         const localSkillId = params.get("skillId");
         if (localSkillId) {
@@ -51,8 +65,8 @@ export function SkillPublishingPanel({ planId }: { planId?: string }) {
     }, [params, form, skills]);
     useEffect(() => { setConfirmed(false); }, [selected, current?.preview?.previewDigest]);
     const run = async (work: () => Promise<unknown>) => {
-        setBusy(true); setError("");
-        try { await work(); } catch (e) { setError(e instanceof Error ? e.message : "操作未完成，请保留此草稿后重试"); } finally { setBusy(false); }
+        setBusy(true); setError(""); setMarketUnavailable(false);
+        try { await work(); } catch (e) { showError(e); } finally { setBusy(false); }
     };
     const makePlan = async () => {
         const values = await form.validateFields();
@@ -68,7 +82,7 @@ export function SkillPublishingPanel({ planId }: { planId?: string }) {
             // The selected publication target owns the cloud ID; never reuse a
             // legacy metadata ID as an implicit update destination.
             delete metadata.skillId;
-            replace(await preparePublication(localSkillId, metadata, { publicationTarget, marketSkillId: publicationTarget === "existing" ? marketSkillId : undefined }, preparingFrom?.planId));
+            replace(await preparePublication(localSkillId, metadata, { publicationTarget, marketSkillId: publicationTarget === "existing" ? marketSkillId : undefined }, preparingFrom?.status === "rejected" ? undefined : preparingFrom?.planId));
             setPreparingFrom(null);
             setCreating(false); message.success("已准备本机草稿，请检查文件后确认上传");
         });
@@ -79,30 +93,30 @@ export function SkillPublishingPanel({ planId }: { planId?: string }) {
     };
     const reprepare = (plan: PublishPlan) => run(async () => {
         const { skill } = await getSkill(plan.skillId);
-        if (skill.versionId !== plan.versionId) throw new Error("本机技能已更新，原稿仍保留。请从“我的技能”检查当前文件后重新准备投稿。");
+        if (plan.status !== "rejected" && skill.versionId !== plan.versionId) throw new Error("本机技能已更新，原稿仍保留。请从“我的技能”检查当前文件后重新准备投稿。");
         setSkills(items => [skill, ...items.filter(item => item.skillId !== skill.skillId)]);
         form.resetFields();
         form.setFieldsValue({ ...plan.metadata, requirements: [...plan.metadata.requirements], localSkillId: plan.skillId, publicationTarget: undefined, marketSkillId: plan.marketSkillId || plan.metadata.skillId });
-        setPreparingFrom(plan); setConfirmed(false); setCreating(true);
+        setPreparingFrom({ ...plan, versionId: skill.versionId }); setConfirmed(false); setCreating(true);
     });
+    if (marketUnavailable) return <section aria-label="技能投稿"><Alert type="info" title={error} action={<Button onClick={() => void reload()} loading={loading}>刷新</Button>} /></section>;
     return <section aria-label="技能投稿">
         <div className="skill-publish-status">
             <p>投稿分两步：先将选定文件上传为私有草稿，再检查公开预览并确认送审。只有审核通过后，其他人才能下载。</p>
             <div className="skill-market-actions">
-                <span>{auth.connected ? "投稿账号已连接" : "投稿前需要在官网授权"}</span>
+                <span>{auth.connected ? "投稿账号已连接" : "投稿前需要授权连接技能市场"}</span>
                 {auth.connected ? <Button disabled={busy} onClick={() => void run(async () => { await disconnectMarketAuthorization(); setAuth({ connected: false }); })}>断开投稿账号</Button> : <Button loading={busy} onClick={() => void run(async () => { const value = await startMarketAuthorization(); setAuth(value); if (value.verificationUrl) await openSkillWebsite(value.verificationUrl); })}>连接投稿账号</Button>}
-                <Button disabled={busy} onClick={() => void run(async () => { const value = await getMarketAuthorization(); setAuth(value); if (!value.connected) message.info("授权尚未完成，请在官网确认后重试"); })}>检查授权状态</Button>
-                <Button onClick={() => void run(() => openSkillWebsite(`${website}/mine`))}>官网投稿与审核结果</Button>
+                <Button disabled={busy} onClick={() => void run(async () => { const value = await getMarketAuthorization(); setAuth(value); if (!value.connected) message.info("授权尚未完成，请在授权页确认后重试"); })}>检查授权状态</Button>
             </div>
-            {auth.userCode && !auth.connected ? <p>确认码：<strong>{auth.userCode}</strong>。请在打开的官网核对，完成后返回检查授权状态。</p> : null}
+            {auth.userCode && !auth.connected ? <p>确认码：<strong>{auth.userCode}</strong>。请在打开的授权页核对，完成后返回检查授权状态。{auth.verificationUrl ? <Button type="link" onClick={() => void run(() => openSkillWebsite(auth.verificationUrl!))}>打开授权页</Button> : null}</p> : null}
         </div>
         {error ? <Alert type="error" showIcon title={error} className="mb-4" /> : null}
         <div className="skill-market-actions mb-4"><Button type="primary" onClick={() => { setPreparingFrom(null); setCreating(true); form.resetFields(); }}>准备新投稿</Button><Button onClick={() => void reload()} loading={loading}>刷新本机草稿</Button></div>
         {loading ? <Skeleton active /> : creating ? <Form form={form} layout="vertical" className="max-w-3xl" initialValues={{ versionLabel: "1.0.0", requirements: [], sourceUrl: "", publicationTarget: "new" }}>
-            {preparingFrom ? <Alert type="info" title="沿用原稿的文件与版本。修改后生成新的本机草稿，原稿继续保留；请重新检查并确认上传。" className="mb-4" /> : null}
+            {preparingFrom ? <Alert type="info" title={preparingFrom.status === "rejected" ? "沿用原稿信息，使用本机技能的当前文件准备新投稿。请重新检查并确认上传。" : "沿用原稿的文件与版本。修改后生成新的本机草稿，原稿继续保留；请重新检查并确认上传。"} className="mb-4" /> : null}
             <Form.Item name="localSkillId" label="选择本机技能" rules={[{ required: true, message: "请选择一个技能" }]}><Select disabled={Boolean(preparingFrom)} onChange={selectSkill} options={skills.filter(skill => skill.sourceType !== "market").map(skill => ({ value: skill.skillId, label: skill.skillName }))} /></Form.Item>
             <Form.Item name="publicationTarget" label="投稿目标" rules={[{ required: true, message: "请明确选择这次投稿的目标" }]} extra="改写他人的技能请选择新技能，并填写来源链接。"><Select options={[{ value: "new", label: "发布新技能" }, { value: "existing", label: "为我的市场技能发布新版本" }]} /></Form.Item>
-            {publicationTarget === "existing" ? <Form.Item name="marketSkillId" label="已有市场技能编号" extra="在官网打开自己已发布的技能，从页面链接中复制技能编号。请勿填写本机技能编号。" rules={[{ required: true, message: "请填写你已发布的市场技能编号" }, { validator: (_, value) => value === form.getFieldValue("localSkillId") ? Promise.reject(new Error("这是本机技能编号；首次投稿请选择发布新技能。")) : Promise.resolve() }]}><Input /></Form.Item> : null}
+            {publicationTarget === "existing" ? <Form.Item name="marketSkillId" label="已有市场技能编号" extra="在技能市场打开自己已发布的技能，从页面链接的 skillId 中复制编号。请勿填写本机技能编号。" rules={[{ required: true, message: "请填写你已发布的市场技能编号" }, { validator: (_, value) => value === form.getFieldValue("localSkillId") ? Promise.reject(new Error("这是本机技能编号；首次投稿请选择发布新技能。")) : Promise.resolve() }]}><Input /></Form.Item> : null}
             <Form.Item name="name" label="公开名称" rules={[{ required: true, message: "请填写公开名称" }]}><Input maxLength={80} /></Form.Item>
             <Form.Item name="description" label="用途和输入输出" rules={[{ required: true, message: "请说明输入、输出和使用场景" }]}><Input.TextArea rows={4} maxLength={500} /></Form.Item>
             <div className="grid gap-4 sm:grid-cols-2"><Form.Item name="versionLabel" label="版本" rules={[{ required: true, message: "请填写版本" }]}><Input maxLength={64} /></Form.Item><Form.Item name="license" label="许可证" rules={[{ required: true, message: "请选择你有权采用的许可证" }]}><Select options={["MIT", "Apache-2.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0"].map(value => ({ value, label: value }))} /></Form.Item></div>
@@ -122,9 +136,9 @@ export function SkillPublishingPanel({ planId }: { planId?: string }) {
                 {current.preview?.warnings?.map(value => <Alert key={value} type="warning" title={value} />)}
                 {current.reviewReason ? <Alert type="info" title="审核意见" description={current.reviewReason} /> : null}
                 {current.status === "awaiting_upload_confirmation" || current.status === "uploading" ? <><Checkbox checked={confirmed} onChange={e => setConfirmed(e.target.checked)}>我已核对文件和分享权限，确认上传为私有草稿。</Checkbox><div className="skill-market-actions"><Button type="primary" disabled={!confirmed || !auth.connected || needsPublicationTargetCorrection(current) || unsupportedRequirements(current.metadata.requirements).length > 0} loading={busy} onClick={() => void run(async () => { replace(await uploadPublication(current)); message.success("已读取公开预览，请再次核对后送审"); })}>确认上传私有草稿</Button></div></> : null}
-                {current.status === "awaiting_submit_confirmation" ? <><p>通过审核后，以上内容和文件将公开。此预览对应作者：{current.preview?.author}。</p><Checkbox checked={confirmed} onChange={e => setConfirmed(e.target.checked)}>我已检查这份公开预览，确认提交审核。</Checkbox><div className="skill-market-actions"><Button type="primary" disabled={!auth.connected || !canSubmitPublication(current, confirmed)} loading={busy} onClick={() => void run(async () => { replace(await submitPublication(current)); message.success("已送审，可在官网查看结果和修改意见"); })}>确认送审</Button></div></> : null}
-                {current.submissionId ? <div className="skill-market-actions"><Button loading={busy} onClick={() => void run(async () => replace(await refreshPublication(current.planId)))}>刷新预览与审核状态</Button><Button onClick={() => void run(() => openSkillWebsite(`${website}/submissions/${encodeURIComponent(current.submissionId!)}`))}>在官网修改稿件</Button></div> : null}
-                {current.status === "rejected" ? <p>请在官网按审核意见修改，保存后回到这里刷新预览，再次确认送审。</p> : null}
+                {current.status === "awaiting_submit_confirmation" ? <><p>通过审核后，以上内容和文件将公开。此预览对应作者：{current.preview?.author}。</p><Checkbox checked={confirmed} onChange={e => setConfirmed(e.target.checked)}>我已检查这份公开预览，确认提交审核。</Checkbox><div className="skill-market-actions"><Button type="primary" disabled={!auth.connected || !canSubmitPublication(current, confirmed)} loading={busy} onClick={() => void run(async () => { replace(await submitPublication(current)); message.success("已送审，可在这里刷新审核结果和修改意见"); })}>确认送审</Button></div></> : null}
+                {current.submissionId ? <div className="skill-market-actions"><Button loading={busy} onClick={() => void run(async () => replace(await refreshPublication(current.planId)))}>刷新预览与审核状态</Button></div> : null}
+                {current.status === "rejected" ? <><p>审核未通过：{current.reviewReason}。修改技能后重新准备投稿。</p><Button disabled={busy} onClick={() => void reprepare(current)}>基于此稿重新准备</Button></> : null}
             </article> : <p className="skill-market-empty">还没有投稿草稿。可以选择自己的技能准备投稿，也可以让画布助手先整理草稿。</p>}
         </div>}
     </section>;

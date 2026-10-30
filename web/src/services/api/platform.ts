@@ -1,4 +1,5 @@
-import { ApiError, apiBaseURL, http, type BackendEnvelope } from "./request";
+import { ApiError, apiBaseURL, compactApiParams, http, type BackendEnvelope } from "./request";
+import type { SkillMetadata } from "./skill-market";
 
 export type PlatformRole = "admin" | "member";
 export type PlatformMe = {
@@ -14,6 +15,7 @@ export type PlatformMe = {
         pluginInstall: false;
         diagnostics: false;
         userAdmin: boolean;
+        skillReview: boolean;
     };
 };
 export type AdminUser = {
@@ -78,3 +80,32 @@ export const bindPlatformRelayKey = (id: string, key: string) => http.put<{ user
 export const clearPlatformRelayKey = (id: string) => http.delete<{ user: AdminUser }>(`/platform/admin/users/${encodeURIComponent(id)}/relay-key`);
 export const createPlatformInvitation = (input: { role: PlatformRole; expiresInHours: number }) => http.post<{ token: string; url: string; expiresAt: string }>("/platform/admin/invitations", input);
 export const listPlatformAudit = () => http.get<{ items: PlatformAuditItem[] }>("/platform/admin/audit", { params: { limit: 100 } });
+
+export type PlatformMarketAuthorization = { userCode: string; clientName: string; expiresAt: string; status: "pending" | "approved" };
+export type SkillSubmissionStatus = "draft" | "ready_to_submit" | "in_review" | "published" | "rejected";
+export type SkillSubmissionSummary = {
+    id: string; status: SkillSubmissionStatus; revision: number; previewDigest: string;
+    author: { id: string; username: string; displayName: string };
+    target: "new" | "existing"; skillId: string; currentSkillName: string | null;
+    metadata: SkillMetadata; fileCount: number; archiveBytes: number;
+    submittedAt: string | null; reviewedAt: string | null; reviewReason: string; reviewer: string | null;
+};
+export type MarketFile = { path: string; size: number; sha256: string; mimeType: string };
+export type SkillSubmissionDetail = {
+    submission: SkillSubmissionSummary;
+    files: MarketFile[];
+    previousRelease: { releaseId: string; versionLabel: string; files: MarketFile[] } | null;
+};
+export type SkillSubmissionFile = { path: string; mimeType: string; encoding: "utf-8" | "base64"; content: string };
+export type MarketSkillSummary = { skillId: string; name: string; ownerUsername: string; official: boolean; listed: boolean; currentReleaseId: string; versionLabel: string; publishedAt: string };
+
+export const getPlatformMarketAuthorization = (userCode: string, signal?: AbortSignal) => http.get<PlatformMarketAuthorization>(`/platform/market/authorizations/${encodeURIComponent(userCode)}`, { signal });
+export const approvePlatformMarketAuthorization = (userCode: string) => http.post<{ approved: true }>(`/platform/market/authorizations/${encodeURIComponent(userCode)}/approve`, {});
+export const listSkillSubmissions = (status: "pending" | "processed", signal?: AbortSignal) => http.get<{ items: SkillSubmissionSummary[] }>("/platform/admin/skill-submissions", { params: compactApiParams({ status }), signal });
+export const getSkillSubmission = (id: string, signal?: AbortSignal) => http.get<SkillSubmissionDetail>(`/platform/admin/skill-submissions/${encodeURIComponent(id)}`, { signal });
+export const getSkillSubmissionFile = (id: string, path: string, signal?: AbortSignal) => http.get<SkillSubmissionFile>(`/platform/admin/skill-submissions/${encodeURIComponent(id)}/file`, { params: compactApiParams({ path }), signal });
+export const approveSkillSubmission = (id: string, input: { revision: number; previewDigest: string; official: boolean }) => http.post<{ submission: SkillSubmissionSummary; release: { skillId: string; releaseId: string } }>(`/platform/admin/skill-submissions/${encodeURIComponent(id)}/approve`, input);
+export const rejectSkillSubmission = (id: string, input: { revision: number; reason: string }) => http.post<{ submission: SkillSubmissionSummary }>(`/platform/admin/skill-submissions/${encodeURIComponent(id)}/reject`, input);
+export const listAdminMarketSkills = (signal?: AbortSignal) => http.get<{ items: MarketSkillSummary[] }>("/platform/admin/market-skills", { signal });
+export const unlistMarketSkill = (skillId: string) => http.post<{ skill: MarketSkillSummary }>(`/platform/admin/market-skills/${encodeURIComponent(skillId)}/unlist`, {});
+export const relistMarketSkill = (skillId: string) => http.post<{ skill: MarketSkillSummary }>(`/platform/admin/market-skills/${encodeURIComponent(skillId)}/relist`, {});
