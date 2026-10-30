@@ -4,11 +4,12 @@ hfp - all in one 是基于 BeefTV 的本地视频创作工作台。本页收录�
 
 ## 开发必读
 
-1. [仓库地图：职责、入口和数据链路](repository-map.md)
+1. [仓库地图：三种运行形态、职责、入口和数据链路](repository-map.md)
 2. [开发规范：改动边界、验证与提交](../CONTRIBUTING.md)
 3. [本地开发：完整准备、启动、数据与重启](local-development.md)
 4. [排查指南：保存、插件、助手和模型错误](troubleshooting.md)
-5. [AI 协作约定](../AGENTS.md)与[视觉设计规范](DESIGN.md)
+5. [部署指引：选择运行方式，部署、升级与备份团队服务器](deployment.md)
+6. [AI 协作约定](../AGENTS.md)与[视觉设计规范](DESIGN.md)
 
 ## 开始使用
 
@@ -34,7 +35,7 @@ hfp - all in one 是基于 BeefTV 的本地视频创作工作台。本页收录�
 
 ## 开发参考
 
-- [团队服务器与创意工坊方案（第一期多人底座已实施，其余尚未实施）](team-server-and-workshop.md)
+- [团队服务器与创意工坊方案（第一至三期已实施，第四期加固未实施）](team-server-and-workshop.md)
 - [团队服务器：运行结构、信任边界、部署与平台接口](content/docs/backend/team-server.mdx)
 - [多人服务器与公共创意工坊方案（初版草案，已由上一条取代）](server-workspaces-and-community.md)
 - [后端本地开发](content/docs/backend/local-development.mdx)

@@ -36,9 +36,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-beeftv-windo
 
 ## 配置模型
 
-打开“模型配置”。内置 BeefAPI 使用「连接 BeefAPI」，在系统浏览器中完成授权后即可拉取模型。其他渠道仍填写 Base URL 和密钥。密钥保存在本地工作区，不会写入画布、素材或任务列表。
+打开“模型配置”。内置模型服务点「连接内置模型服务」，在系统浏览器中完成授权后即可拉取模型；其他渠道填写 Base URL 和密钥。密钥保存在本地工作区，不会写入画布、素材或任务列表。
 
-模型请求可能访问外部供应商，但 BeefTV 不会把项目数据同步到 SaaS 存储。素材会先写入本地资源目录，再作为本地资源引用提交给模型渠道。
+模型请求可能访问外部供应商，但应用不会把项目数据同步到任何云端存储。素材会先写入本地资源目录，再作为本地资源引用提交给模型渠道。
 
 ## 本地开发与验证
 
@@ -52,4 +52,4 @@ BEEFTV_GO_DIR=/path/to/go ./scripts/verify-beeftv-local-release.sh
 
 桌面运行时会在本地工作区保存 SQLite 数据库、资源文件、模型配置和迁移备份。升级迁移前会自动创建数据库备份；如需迁移或恢复，请先退出应用 并完整复制工作区数据目录。
 
-登录、云存储、团队同步和计费不属于 BeefTV 本地版。以本地能力契约、精简 schema 和发行门禁为准，详见 `docs/local-first-architecture.md`。
+桌面版是单人本地应用，没有登录、云存储和计费。企业内多人使用请部署团队服务器（账号登录、每人一个独立工作区、创意工坊和站内技能市场），见 [部署指引](docs/deployment.md)。本地能力边界详见 `docs/local-first-architecture.md`。

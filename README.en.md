@@ -36,7 +36,8 @@ The development identity proxy is restricted to eligible requests from the local
 - [Development rules](CONTRIBUTING.md): scope, verification and contribution workflow.
 - [Local setup and restart](docs/local-development.md): commands, identity and data preservation.
 - [Troubleshooting](docs/troubleshooting.md): canvas saves, plugins, assistant startup and provider failures.
-- [Team server](docs/content/docs/backend/team-server.mdx): multi-user deployment with one private workspace per member (phase one, not yet production-verified).
+- [Deployment guide](docs/deployment.md): choosing between the desktop app, the development server and the team server; deploying, upgrading and backing up the team server.
+- [Team server](docs/content/docs/backend/team-server.mdx): in-company multi-user deployment — accounts, one private workspace per member, the project workshop and an in-house skill market (not yet production-verified).
 - [Documentation index](docs/index.md) and [agent instructions](AGENTS.md).
 
 Detailed developer documents are maintained in Chinese. Historical upstream verification reports apply only to the versions and environments they describe.

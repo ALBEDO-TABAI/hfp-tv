@@ -99,12 +99,28 @@ curl --fail --silent --show-error http://127.0.0.1:43123/api/assistant/status
 - 改 Go 源码需要重新编译后端并重启；改前端源码通常由 Vite 自动更新；改助手源码需要重启助手或后端；修改插件后需要重新打包并重启后端。
 - 日志保存在 `.local/logs/`，上述 `tee` 命令每次启动覆盖同名日志；需要保留时先另存。分享诊断前检查并移除凭据、提示词与私人素材内容。
 
+## 团队服务器本机试运行
+
+改了团队服务器（登录、创意工坊、技能市场、管理页）时，用真实二进制在临时目录里跑一遍。不要指向 `.local/project-workbench-debug` 或任何正式数据卷。
+
+```bash
+BUN="$PWD/.local/node_modules/.bin/bun"
+(cd web && PATH="$(dirname "$BUN"):$PATH" "$BUN" run build)
+(cd backend && go build -o /tmp/hfp-teamserver ./cmd/teamserver)
+export TEAMSERVER_DATA_DIR="$(mktemp -d)"
+printf '%s\n' 'trial-admin-pass' | /tmp/hfp-teamserver admin create --username admin --display-name 管理员
+TEAMSERVER_ADDR=127.0.0.1:43191 TEAMSERVER_COOKIE_SECURE=false \
+TEAMSERVER_WEB_DIR="$PWD/web/dist" /tmp/hfp-teamserver
+```
+
+打开 `http://127.0.0.1:43191` 以 `admin` 登录。内置技能市场会占用 `127.0.0.1:18090`，被占用时设置 `TEAMSERVER_MARKET_ADDR`。试完按 `Ctrl+C` 停止并删除临时目录。插件包、助手依赖和启动配置的准备与上面的浏览器开发相同；没有配置助手命令时，助手面板显示未就绪，不影响其他功能。
+
 ## 原生桌面与其他运行方式
 
 Wails 桌面入口是 `backend/cmd/desktop`，会通过原生绑定提供启动身份；不能把浏览器开发代理当作正式桌面认证。
 
 `scripts/beeftv-shared-dev.sh` 当前启动 Vite 的端口为 `3000`，而 `backend/cmd/desktop/wails.json` 的前端地址为 `43123`。原生联调前必须对齐，不能直接套用旧说明中的已验证结论。桌面构建、安装和打包依赖见[桌面开发](desktop-local-development.md)与[桌面发布](desktop-release.md)。
 
-仓库还保留 Compose 配置；它们与本页的浏览器开发入口不同。使用前核对 Dockerfile、数据卷、插件与助手的装配，不把已有配置文件视为当前环境的成功部署证明。
+根目录的 Compose 配置是早期单工作区、无登录形态，与本页的浏览器开发入口不同，也不用于服务器部署；服务器部署见[部署指引](deployment.md)。
 
 原生桌面的正式安装位置是 `/Applications/hfp-allinone.app`，更新使用 `scripts/update-local-beeftv-app.sh`。默认数据目录使用系统配置目录下的 `hfp-allinone`；新目录不存在且旧 `BeefTV` 目录存在时沿用旧目录，不搬迁数据。浏览器开发继续使用 `.local/project-workbench-debug`。

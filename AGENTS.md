@@ -2,7 +2,7 @@
 
 本文件是 hfp - all in one 仓库中 AI、自动化工具和协作者的工作约定。用户当前任务优先于本文件；本文件优先于个人习惯。所有结论应能回溯到代码、配置、测试、日志或文档，不用历史印象替代现状。
 
-开始前按任务阅读 [仓库地图](docs/repository-map.md)、[开发规范](CONTRIBUTING.md)、[本地开发](docs/local-development.md)和[排查指南](docs/troubleshooting.md)。
+开始前按任务阅读 [仓库地图](docs/repository-map.md)、[开发规范](CONTRIBUTING.md)、[本地开发](docs/local-development.md)、[部署指引](docs/deployment.md)和[排查指南](docs/troubleshooting.md)。
 
 ## 1. 项目边界
 
@@ -13,11 +13,11 @@ hfp - all in one（`ALBEDO-TABAI/hfp-tv`）是基于 BeefTV（`glanderness/BeefT
 | 单元 | 技术栈 | 入口 | 责任 |
 | --- | --- | --- | --- |
 | `web/` | Vite、React 19、TypeScript、React Router、Ant Design、Tailwind、Zustand、TanStack Query | `web/src/application.tsx`、`web/src/router.tsx` | 工作区 UI、画布交互、浏览器缓存、API 调用和模型协议适配 |
-| `backend/` | Go 1.25、Gin、GORM、SQLite | `backend/cmd/desktop`、`backend/cmd/server` | 本地工作区 API、持久化任务、资源和外部模型协议适配 |
+| `backend/` | Go 1.25、Gin、GORM、SQLite | `backend/cmd/desktop`、`backend/cmd/server`、`backend/cmd/teamserver` | 工作区内核（本地工作区 API、持久化任务、资源和外部模型协议适配）；团队服务器（登录网关、每人一个托管内核、创意工坊、站内技能市场） |
 | `agent-host/` | Node.js、官方 Pi Durable SDK | `agent-host/server.mjs` | 创作助手执行、会话与工具桥；由 Go 管理进程和授权 |
 | `docs/` | Markdown、MDX | `docs/index.md` | 面向用户和开发者的专题文档；当前不包含独立文档站构建工程 |
 
-根目录脚本负责 Wails 与本地开发验证。主线不依赖 PostgreSQL、Redis、登录或多租户部署。
+根目录脚本负责 Wails 与本地开发验证，`deploy/teamserver/` 负责团队服务器部署。主线不依赖 PostgreSQL、Redis。项目只在企业内部署：多人使用走团队服务器（账号登录、每人一个独立工作区），工作区内核本身仍按单一所有者工作、不感知平台账号；不依赖上游 BeefTV 的在线服务。
 
 ## 2. 开始工作前
 
@@ -51,6 +51,7 @@ hfp - all in one（`ALBEDO-TABAI/hfp-tv`）是基于 BeefTV（`glanderness/BeefT
 - `backend/internal/provider/`：模型供应商能力和协议实现。
 - `backend/internal/database/`：数据库连接、迁移和连接池。
 - `backend/cmd/`：可执行入口、迁移和启动配置；启动参数不得绕过数据目录约束。
+- `backend/internal/teamserver/`、`accounts/`、`kernelpool/`、`workshop/`、`skillmarket/`：团队服务器平台层，数据在独立的 `platform.db`。平台只经网关和 `projectsnapshot` 端口接触工作区，不直接读写工作区数据库；托管内核的信任入口和拒绝接口在 `bootstrap/hosted.go`。
 
 调用链应保持为：`HTTP -> handler -> localapp/domain port -> app/domain implementation -> repository/model`；需要模型上游时进入 `generation` / `provider` / `protocol` / `outbound`。
 
@@ -95,7 +96,7 @@ hfp - all in one（`ALBEDO-TABAI/hfp-tv`）是基于 BeefTV（`glanderness/BeefT
 
 - Gin 接口统一返回 `{ code, data, msg, reason }`；失败时 HTTP status 和业务 `code` 都应表达真实失败，不把所有错误包装成 200。机器可读原因放在 `reason`，见 `docs/content/docs/backend/http-api.mdx`。
 - 所有对象读取、更新、删除都在 service 校验当前用户和资源归属；管理员权限在 service 校验，不依赖前端隐藏按钮。
-- 默认开放本机回环（`localhost` / `127.0.0.1` / `::1`）和局域网私网模型上游，仅拦截链路本地（`169.254.0.0/16` 等）、未指定与多播地址；需要严格公网隔离的部署可显式设置 `CANVAS_ALLOW_PRIVATE_UPSTREAMS=false` 并通过 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS` 精确放行。
+- 默认开放本机回环（`localhost` / `127.0.0.1` / `::1`）和局域网私网模型上游，仅拦截链路本地（`169.254.0.0/16` 等）、未指定与多播地址；需要严格公网隔离的部署可显式设置 `CANVAS_ALLOW_PRIVATE_UPSTREAMS=false` 并通过 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS` 精确放行。团队服务器强制关闭私网出站，并拒绝会让各工作区共用凭据的进程级环境变量（见 `CheckHostedEnvironment`）。
 - 用户 API Key 保存在浏览器本地，任务创建时可能提交给自部署后端；只在可信部署和 HTTPS 下使用真实密钥。日志、错误上报、URL、localStorage 和持久任务正文不得写入敏感 URL、Cookie 或 API Key。
 - 生产必须配置明确的 `CANVAS_CORS_ORIGINS`，保持 HTTPS，限制数据库、备份、数据目录和 `.settings-key` 权限；默认关闭公开注册。
 - 数据库字段或表变化时同步更新 `docs/content/docs/backend/backend-database.mdx`，不能只改 GORM model。
@@ -115,7 +116,8 @@ hfp - all in one（`ALBEDO-TABAI/hfp-tv`）是基于 BeefTV（`glanderness/BeefT
 - 先阅读 `docs/local-development.md`；使用容器时再核对对应 Compose 文件。当前没有 `.env.example`。宿主机后端开发必须使用 Git 忽略的 `.local/project-workbench-debug`，通过 `CANVAS_BACKEND_DATA_DIR` 显式指定；不要把 `backend/data` 当作开发账号数据库。
 - 本地缓存放 `.local/cache`；不要提交数据库、上传文件、`.env`、真实密钥、构建产物或编辑器配置。
 - 宿主机开发：按启动说明准备模型插件、助手依赖和启动配置；浏览器使用 Vite `43123`，后端使用 `43180`，配齐同源开发身份。只运行 `go run ./cmd/server` 不代表完整工作区可用。不要用 pnpm/npm 覆盖同一套 `node_modules`，也不要提交 `pnpm-lock.yaml` 或 `package-lock.json`。Docker 热更新使用 `docker-compose.dev.yml`；本地构建运行使用 `docker-compose.local.yml`，需另行验证。
-- 单机 Compose 使用 `docker-compose.yml`（SQLite 数据卷，backend、web），源码构建可叠加 `docker-compose.build.yml`。公网只暴露 web 的 `3000`，backend `8080` 留在 Compose 网络内。
+- 服务器部署只用团队服务器：`deploy/teamserver/`（单镜像 + Caddy），步骤见 `docs/deployment.md`。根目录 `docker-compose.yml` 是早期单工作区、无登录形态，不用于服务器部署。
+- 团队服务器本机试运行：构建 `web/dist` 后用 `go build ./cmd/teamserver` 的二进制，在临时数据目录、非开发端口启动（`TEAMSERVER_COOKIE_SECURE=false`），用完停掉；不要指向正式数据卷。
 - 默认不启动 dev server；只有用户明确要求浏览器预览或联调时才启动，并先确认端口、数据目录和现有进程。
 - macOS 本机唯一正式应用路径是 `/Applications/hfp-allinone.app`。需要更新本机应用时只运行 `./scripts/update-local-beeftv-app.sh`；不将 `build/bin/hfp-allinone.app` 作为可使用版本保留，不复制、重命名或存档额外 `.app` 副本。
 - 健康检查只能证明入口可用，不能替代登录、SSE、任务生成和资源访问验证。
@@ -125,7 +127,7 @@ hfp - all in one（`ALBEDO-TABAI/hfp-tv`）是基于 BeefTV（`glanderness/BeefT
 项目当前默认不自动运行语法检查、类型检查、测试或构建。用户明确要求验证，或改动风险需要验证时，按范围选择最小充分命令，并在交付中如实记录：
 
 - 前端：`cd web && bun run build`；专项测试用 `bun test ...`。UI 退场规则用 `bun run lint`（只禁 antd Empty 和静态 `Modal.confirm`，不是风格检查）。
-- 后端：`cd backend && go test ./...`；涉及资源、任务或权限时补对应集成/冒烟路径。
+- 后端：`cd backend && go test ./...`；涉及资源、任务或权限时补对应集成/冒烟路径。团队服务器改动至少跑 `go test ./internal/teamserver ./internal/accounts ./internal/workshop ./internal/skillmarket ./internal/projectsnapshot` 和 `go test ./internal/bootstrap -run 'Hosted|ProjectSnapshot'`。本机 Homebrew ffmpeg 8.1 下字幕渲染相关用例和一个 DNS 计时用例的失败是既有环境问题，先在未改动的提交上复现再判断。
 - 旧内置 Agent 已从产品运行面退场：`/agent/*` 路由不再注册，通用任务创建、任务重试和任务 Worker 拒绝 `cloud_agent`、`cloud_agent_step`、`agent_memory_compact`，旧轮次与记忆压缩调度保持停用，历史数据保留。当前分支的替换内核采用 `agent-host/` 中钉选的官方 pi SDK，Go 管理运行时、业务轮次及操作授权；React 使用 `/api/assistant/*`。宿主只有 Durable 一套执行运行时：旧 JSONL 会话只读历史，在旧会话里发新消息会以交接说明开一条新的 Durable 会话，不恢复旧 SDK 的 create/prompt/replace/abort 执行路径。按 `docs/refactor/pi-official-reuse.md` 核对官方 API 与实际接入路径，不能恢复旧入口或另建模型会话循环。零模型宿主验证、真实业务操作、付费模型验收与正式发布分别记证据。
 - 文档：检查链接、路径、代码入口和命令上下文；当前 `docs/` 没有 `package.json`，不执行文档站构建命令。
 - UI 变更能浏览器验证时，检查关键路由、明暗主题、滚动、弹窗、空态和核心交互；不能验证时说明替代依据，不把静态阅读或 `git diff` 写成运行验证。
@@ -140,6 +142,6 @@ hfp - all in one（`ALBEDO-TABAI/hfp-tv`）是基于 BeefTV（`glanderness/BeefT
 - API、数据表、SSE、资源存储、部署或安全边界变化时同步对应专题文档；不要只改代码和根 README。
 - 文档默认中文，不写过期日期，不公开密码、Token、Cookie、真实账号或机器敏感路径。命令、端口、环境变量必须以当前脚本和 Compose 为准。
 - Git 提交说明使用 `<type>(<scope>): <业务模块> - <变更摘要>`，`type` 为 `feat|fix|refactor|perf|docs|test|build|ci|chore|revert`。
-- 交叉 review：改动涉及前端 UI、交互或用户可见功能（含文案、设置项、安装与更新体验）的 PR，开出后由发起人在飞书团队群通知另一位协作者 review，附 PR 链接、改动要点和截图或录屏；对方在 PR 上 approve 或在飞书明确回复可以合并后再合并。纯后端或内部改动在 PR 描述里写明影响范围即可。AI 代理默认不合并 PR、不发版；项目负责人对某个 PR 明确授权时才可合并该 PR，授权不延伸到其他 PR 或发版，用户可见功能的 PR 仍须先完成交叉 review。通知内容只写已验证的事实，不附密钥、诊断包原文或本机路径。
+- 提交与合并：项目由负责人一人维护，改动直接提交并推送到 `ALBEDO-TABAI/hfp-tv` 的 `main`，不开 PR、不做交叉 review，也不推送到上游 BeefTV。AI 代理只在负责人明确要求时提交和推送；推送前 `git fetch` 确认只做快进，推送后读回远端提交。发版仍需单独授权。
 
 交付前至少检查：改动是否聚焦、调用方和类型是否同步、错误/权限/数据归属是否完整、必要文档是否同步、验证是否如实说明、是否留下密钥或本地数据。

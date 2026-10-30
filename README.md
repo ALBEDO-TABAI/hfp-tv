@@ -57,7 +57,8 @@
 - [开发规范](CONTRIBUTING.md)：改动边界、验证与提交要求。
 - [本地开发与重启](docs/local-development.md)：可执行步骤、数据保护和身份配置。
 - [故障排查](docs/troubleshooting.md)：保存失败、插件缺失、助手与模型错误。
-- [团队服务器](docs/content/docs/backend/team-server.mdx)：多人部署，每人一个独立工作区（第一期，尚未在生产环境验收）。
+- [部署指引](docs/deployment.md)：桌面版、开发服务与团队服务器怎么选，团队服务器的部署、升级与备份。
+- [团队服务器](docs/content/docs/backend/team-server.mdx)：企业内多人部署——账号登录、每人一个独立工作区、创意工坊、站内技能市场（尚未在生产环境验收）。
 - [完整文档索引](docs/index.md)与 [AI 协作约定](AGENTS.md)。
 
 ---

@@ -21,10 +21,26 @@
 | Bun 报 `Unknown lockfile version` | Bun 版本及出错的锁文件 | 助手清单需要 Bun 1.4.4 或更新版本；保持 `--frozen-lockfile`，不要删锁文件重解依赖 |
 | Go 报缓存目录必须为绝对路径 | `GOCACHE` / `GOMODCACHE` | 使用仓库根目录的绝对路径；见启动说明 |
 
+## 团队服务器
+
+| 现象 | 先检查什么 | 对应处理 |
+| --- | --- | --- |
+| 登录或任何写操作返回 403 `origin_forbidden` / `origin_required` | 反向代理是否保留了 `Host`，`X-Forwarded-Host` 是否来自 `TEAMSERVER_TRUSTED_PROXIES` 里的地址 | Caddy 默认保留 `Host`；nginx 需 `proxy_set_header Host $host`；Compose 外的代理把它的地址加进 `TEAMSERVER_TRUSTED_PROXIES`。不要关掉来源校验 |
+| 本机 HTTP 试运行登录后马上又回到登录页 | `TEAMSERVER_COOKIE_SECURE` | 只在本机 HTTP 试运行时设为 `false`；正式部署必须走 HTTPS |
+| 进程启动即退出，提示环境变量 | 日志里列出的变量（如 `CANVAS_ALLOW_PRIVATE_UPSTREAMS`、`BEEFTV_AGENT_HOST_TOKEN`） | 团队服务器拒绝会让各工作区共用凭据或打开私网出站的设置；删掉这些变量，内网中转站用 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS` 精确放行 |
+| 页面提示“工作区暂时无法打开”（503 `workspace_unavailable`） | `docker compose logs teamserver` 里的 `open workspace=…` 行 | 常见原因是官方插件目录缺失、数据卷权限或磁盘已满；修好后刷新即可重试 |
+| “公司中转站”渠道显示“等待管理员绑定” | 用户管理里该成员的中转站密钥 | 管理员绑定后无需重启，下次打开模型配置即生效 |
+| 中转站请求失败、提示地址不允许 | 中转站是否在内网 | 把中转站主机名写进 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS`，不要打开整个私网出站 |
+| 任务进度、助手回复卡住或中途断开 | 反向代理是否缓冲了流式响应 | Caddy 示例已设 `flush_interval -1`；nginx 需对 `/api/` 关闭缓冲并把读超时设到 1 小时 |
+| 技能页提示“未配置技能市场” | 是否在团队服务器上访问 | 桌面版和单工作区开发服务没有默认市场；团队服务器会自动接入站内市场 |
+| 投稿到创意工坊被预检拦下 | 预检列出的问题和节点 | “只保存在浏览器里”的素材需重新上传；“文件不存在”需恢复或删掉对应节点；画板未保存需打开画板保存一次 |
+| 技能投稿提示 SKILL.md 缺少元信息 | SKILL.md 开头是否有写错的头信息 | 没有头信息时会自动补；已有但不合规（如名字含空格或大写）需改成小写字母、数字和连字符 |
+
 ## 从哪里取证
 
 - **页面**：画布保存状态、任务“查看详情”、助手对话及错误；复制排查信息前确认其内容适合分享。
 - **本地服务**：`.local/logs/backend.log`、`.local/logs/web.log`。程序由其他终端启动时，输出可能仍在原终端。
+- **团队服务器**：`docker compose logs teamserver`；管理员“用户管理 → 操作记录”可查账号、审核和下架操作。
 - **任务**：`GET /api/tasks/:id` 返回阶段、结果状态及失败诊断。`dispatched`、HTTP 状态和 `requestId` 比笼统的页面标题更能定位失败边界。
 - **助手**：`GET /api/assistant/status` 用于本地就绪检查；会话与模型请求诊断保存在工作区中。不能把内部日志原文直接发给模型或公开提交。
 - **代码入口**：按[仓库地图](repository-map.md)找负责该阶段的模块；不要同时改页面、传输和服务端来掩盖一个未定位的问题。
