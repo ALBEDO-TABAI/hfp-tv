@@ -8,7 +8,7 @@ hfp - all in one is an AI video and short-film workspace derived from [BeefTV](h
 
 ## Unofficial derivative notice
 
-This repository, [ALBEDO-TABAI/hfp-tv](https://github.com/ALBEDO-TABAI/hfp-tv), is an independently modified derivative. It is not an official BeefTV release and is not endorsed by or commercially authorized by BeefTV.
+This repository, [ALBEDO-TABAI/hfp-tv](https://github.com/ALBEDO-TABAI/hfp-tv), is an independently modified derivative. It is not endorsed by BeefTV.
 
 The derivative changes the product branding and visual interface while retaining the upstream local workspace, canvas, media, provider and assistant architecture. Feature descriptions are in [FEATURES.md](docs/FEATURES.md), and the visual specification is in [DESIGN.md](docs/DESIGN.md). These descriptions do not replace runtime acceptance testing for a particular build.
 

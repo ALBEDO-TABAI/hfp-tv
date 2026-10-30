@@ -11,7 +11,7 @@
 ## 非官方衍生版本声明 · Unofficial Derivative Notice
 
 **中文说明**
-- **非官方独立修改版**：`hfp - all in one`（仓库地址：`https://github.com/ALBEDO-TABAI/hfp-tv`）是基于上游公开项目 [glanderness/BeefTV](https://github.com/glanderness/BeefTV) 独立修改而成的衍生版本。
+- **非官方独立修改版**：`hfp - all in one`（仓库地址：`https://github.com/ALBEDO-TABAI/hfp-tv`）是基于上游公开项目 [glanderness/BeefTV](https://github.com/glanderness/BeefTV) 独立修改而成的衍生版本，未获得 BeefTV 官方背书。
 - **主要变更摘要**：
   1. 产品品牌与用户界面全面重命名为 `hfp - all in one`（含全新胶片书脊标志、斜体衬线字标与海报式启动幕布）。
   2. 保留上游 100% 功能与本地优先架构（详见 [`docs/FEATURES.md`](docs/FEATURES.md)）。
@@ -19,11 +19,11 @@
 - **开源与源码可用许可**：本仓库免费公开分发，并严格遵循与上游相同的许可证条款——即 [`LICENSE`](LICENSE)（**Part A: `BeefTV Source Available License 1.0`** 与 **Part B: 历史 `MIT` 许可证**），完整保留 [`NOTICE`](NOTICE)、[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 及 [`licenses/`](licenses/) 下的全部第三方与字体/光学算法许可文件。
 
 **English Notice**
-- **Unofficial, Independently Modified Version**: `hfp - all in one` (`https://github.com/ALBEDO-TABAI/hfp-tv`) is an unofficial, independently modified derivative based on the open-source project [glanderness/BeefTV](https://github.com/glanderness/BeefTV). **It is NOT an official BeefTV release and is NOT endorsed by or affiliated with BeefTV.**
+- **Unofficial, Independently Modified Version**: `hfp - all in one` (`https://github.com/ALBEDO-TABAI/hfp-tv`) is an unofficial, independently modified derivative based on the open-source project [glanderness/BeefTV](https://github.com/glanderness/BeefTV). **It is not endorsed by BeefTV.**
 - **Summary of Changes**:
   1. Rebranded user-facing surfaces and package metadata to `hfp - all in one` with a new film-spine emblem, serif-paired wordmark, and poster-sheet splash screen.
   2. Preserved 100% of upstream features and local-first workspace capabilities (see [`docs/FEATURES.md`](docs/FEATURES.md)).
-  3. Completely redid the art direction, visual design, liquid-glass material surfaces, typography pairing, 12-column responsive grid, and interactions following the Ready Library (「藏书阁」) design system (see [`docs/DESIGN.md`](docs/DESIGN.md)).
+  3. Completely redid the art direction, visual design, liquid-glass material surfaces, typography pairing, 12-column responsive grid, and interactions following the Ready Library design system (see [`docs/DESIGN.md`](docs/DESIGN.md)).
 - **License & Free Distribution**: Distributed free of charge under the exact same [`LICENSE`](LICENSE) (**Part A: `BeefTV Source Available License 1.0`** + **Part B: historical `MIT` License**), with [`NOTICE`](NOTICE), [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), and [`licenses/`](licenses/) retained in full.
 
 ---
@@ -37,7 +37,7 @@
    - **独立多模态创作室 (`/create`)**：支持视频、图片、文本三模式生成，`@` 智能引用素材与技能、内置 AI 提示词优化器、分镜轨预览与历史会话管理。
    - **时间线成片剪辑器 (`/projects/:id/editor`)**：200 步撤销/重做命令状态机、8 个内置片段/字幕插件、本地 `whisper.cpp` / 云端语音转写字幕、本机 FFmpeg 成片渲染导出。
    - **个人资产库 (`/assets`)、技能市场 (`/skills`)、模型配置与诊断 (`/settings`)、MCP 外部工具接入 (`/agents`)、插件中心 (`/plugins`)**。
-2. **「藏书阁」艺术指导设计系统**：
+2. **「Ready Library」艺术指导设计系统**：
    - 详见 [`docs/DESIGN.md`](docs/DESIGN.md) 与全量功能盘点 [`docs/FEATURES.md`](docs/FEATURES.md)。
 
 ---
