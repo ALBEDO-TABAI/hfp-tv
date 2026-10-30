@@ -7,6 +7,27 @@ import { loadAgentsPage, loadAssetsPage, loadCanvasPage, loadCanvasProjectPage, 
 import { CanvasRefreshShell } from "@/pages/canvas/canvas-refresh-shell";
 import RouteErrorPage from "@/pages/route-error";
 import { isLocalWorkspaceMode } from "@/services/workspace-mode";
+import { hostedCapability, usePlatformSession } from "@/stores/use-platform-session";
+import type { PlatformMe } from "@/services/api/platform";
+import { platformLoginPath } from "@/lib/platform-navigation";
+
+const LoginPage = lazy(() => import("@/pages/login"));
+const InvitePage = lazy(() => import("@/pages/invite"));
+const AdminUsersPage = lazy(() => import("@/pages/admin/users"));
+
+function PlatformRoute({ children, publicPage = false }: { children: ReactNode; publicPage?: boolean }) {
+    const { mode, me } = usePlatformSession();
+    const { pathname, search } = useLocation();
+    if (publicPage) return mode === "local" ? <Navigate to="/" replace /> : children;
+    if (mode === "hosted" && !me) return <Navigate to={platformLoginPath(pathname, search)} replace />;
+    return children;
+}
+
+function CapabilityRoute({ capability, children }: { capability: keyof PlatformMe["capabilities"]; children: ReactNode }) {
+    const { mode, me } = usePlatformSession();
+    const allowed = capability === "userAdmin" ? mode === "hosted" && me?.user.role === "admin" && me.capabilities.userAdmin : hostedCapability(capability);
+    return allowed ? children : <Navigate to="/" replace />;
+}
 
 const AgentsPage = lazy(loadAgentsPage);
 const AssetsPage = lazy(loadAssetsPage);
@@ -36,7 +57,7 @@ function WorkspaceLayout() {
     const { pathname } = useLocation();
     const isCanvasProjectRoute = pathname.startsWith("/canvas/");
     const fallback = isCanvasProjectRoute ? <CanvasRefreshShell /> : <FullScreenLoader label="正在打开创作空间" detail="准备当前页面" />;
-    return <Suspense fallback={fallback}><UserLayout><Outlet /></UserLayout></Suspense>;
+    return <PlatformRoute><Suspense fallback={fallback}><UserLayout><Outlet /></UserLayout></Suspense></PlatformRoute>;
 }
 
 function LocalAwareProjectRoute() {
@@ -64,13 +85,15 @@ function devRoutes() {
     const DirectorReproLab = lazy(() => import("@/pages/dev/director-repro-lab"));
     const AssistantPanelLab = lazy(() => import("@/pages/dev/assistant-panel-lab"));
     return [
-        { path: "/dev/folders", element: fullScreenDeferred(<FolderPreviewLab />), errorElement: <RouteErrorPage /> },
-        { path: "/dev/director-repro", element: fullScreenDeferred(<DirectorReproLab />), errorElement: <RouteErrorPage /> },
-        { path: "/dev/assistant-panel", element: fullScreenDeferred(<AssistantPanelLab />), errorElement: <RouteErrorPage /> },
+        { path: "/dev/folders", element: <PlatformRoute>{fullScreenDeferred(<FolderPreviewLab />)}</PlatformRoute>, errorElement: <RouteErrorPage /> },
+        { path: "/dev/director-repro", element: <PlatformRoute>{fullScreenDeferred(<DirectorReproLab />)}</PlatformRoute>, errorElement: <RouteErrorPage /> },
+        { path: "/dev/assistant-panel", element: <PlatformRoute>{fullScreenDeferred(<AssistantPanelLab />)}</PlatformRoute>, errorElement: <RouteErrorPage /> },
     ];
 }
 
 export const router = createWorkspaceRouter([
+    { path: "/login", element: <PlatformRoute publicPage>{fullScreenDeferred(<LoginPage />)}</PlatformRoute>, errorElement: <RouteErrorPage /> },
+    { path: "/invite/:token", element: <PlatformRoute publicPage>{fullScreenDeferred(<InvitePage />)}</PlatformRoute>, errorElement: <RouteErrorPage /> },
     ...(import.meta.env.DEV ? devRoutes() : []),
     {
         element: <WorkspaceLayout />,
@@ -93,10 +116,11 @@ export const router = createWorkspaceRouter([
             },
             {
                 path: "/plugins/eagle",
-                element: <RequireFeature feature="pluginCenterEnabled">{deferred(<EagleLibraryPage />)}</RequireFeature>,
+                element: <CapabilityRoute capability="eagle"><RequireFeature feature="pluginCenterEnabled">{deferred(<EagleLibraryPage />)}</RequireFeature></CapabilityRoute>,
             },
             { path: "/settings", element: deferred(<SettingsPage />) },
-            { path: "/agents", element: deferred(<AgentsPage />) },
+            { path: "/agents", element: <CapabilityRoute capability="externalAgents">{deferred(<AgentsPage />)}</CapabilityRoute> },
+            { path: "/admin/users", element: <CapabilityRoute capability="userAdmin">{deferred(<AdminUsersPage />)}</CapabilityRoute> },
             { path: "/test-voice-recording", element: deferred(<TestVoiceRecording />) },
             {
                 path: "/projects",
@@ -130,5 +154,5 @@ export const router = createWorkspaceRouter([
             { path: "/canvas/:id", element: <CanvasProjectPage /> },
         ],
     },
-    { path: "*", element: fullScreenDeferred(<NotFound />) },
+    { path: "*", element: <PlatformRoute>{fullScreenDeferred(<NotFound />)}</PlatformRoute> },
 ]);

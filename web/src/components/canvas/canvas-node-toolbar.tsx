@@ -14,6 +14,7 @@ import { formatBytes, getDataUrlByteSize } from "@/lib/image-utils";
 import { GenerationFailureNotice } from "@/components/generation/generation-failure-notice";
 import { explainGenerationError } from "@/lib/generation-error";
 import { canvasNodeDiagnosticContext } from "@/services/diagnostics/canvas-media-diagnostics";
+import { hostedCapability } from "@/stores/use-platform-session";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import { CanvasNodeType, type CanvasNodeData, type CanvasNodeMetadata, type CanvasWorkspaceMode, type ViewportTransform } from "@/types/canvas";
@@ -315,7 +316,7 @@ export function CanvasNodeToolbar({
             group: placement.group,
             order: placement.order,
             section: tool.nodeToolbar?.section,
-            description: tool.nodeToolbar?.description,
+            description: tool.id === "depthCapture" && !hostedCapability("depthCapture") ? "团队服务器暂不支持" : tool.nodeToolbar?.description,
             active: tool.active?.(nodeHoverCtx),
             danger: tool.danger,
             disabled: tool.disabled?.(nodeHoverCtx),
@@ -537,7 +538,7 @@ function NodeDockMenuButton({
                     }
                 >
                     <div>
-                        <span className="inline-flex items-center gap-2">{tool.label}</span>
+                        <Tooltip title={tool.disabled && tool.id === "depthCapture" ? tool.description : undefined}><span className="inline-flex items-center gap-2">{tool.label}</span></Tooltip>
                     </div>
                     {isSplit ? <ChevronRight className="canvas-grid-split-chevron" strokeWidth={2} /> : null}
                 </div>

@@ -1,4 +1,6 @@
 import { getRegisteredPlugin } from "@/lib/plugins/plugin-registry";
+import { EAGLE_PLUGIN_ID } from "@/lib/plugins/builtin/eagle";
+import { hostedCapability } from "@/stores/use-platform-session";
 import { pluginStorageFor } from "@/lib/plugins/plugin-storage";
 import { isLocalWorkspaceMode } from "@/services/workspace-mode";
 import type { Asset } from "@/stores/use-asset-store";
@@ -29,6 +31,7 @@ export type ExternalAssetSyncResult = {
 
 export function createHostedAssetSources(installations: PluginInstallation[]): HostedAssetSource[] {
     return installations.flatMap((installation) => {
+        if (installation.manifest.id === EAGLE_PLUGIN_ID && !hostedCapability("eagle")) return [];
         if (!isPluginEffectivelyEnabled(installation.manifest.id, installation.enabled)) return [];
         const plugin = getRegisteredPlugin(installation.manifest.id);
         if (!plugin?.createAssetSource) return [];

@@ -1,4 +1,5 @@
 import { CollectionToolbar } from "@/components/layout/collection-toolbar";
+import { hostedCapability } from "@/stores/use-platform-session";
 import { Alert, App, Button, Drawer, Form, Input, Modal, Select, Typography } from "antd";
 import { Switch } from "@/components/ui/base/switch";
 import { SegmentedControl } from "@/components/ui/base/segmented-control";
@@ -557,7 +558,7 @@ export default function TasksPage() {
                         </div>
                         <div className="flex flex-wrap justify-end gap-2">
                             {canQueryProviderTask(detailTask) ? <Button icon={<RefreshCw className="size-4" />} loading={actingId === detailTask.id} onClick={() => void queryProviderTask(detailTask)}>取回结果</Button> : null}
-                            {isTaskFailed(detailTask) ? <Button icon={<Bug className="size-4" />} onClick={() => navigate(`/settings?section=diagnostics&taskId=${encodeURIComponent(detailTask.id)}${detailTask.projectId ? `&projectId=${encodeURIComponent(detailTask.projectId)}` : ""}`)}>导出诊断包</Button> : null}
+                            {isTaskFailed(detailTask) && hostedCapability("diagnostics") ? <Button icon={<Bug className="size-4" />} onClick={() => navigate(`/settings?section=diagnostics&taskId=${encodeURIComponent(detailTask.id)}${detailTask.projectId ? `&projectId=${encodeURIComponent(detailTask.projectId)}` : ""}`)}>导出诊断包</Button> : null}
                         </div>
                         {detailTask.error || isTaskFailed(detailTask) ? (
                             <GenerationFailureNotice

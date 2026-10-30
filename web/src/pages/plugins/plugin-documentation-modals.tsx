@@ -3,6 +3,7 @@ import { CloudUpload, FileText, ShieldCheck } from "lucide-react";
 import { useRef, useState } from "react";
 
 import type { RegisteredPlugin } from "@/lib/plugins/plugin-types";
+import { hostedCapability } from "@/stores/use-platform-session";
 
 import pluginDevelopmentGuideMarkdown from "./plugin-development-guide.md?raw";
 import { getPluginDocumentation } from "./plugin-documentation";
@@ -18,6 +19,7 @@ type UploadPluginModalProps = {
 export function UploadPluginModal({ open, onClose, onUpload }: UploadPluginModalProps) {
     const [isDraggingPlugin, setIsDraggingPlugin] = useState(false);
     const dragDepth = useRef(0);
+    if (!hostedCapability("pluginInstall")) return null;
 
     const handlePluginDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();

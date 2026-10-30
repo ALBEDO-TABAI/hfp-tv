@@ -25,7 +25,7 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
     const localMode = isLocalWorkspaceMode() || storageMode === "local" || user?.username === "local";
     useDesktopUpdateBootstrap();
 
-    const hideChrome = pathname.startsWith("/admin") || /^\/canvas\/[^/]+/.test(pathname);
+    const hideChrome = /^\/canvas\/[^/]+/.test(pathname);
     const spatialWorkbench = isSpatialWorkbenchPath(pathname);
     const creationWorkspace = pathname === "/create";
 

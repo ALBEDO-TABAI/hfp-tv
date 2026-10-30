@@ -6,6 +6,18 @@ import { mergeManagedBeefAPICatalog } from "../src/pages/settings/channel-settin
 import { createModelChannel, defaultConfig, type AiConfig } from "../src/stores/use-config-store";
 import { createModelConfigRepository } from "../src/services/model-config-repository";
 
+test("hosted bootstrap errors never apply a local identity or load model config", async () => {
+    const calls: string[] = [];
+    await expect(workspaceBootstrap.initializeWorkspaceState({
+        allowLocalFallback: false,
+        loadWorkspace: async () => { throw new Error("workspace unavailable"); },
+        createLocalWorkspace: () => { calls.push("local"); return {}; },
+        applySession: async () => { calls.push("session"); },
+        restoreModelConfig: async () => { calls.push("config"); },
+    })).rejects.toThrow("workspace unavailable");
+    expect(calls).toEqual([]);
+});
+
 test("an unacknowledged config write remains dirty and can be retried", async () => {
     let acknowledge = false;
     const repository = createModelConfigRepository({

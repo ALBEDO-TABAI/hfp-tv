@@ -13,6 +13,7 @@ import { DepthComponentsPanel } from "@/components/depth-components-panel";
 import { ReferenceStoragePane } from "./reference-storage-pane";
 import { getDesktopAppBinding } from "@/services/desktop-runtime";
 import { PageHeader } from "@/components/layout/workspace-page";
+import { hostedCapability } from "@/stores/use-platform-session";
 
 type ConfigSectionKey = "channels" | "models" | "storage" | "diagnostics";
 
@@ -33,7 +34,7 @@ export default function SettingsPage() {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const shouldPromptContinue = searchParams.get("continue") === "1";
     const userChannels = config.channels.filter((channel) => channel.scope !== "system");
-    const nativeStorage = Boolean(getDesktopAppBinding()?.StorageSettings);
+    const nativeStorage = hostedCapability("storageSettings") && Boolean(getDesktopAppBinding()?.StorageSettings);
     useLayoutEffect(() => {
         document.body.classList.add("app-user-overlays");
         return () => document.body.classList.remove("app-user-overlays");
@@ -70,7 +71,7 @@ export default function SettingsPage() {
     const panes: Record<Exclude<ConfigSectionKey, "diagnostics">, ReactNode> = {
         channels: (
             <SettingsPane>
-                <ChannelSettingsPane onOpenDiagnostics={() => selectSection("diagnostics")} />
+                <ChannelSettingsPane onOpenDiagnostics={hostedCapability("diagnostics") ? () => selectSection("diagnostics") : undefined} />
                 <div className="settings-section model-default-section">
                     <div className="settings-pane-header">
                         <div className="min-w-0">

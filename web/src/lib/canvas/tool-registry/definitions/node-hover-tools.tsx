@@ -5,6 +5,7 @@ import { canvasNodeFailureExplanation, canRecoverOrRetryDepthCapture } from "@/l
 import { registerToolbarTools, type ToolContext, type ToolDefinition } from "@/lib/canvas/tool-registry";
 import { CanvasNodeType } from "@/types/canvas";
 import { canOpenCanvasNodePromptPanel } from "@/lib/canvas/canvas-node-semantics";
+import { hostedCapability } from "@/stores/use-platform-session";
 
 // 节点状态判定辅助函数——从 ToolContext 派生
 function isImage(ctx: ToolContext) { return ctx.node?.type === CanvasNodeType.Image; }
@@ -144,14 +145,14 @@ export const nodeHoverToolbarTools: ToolDefinition[] = [
         workflow: { operationId: "video.depth", outputType: "video" },
         toolbar: "node-hover",
         category: "node-state",
-        label: "生成近白远黑的深度动作参考视频",
+        label: () => hostedCapability("depthCapture") ? "生成近白远黑的深度动作参考视频" : "团队服务器暂不支持",
         displayLabel: "深度动作捕捉",
         icon: <WandSparkles className="size-3.5" />,
         defaultVisible: true,
         defaultOrder: 47,
         nodeToolbar: { group: "more", order: 40, section: "视频处理", description: "本地生成深度参考视频；首次需下载组件，CPU 处理可能较慢" },
         applicable: (ctx) => hasVideo(ctx) && !simpleMode(ctx),
-        disabled: (ctx) => ctx.trimmingVideo,
+        disabled: (ctx) => !hostedCapability("depthCapture") || ctx.trimmingVideo,
         run: (ctx) => ctx.handlers.onNodeDepthCapture(ctx.node!),
     },
     {

@@ -17,6 +17,8 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { getDesktopAppBinding } from "@/services/desktop-runtime";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { OnboardingEntry } from "@/components/onboarding/first-creation-guide";
+import { PlatformAccountMenu } from "@/components/layout/platform-account-menu";
+import { hostedCapability } from "@/stores/use-platform-session";
 
 export type WorkspaceNavItem = {
     id: string;
@@ -54,8 +56,8 @@ function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[];
                 { ...toolItem("assets", "/assets"), title: "资产" },
                 { ...toolItem("skills", "/skills"), title: "技能" },
                 { id: "settings:channels", title: "模型配置", icon: Settings2, to: "/settings?section=channels" },
-                ...(getDesktopAppBinding()?.StorageSettings ? [{ id: "settings:storage", title: "存储设置", icon: HardDrive, to: "/settings?section=storage" }] : []),
-                { id: "agents", title: "hfp - all in one MCP", icon: Plug, to: "/agents" },
+                ...(hostedCapability("storageSettings") && getDesktopAppBinding()?.StorageSettings ? [{ id: "settings:storage", title: "存储设置", icon: HardDrive, to: "/settings?section=storage" }] : []),
+                ...(hostedCapability("externalAgents") ? [{ id: "agents", title: "hfp - all in one MCP", icon: Plug, to: "/agents" }] : []),
             ],
         },
     ];
@@ -319,6 +321,7 @@ export function WorkspaceSidebarNav({ collapsed, onNavigate, onOpenSearch, onExp
                         {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
                     </AnimatedThemeToggler>
                 </div>
+                <PlatformAccountMenu collapsed={collapsed} />
             </div>
         </div>
     );

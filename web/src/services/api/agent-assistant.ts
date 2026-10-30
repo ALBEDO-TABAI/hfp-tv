@@ -1,6 +1,6 @@
 // 内置创作助手：浏览器只与同源 Go 代理通信，宿主/owner/模型凭据都不进入页面。
 // 三个端点的真实路径都在 /api/assistant/* 下；写错路径会让面板永远拿不到回复。
-import { ApiError, apiBaseURL, http } from "./request";
+import { ApiError, apiBaseURL, http, handleUnauthenticated } from "./request";
 import { assertUserScope, captureUserScope, userScopeMatches, type CapturedUserScope } from "@/lib/user-scope-guard";
 
 /** 后端给出的不可用原因（穷举，见契约 A1）；未知值一律走兜底文案。 */
@@ -498,6 +498,7 @@ export async function streamAgentChat(
         const text = await response.text().catch(() => "");
         let reason = `http_${response.status}`;
         try { reason = JSON.parse(text)?.reason || reason; } catch { /* 非 JSON */ }
+        handleUnauthenticated(response.status, reason);
         if (response.status === 403 && uiSession?.token === token) resetAgentUiSession();
         const message = agentAssistantFailureText(reason);
         if (response.headers.get("X-Beeftv-Turn-Admission") === "rejected") {
@@ -624,6 +625,7 @@ export async function cancelAgentChat(canvasId: string, target?: { sessionId: st
     type CancelPayload = { code?: number; reason?: string; data?: { state?: AgentCancelState } };
     let payload: CancelPayload | null = null;
     try { payload = JSON.parse(text) as CancelPayload; } catch { payload = null; }
+    handleUnauthenticated(response.status, payload?.reason);
     if (response.status === 403 && uiSession?.token === token) resetAgentUiSession();
     const businessFailed = payload !== null && typeof payload.code === "number" && payload.code !== 0;
     if (!response.ok || businessFailed) {
@@ -642,6 +644,7 @@ export async function steerAgentChat(canvasId: string, sessionId: string, messag
     });
     let payload: { code?: number; reason?: string; data?: { accepted?: boolean } } | null = null;
     try { payload = await response.json(); } catch { payload = null; }
+    handleUnauthenticated(response.status, payload?.reason);
     if (response.status === 403 && uiSession?.token === token) resetAgentUiSession();
     if (!response.ok || payload?.code !== 0 || payload?.data?.accepted !== true) {
         throw new Error(agentAssistantFailureText(payload?.reason, "未能确认助手收到补充要求，原任务仍会保留。请查看最新回复后再决定是否发送。"));

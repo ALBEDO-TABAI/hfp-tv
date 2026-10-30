@@ -21,6 +21,7 @@ import { usePluginStore } from "@/stores/use-plugin-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { isLocalRuntimeMode } from "@/lib/runtime-mode";
 import { workspaceCapabilities } from "@/services/workspace-mode";
+import { hostedCapability } from "@/stores/use-platform-session";
 
 import { PluginDetailsModal } from "./plugin-documentation-modals";
 import "./plugins.css";
@@ -147,6 +148,7 @@ export default function PluginsPage() {
     const filteredPlugins = useMemo(() => {
         const normalizedSearch = search.trim().toLocaleLowerCase();
         return registeredPlugins.filter((plugin) => {
+            if (plugin.manifest.id === EAGLE_PLUGIN_ID && !hostedCapability("eagle")) return false;
             const state = pluginStates[plugin.manifest.id];
             const isApplicationPlugin = backendPluginById.get(plugin.manifest.id)?.management.kind === "application" || isOfficialApplicationPluginId(plugin.manifest.id);
             if (user?.role !== "admin" && !features.systemPluginsVisibleToUsers && !isApplicationPlugin) return false;

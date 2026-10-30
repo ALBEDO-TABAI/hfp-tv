@@ -9,6 +9,8 @@ import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from "re
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { appHref } from "@/lib/app-routing";
 import { isLocalWorkspaceMode } from "@/services/workspace-mode";
+import { subscribeHostedCanvasUpdates } from "@/services/api/canvas-events";
+import { isHostedMode } from "@/stores/use-platform-session";
 import { queryGenerationTask, type GenerationTask } from "@/services/api/task-center";
 import { generationErrorMessage } from "@/lib/generation-error";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
@@ -258,11 +260,13 @@ function InfiniteCanvasPage() {
         return () => { disposed = true; window.clearInterval(timer); };
     }, [projectId, setNodes]);
     useEffect(() => {
-        if (!projectId || !isLocalWorkspaceMode() || window.location.protocol !== "http:") return;
-        const source = new EventSource(`/api/canvas-projects/${encodeURIComponent(projectId)}/events`);
+        if (!projectId || !isLocalWorkspaceMode()) return;
         const sync = () => void refreshLocalCanvasProjectIfChanged(projectId).then((project) => {
             if (project) { setNodes(project.nodes || []); setConnections(project.connections || []); }
         });
+        if (isHostedMode()) return subscribeHostedCanvasUpdates(projectId, sync);
+        if (window.location.protocol !== "http:") return;
+        const source = new EventSource(`/api/canvas-projects/${encodeURIComponent(projectId)}/events`);
         source.addEventListener("canvas.updated", sync);
         return () => { source.removeEventListener("canvas.updated", sync); source.close(); };
     }, [projectId, setNodes]);

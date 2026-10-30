@@ -9,6 +9,7 @@ import { clearVideoPreviewCache } from "@/services/api/resources";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { getDesktopAppBinding } from "@/services/desktop-runtime";
 import { EnvironmentChecks } from "./environment-checks";
+import { hostedCapability } from "@/stores/use-platform-session";
 
 type DiagnosticsPanelProps = {
     taskId?: string;
@@ -39,7 +40,7 @@ export default function DiagnosticsPanel({ taskId, projectId, open, onClose }: D
 	const [updateLogError, setUpdateLogError] = useState("");
 
     useEffect(() => {
-        if (!open) return;
+        if (!open || !hostedCapability("diagnostics")) return;
         let cancelled = false;
         setLoadingPreview(true);
         void buildInput(range, undefined, taskId, projectId).then(previewDiagnosticBundle)
@@ -72,6 +73,7 @@ export default function DiagnosticsPanel({ taskId, projectId, open, onClose }: D
         }
     };
 
+    if (!hostedCapability("diagnostics")) return null;
     return (
         <AppModal
             open={open}

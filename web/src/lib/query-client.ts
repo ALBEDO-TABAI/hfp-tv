@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
+import { subscribeUserScope } from "@/lib/user-scope";
 
 export const appQueryClient = new QueryClient({
     defaultOptions: {
@@ -9,3 +10,5 @@ export const appQueryClient = new QueryClient({
         },
     },
 });
+
+subscribeUserScope(() => appQueryClient.clear());

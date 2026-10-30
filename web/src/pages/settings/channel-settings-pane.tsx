@@ -10,7 +10,7 @@ import { mergeFetchedChannelModelProfiles } from "@/lib/channel-model-catalog";
 import { seedancePortraitModel } from "@/lib/seedance-portrait";
 import { ensureModelProfilesWithUiDefaults } from "@/lib/model-protocols";
 import { fetchChannelModels, type ChannelModelFetchResult } from "@/services/api/image";
-import { channelHasGenerationCredential, channelHasManagedBeefAPICredential, createModelChannel, defaultBaseUrlForApiFormat, filterModelsByCapability, isBuiltinBeefAPIChannel, modelOptionsFromChannels, normalizeConfigSnapshot, useConfigStore, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { channelHasGenerationCredential, channelHasManagedBeefAPICredential, createModelChannel, defaultBaseUrlForApiFormat, filterModelsByCapability, isBuiltinBeefAPIChannel, isPlatformManagedChannel, modelOptionsFromChannels, normalizeConfigSnapshot, useConfigStore, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { ChannelModelSettings } from "./channel-model-settings";
 import { ModelServiceEditor } from "./model-service-editor";
 import { currentModelConnectionReceipt, useModelConnectionTests } from "@/stores/use-model-connection-tests";
@@ -200,7 +200,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
         if (deleting.current.has(id)) return;
         const latest = useConfigStore.getState().config;
         const channel = latest.channels.find((item) => item.id === id);
-        if (channel && (channel.scope === "system" || isBuiltinBeefAPIChannel(channel))) {
+        if (channel && (channel.scope === "system" || isBuiltinBeefAPIChannel(channel) || isPlatformManagedChannel(channel))) {
             message.warning("系统渠道由管理员维护");
             return;
         }
@@ -275,7 +275,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
     };
 
     const refreshAllModels = async () => {
-        const catalogChannels = userChannels.filter(channel => !isTopazUpscaleChannel(channel));
+        const catalogChannels = userChannels.filter(channel => !isTopazUpscaleChannel(channel) && !isPlatformManagedChannel(channel));
         const runnable = catalogChannels.filter((channel) => !channelConnectionError(channel, isBuiltinBeefAPIChannel(channel) ? beefConnection : null));
         const skipped = catalogChannels.filter((channel) => channelConnectionError(channel, isBuiltinBeefAPIChannel(channel) ? beefConnection : null));
         if (!runnable.length) {
@@ -383,6 +383,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                     {userChannels.map((channel) => {
                         const editing = editingChannelId === channel.id;
                         const builtinBeefAPI = isBuiltinBeefAPIChannel(channel);
+                        const platformManaged = isPlatformManagedChannel(channel);
                         const topazUpscale = isTopazUpscaleChannel(channel);
                         return (
                             <section key={channel.id} data-onboarding={builtinBeefAPI ? "official-channel" : undefined} aria-labelledby={`channel-${channel.id}-title`} className="settings-channel p-2.5 sm:p-3">
@@ -390,13 +391,12 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                     <div className="min-w-0 flex-1 basis-52">
                                         <h3 id={`channel-${channel.id}-title`} className="flex items-center gap-2 text-sm font-semibold">
                                             {builtinBeefAPI ? <HfpLogoMark size={20} /> : <ModelLogo icon={MODEL_SERVICE_PRESETS.find((preset) => preset.id === servicePresetFor(channel))?.icon} size={20} />}
-                                            {builtinBeefAPI ? "hfp - all in one" : channel.name || "未命名渠道"}
+                                            {builtinBeefAPI ? "内置模型服务" : channel.name || "未命名渠道"}
                                         </h3>
                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-foreground/55">
                                             {builtinBeefAPI ? (
                                                 <>
                                                     <span>已保存 {channel.models.length} 个模型</span>
-                                                    <span>hfp - all in one 官方算力渠道，一键连接、开箱即用</span>
                                                 </>
                                             ) : (
                                                 <span>{channelProtocolLabel(channel)} · 已保存 {channel.models.length} 个模型</span>
@@ -404,7 +404,8 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                             <ChannelStatus channel={channel} persistence={persistence} connection={builtinBeefAPI ? beefConnection : null} />
                                         </div>
                                         {topazUpscale ? <p className="mt-1 text-xs text-foreground/55">从图片或视频节点上方的「AI超分」使用</p> : null}
-                                        {!builtinBeefAPI && !topazUpscale && <p className="mt-1 break-all text-xs text-foreground/50">模型目录地址：{modelCatalogRequestURL(channel)}</p>}
+                                        {platformManaged ? <p className="mt-1 text-xs text-foreground/55">{channel.enabled === false ? "等待管理员绑定中转站密钥" : "由管理员维护，按你的个人密钥计量"}</p> : null}
+                                        {!builtinBeefAPI && !topazUpscale && !platformManaged && <p className="mt-1 break-all text-xs text-foreground/50">模型目录地址：{modelCatalogRequestURL(channel)}</p>}
                                     </div>
                                     <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto sm:shrink-0">
                                         {builtinBeefAPI && catalogSyncFailed ? <Button loading={beefBusy} onClick={() => void runBeefAction(getBeefAPIConnection, "无法更新模型列表")}>重试更新模型列表</Button> : null}
@@ -417,11 +418,11 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                                 onRetry={() => void runBeefAction(retryBeefConnection, "无法重新连接")}
                                                 onDisconnect={() => void runBeefAction(disconnectBeefAPIConnection, "无法断开连接")}
                                                 onWallet={() => {
-                                                    void openBeefAPIWallet().catch((error) => message.error(error instanceof Error ? error.message : "无法打开 hfp - all in one 账户"));
+                                                    void openBeefAPIWallet().catch((error) => message.error(error instanceof Error ? error.message : "无法打开模型服务账户"));
                                                 }}
                                             />
                                         ) : null}
-                                        {!topazUpscale ? (
+                                        {!topazUpscale && !platformManaged ? (
                                         <Button
                                             className="h-10 sm:h-8"
                                             size="small"
@@ -433,6 +434,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                             拉取模型
                                         </Button>
                                         ) : null}
+                                        {!platformManaged ? (
                                         <Button
                                             size="small"
                                             icon={<Pencil className="size-3.5" />}
@@ -445,7 +447,8 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                         >
                                             编辑
                                         </Button>
-                                        {!builtinBeefAPI ? (
+                                        ) : null}
+                                        {!builtinBeefAPI && !platformManaged ? (
                                             <Popconfirm classNames={{ root: "model-channel-delete-confirm" }} title="删除个人模型渠道？" description="该渠道关联的模型选择会同时移除。" okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onOpenChange={recordChannelDeleteConfirmOpen} onConfirm={() => deleteChannel(channel.id)}>
                                                     <Button
                                                         title="删除渠道"
@@ -758,7 +761,7 @@ export function BeefAPIConnectionActions({
         return (
             <>
                 <Button className={buttonClass} size="small" onClick={onWallet}>
-                    打开 hfp - all in one 账户
+                    打开模型服务账户
                 </Button>
                 <Button className={buttonClass} size="small" loading={busy} onClick={onDisconnect}>
                     断开连接
@@ -787,7 +790,7 @@ export function BeefAPIConnectionActions({
     }
     return (
         <Button data-onboarding="official-connect" className={buttonClass} size="small" type="primary" loading={busy} onClick={onConnect}>
-            连接 hfp - all in one
+            连接内置模型服务
         </Button>
     );
 }
@@ -858,7 +861,7 @@ function channelConnectionError(channel: ModelChannel, connection?: BeefAPIConne
     }
     if (isBuiltinBeefAPIChannel(channel)) {
         if (connection?.state === "connected" || channelHasManagedBeefAPICredential(channel)) return "";
-        return "请先连接 hfp - all in one";
+        return "请先在模型配置中连接内置模型服务";
     }
     if (!channelHasGenerationCredential(channel) && !channelAllowsEmptyAPIKey(channel)) return "请填写 API Key / Access Key";
     if (requiresSecretKey(channel) && !channel.secretKey?.trim()) return "当前协议需要填写 Secret Key";

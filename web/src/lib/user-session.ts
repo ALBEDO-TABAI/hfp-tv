@@ -13,6 +13,7 @@ import { defaultFeatureAvailability, useUserStore } from "@/stores/use-user-stor
 import type { WorkspaceBootstrapPayload } from "@/services/api/workspace";
 import { setWorkspaceCapabilitySnapshot } from "@/services/workspace-mode";
 import { withGenerationConsumersPaused } from "@/services/generation-consumer-lifecycle";
+import { usePlatformSession } from "@/stores/use-platform-session";
 
 /**
  * Hydrate the one implicit local workspace. This is deliberately not an auth
@@ -33,7 +34,9 @@ async function hydrateLocalWorkspace(payload: WorkspaceBootstrapPayload) {
 
     try {
         await Promise.all([flushCanvasStorePersistence(), flushAssetStorePersistence()]);
-        setActiveUserScope(payload.workspace.id);
+        const platform = usePlatformSession.getState();
+        if (platform.mode === "hosted" && !platform.me) throw new Error("请先登录");
+        setActiveUserScope(platform.mode === "hosted" && platform.me ? `${platform.me.user.id}:${platform.me.workspace.id}` : payload.workspace.id);
 
         const [persistedCanvas, persistedCanvasHistory, persistedAssets, persistedPlugins] = await Promise.all([
             localForageStorage.getItem(CANVAS_STORE_KEY),

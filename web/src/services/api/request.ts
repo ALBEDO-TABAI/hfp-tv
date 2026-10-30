@@ -53,6 +53,20 @@ export let apiBaseURL = import.meta.env.VITE_CANVAS_BACKEND_URL || "/api";
 // 没有超时会让启动水合一直停留在 loading，Playwright 和用户都看不到页面。
 export const apiClient = axios.create({ baseURL: apiBaseURL, withCredentials: true, timeout: 4_000 });
 
+let unauthenticatedHandler: (() => void) | undefined;
+export function setUnauthenticatedHandler(handler: (() => void) | undefined) {
+    unauthenticatedHandler = handler;
+}
+
+export function handleUnauthenticated(status: number | undefined, reason: unknown) {
+    if (status === 401 && reason === "unauthenticated") unauthenticatedHandler?.();
+}
+
+apiClient.interceptors.response.use((response) => response, (error: unknown) => {
+    if (axios.isAxiosError<BackendEnvelope<unknown>>(error)) handleUnauthenticated(error.response?.status, error.response?.data?.reason);
+    return Promise.reject(error);
+});
+
 export function configureApiRuntime(baseURL: string, launchToken: string, uiBootstrapToken?: string) {
     apiBaseURL = baseURL;
     apiClient.defaults.baseURL = baseURL;

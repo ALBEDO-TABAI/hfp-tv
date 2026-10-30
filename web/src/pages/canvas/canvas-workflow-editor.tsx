@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Checkbox, Input, InputNumber, Select } from "antd";
+import { Alert, Button, Checkbox, Input, InputNumber, Select, Tooltip } from "antd";
+import { hostedCapability } from "@/stores/use-platform-session";
 import { Plus, Redo2, Save, Trash2, Undo2, X } from "lucide-react";
 import { nanoid } from "nanoid";
 import { AppModal } from "@/components/ui/product/app-modal";
@@ -23,10 +24,11 @@ import { IMAGE_PROMPT_REVERSE } from "@/lib/prompts";
 
 const mediaLabels = { image: "图片", video: "视频", audio: "音频", text: "文本" };
 
-export function CanvasWorkflowEditor({ initial, operations, canvasNodes, canvasConnections, readOnly, onClose, onSaved, onReturnToCanvas }: {
+export function CanvasWorkflowEditor({ initial, operations: availableOperations, canvasNodes, canvasConnections, readOnly, onClose, onSaved, onReturnToCanvas }: {
     initial: CanvasWorkflow; operations: WorkflowOperation[]; canvasNodes: CanvasNodeData[]; canvasConnections: CanvasConnection[];
     readOnly: boolean; onClose(): void; onSaved(workflow: CanvasWorkflow): void; onReturnToCanvas(): void;
 }) {
+    const operations = availableOperations.map(operation => operation.id === "video.depth" && !hostedCapability("depthCapture") ? { ...operation, unavailableReason: "团队服务器暂不支持" } : operation);
     const [scope] = useState(captureUserScope);
     const [initialDraft] = useState(() => {
         const value = structuredClone(initial);
@@ -174,7 +176,7 @@ export function CanvasWorkflowEditor({ initial, operations, canvasNodes, canvasC
                     <div className="grid grid-cols-2 gap-2">{(["image", "video", "audio", "text"] as WorkflowMediaType[]).map(mediaType => <Button key={mediaType} className="[&_svg]:size-4" icon={getNodeIcon(mediaType)} disabled={readOnly || saving} onClick={() => addNode({ title: `${mediaLabels[mediaType]}输入`, role: "input", mediaType })}>{mediaLabels[mediaType]}</Button>)}</div>
                     <span className="mt-3 text-sm font-medium">处理节点</span>
                     <Select aria-label="选择画布处理功能" showSearch optionFilterProp="label" placeholder="搜索画布功能" value={capabilityId} onChange={setCapabilityId}
-                        options={[...new Set(capabilities.map(item => item.group))].map(group => ({ label: group, options: capabilities.filter(item => item.group === group).map(item => ({ value: item.id, label: item.name })) }))} />
+                        options={[...new Set(capabilities.map(item => item.group))].map(group => ({ label: group, options: capabilities.filter(item => item.group === group).map(item => ({ value: item.id, label: item.name, disabled: item.id === "operation.video.depth" && !hostedCapability("depthCapture"), title: item.reason })) }))} />
                     {capability ? <div className="flex flex-col gap-3 rounded-xl bg-[var(--surface-card)] p-3">
                         <span className="flex items-center gap-2 text-sm font-medium [&_svg]:size-4">{capability.icon}{capability.name}</span>
                         {capability.mode === "direct" && capability.operation ? <Button disabled={readOnly || saving} icon={<Plus className="size-4" />} onClick={() => addOperation({ ...capability.operation!, name: capability.name })}>添加节点</Button>
@@ -197,7 +199,7 @@ export function CanvasWorkflowEditor({ initial, operations, canvasNodes, canvasC
                     {node ? <>
                         <div className="flex items-center justify-between gap-2"><span className="font-medium">节点属性</span><Button danger type="text" aria-label={`删除节点：${node.title}`} icon={<Trash2 className="size-4" />} disabled={readOnly || saving || uploading} onClick={() => removeNode(node.id)} /></div>
                         <label className="flex flex-col gap-2 text-sm">名称<Input aria-label="工作流节点名称" value={node.title} maxLength={100} disabled={readOnly || saving} onChange={event => updateNode({ title: event.target.value })} /></label>
-                        {isWorkflowOperation(node) ? <label className="flex flex-col gap-2 text-sm">处理方式<Select aria-label="节点处理方式" value={workflowOperationId(node)} disabled={readOnly || saving} options={operations.filter(o => !o.id.startsWith("generate.") || o.id === workflowOperationId(node)).map(o => ({ value: o.id, label: o.name, disabled: Boolean(o.unavailableReason) }))} onChange={id => { const next = operations.find(o => o.id === id); if (next) commit(current => ({ ...current, definition: switchWorkflowOperation(current.definition, node.id, next) })); }} /></label> : <label className="flex flex-col gap-2 text-sm">使用方式<Select aria-label="节点使用方式" value={node.role} disabled={readOnly || saving} options={[{ value: "input", label: "每次可替换" }, { value: "constant", label: "固定内容" }]} onChange={role => updateNode({ role })} /></label>}
+                        {isWorkflowOperation(node) ? <label className="flex flex-col gap-2 text-sm">处理方式<Select aria-label="节点处理方式" value={workflowOperationId(node)} disabled={readOnly || saving} options={operations.filter(o => !o.id.startsWith("generate.") || o.id === workflowOperationId(node)).map(o => ({ value: o.id, label: o.unavailableReason ? <Tooltip title={o.unavailableReason}><span>{o.name}</span></Tooltip> : o.name, disabled: Boolean(o.unavailableReason) }))} onChange={id => { const next = operations.find(o => o.id === id); if (next) commit(current => ({ ...current, definition: switchWorkflowOperation(current.definition, node.id, next) })); }} /></label> : <label className="flex flex-col gap-2 text-sm">使用方式<Select aria-label="节点使用方式" value={node.role} disabled={readOnly || saving} options={[{ value: "input", label: "每次可替换" }, { value: "constant", label: "固定内容" }]} onChange={role => updateNode({ role })} /></label>}
                         {!isWorkflowOperation(node) && node.mediaType === "text" ? <label className="flex flex-col gap-2 text-sm">文本内容<Input.TextArea aria-label="工作流文本内容" value={node.text || ""} disabled={readOnly || saving} autoSize={{ minRows: 3, maxRows: 8 }} onChange={event => updateNode({ text: event.target.value })} /></label> : null}
                         {!isWorkflowOperation(node) && node.mediaType !== "text" ? <div className="flex flex-col gap-2">
                             <Select aria-label="工作流默认素材" placeholder="选择画布素材" value={node.role === "constant" || node.useDefault ? materials.find(item => canvasNodeResourceId(item) === node.resourceId)?.id : undefined} allowClear disabled={readOnly || saving}

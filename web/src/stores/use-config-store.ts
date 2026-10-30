@@ -651,6 +651,13 @@ export function isBuiltinBeefAPIChannel(channel: Pick<ModelChannel, "id" | "pinn
     return channel.id === "beefapi" && channel.pinned === true;
 }
 
+// 团队服务器写入的公司中转站渠道：成员可选用，保存时服务端会还原，界面上不提供修改入口。
+export const PLATFORM_RELAY_CHANNEL_ID = "company-relay";
+
+export function isPlatformManagedChannel(channel: Pick<ModelChannel, "id" | "pinned">) {
+    return channel.id === PLATFORM_RELAY_CHANNEL_ID && channel.pinned === true;
+}
+
 export function channelHasManagedBeefAPICredential(channel: Pick<ModelChannel, "id" | "pinned" | "credentialRef" | "hasApiKey">) {
     if (!isBuiltinBeefAPIChannel(channel)) return false;
     return channel.credentialRef === MANAGED_BEEFAPI_CREDENTIAL_REF || channel.hasApiKey === true;

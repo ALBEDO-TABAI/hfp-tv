@@ -1,10 +1,13 @@
 import { recordDiagnosticEvent } from "./client-diagnostics";
 import { checkEnvironment, type EnvironmentReport } from "./environment-check";
 import { browserCapabilities, browserChecks, probeBrowserStorage } from "./browser-environment";
+import { isHostedMode } from "@/stores/use-platform-session";
 
 // One non-blocking attempt per authenticated workspace. Failures remain visible
 // in diagnostics; startup never waits for repairs or retries in a loop.
 export async function runStartupEnvironmentCheck(signal?: AbortSignal) {
+    // 团队服务器的运行环境由管理员维护，成员不检查也不触发服务器上的修复。
+    if (isHostedMode()) return undefined;
     try {
         const [native, browser] = await Promise.allSettled([checkEnvironment(true, signal), probeBrowserStorage(signal)]);
         if (signal?.aborted) return undefined;

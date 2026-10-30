@@ -10,6 +10,7 @@ import { getWorkspaceBootstrap, type WorkspaceBootstrapPayload } from "@/service
 import { commitModelConfig, flushModelConfig, hydrateModelConfig } from "@/services/model-config-repository";
 import { normalizeConfigSnapshot, useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { isHostedMode } from "@/stores/use-platform-session";
 
 export function WorkspaceBootstrapHydrator({ children }: { children: ReactNode }) {
     const hydrated = useUserStore((state) => state.hydrated);
@@ -28,6 +29,7 @@ export function WorkspaceBootstrapHydrator({ children }: { children: ReactNode }
             createLocalWorkspace: createLocalWorkspacePayload,
             applySession: applyUserSession,
             restoreModelConfig: hydrateLocalModelConfig,
+            allowLocalFallback: !isHostedMode(),
         })
             .then(() => {
                 if (cancelled) return;
@@ -76,12 +78,19 @@ export async function initializeWorkspaceState<T>({
     createLocalWorkspace,
     applySession,
     restoreModelConfig,
+    allowLocalFallback = true,
 }: {
     loadWorkspace: () => Promise<T>;
     createLocalWorkspace: () => T;
     applySession: (payload: T) => Promise<void>;
     restoreModelConfig: () => Promise<void>;
+    allowLocalFallback?: boolean;
 }) {
+    if (!allowLocalFallback) {
+        await applySession(await loadWorkspace());
+        await restoreModelConfig();
+        return;
+    }
     try {
         try {
             await applySession(await loadWorkspace());

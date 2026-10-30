@@ -1,7 +1,7 @@
 import { generationErrorMessage } from "@/lib/generation-error";
 import { GENERATION_RESULT_FETCH_STAGE } from "@/lib/generation-delivery-progress";
 import { assertUserScope, captureUserScope, isUserScopeAbandonedError, type CapturedUserScope } from "@/lib/user-scope-guard";
-import { ApiError, http, apiBaseURL, type BackendEnvelope, type HttpRequestConfig } from "@/services/api/request";
+import { ApiError, http, apiBaseURL, handleUnauthenticated, type BackendEnvelope, type HttpRequestConfig } from "@/services/api/request";
 import { consumeTaskTextStream, createTaskTextStreamParser, type TaskTextStreamEvent } from "@/services/api/task-text-stream";
 import { getDiagnosticTraceId, recordDiagnosticEvent } from "@/services/diagnostics/client-diagnostics";
 import { publishGenerationDeliveryProgress } from "@/stores/use-generation-delivery-progress";
@@ -613,7 +613,8 @@ class TaskTextStreamFatalError extends Error {
 
 async function taskTextStreamHTTPError(response: Response) {
     try {
-        const payload = await response.json() as { msg?: unknown };
+        const payload = await response.json() as { msg?: unknown; reason?: unknown };
+        handleUnauthenticated(response.status, payload.reason);
         if (typeof payload.msg === "string" && payload.msg.trim()) return payload.msg;
     } catch {
         // SSE 错误响应可能是空正文或网关 HTML，只返回状态码，避免泄露正文。

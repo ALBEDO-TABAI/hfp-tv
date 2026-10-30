@@ -13,6 +13,8 @@ import { appQueryClient } from "@/lib/query-client";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import { applyAppearanceMetadata, useAppearanceStore } from "@/stores/use-appearance-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { usePlatformSession } from "@/stores/use-platform-session";
+import { isPlatformPublicPath } from "@/lib/platform-navigation";
 
 const ClientRootInit = lazy(() => import("@/components/layout/client-root-init").then((module) => ({ default: module.ClientRootInit })));
 
@@ -26,6 +28,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     const theme = useActiveTheme();
     const dark = theme === "dark";
     const appearance = useAppearanceStore((state) => state.appearance);
+    const platform = usePlatformSession();
 
     useLayoutEffect(() => {
         document.documentElement.classList.toggle("dark", dark);
@@ -43,7 +46,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <ConfigProvider locale={zhCN} theme={getAntThemeConfig(dark, appearance.activeSkin)} modal={{ centered: true }}>
             <App message={{ duration: 3, maxCount: 3 }} notification={{ duration: 4.5, maxCount: 3, placement: "topRight" }}>
                 <QueryClientProvider client={appQueryClient}>
-                    {isolateDevRepro ? (
+                    {isolateDevRepro || isPlatformPublicPath(appPathname()) || (platform.mode === "hosted" && !platform.me) ? (
                         children
                     ) : (
                         <WorkspaceBootstrapHydrator>
