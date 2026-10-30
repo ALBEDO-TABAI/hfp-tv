@@ -14,6 +14,7 @@ export function platformErrorMessage(error: unknown) {
         invalid_password: "密码至少 8 位",
         cannot_modify_self: "不能停用自己或降低自己的权限",
         invalid_relay_key: "中转密钥无效，请检查后重试",
+        account_managed_by_file: "这个账号的密码、密钥和启停由服务器上的账号文件管理，请联系管理员修改",
         forbidden: "没有操作权限",
         rights_required: "请确认你拥有或有权分享这些素材",
         title_invalid: "请填写有效的作品标题",

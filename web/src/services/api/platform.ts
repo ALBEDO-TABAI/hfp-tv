@@ -3,7 +3,7 @@ import type { SkillMetadata } from "./skill-market";
 
 export type PlatformRole = "admin" | "member";
 export type PlatformMe = {
-    user: { id: string; username: string; displayName: string; role: PlatformRole };
+    user: { id: string; username: string; displayName: string; role: PlatformRole; source?: PlatformAccountSource };
     workspace: { id: string; status: "active" };
     relay: { bound: boolean; hint: string };
     capabilities: {
@@ -20,8 +20,10 @@ export type PlatformMe = {
         workshopReview: boolean;
     };
 };
+/** "file": password, relay key and status come from the server-side account files. */
+export type PlatformAccountSource = "" | "file";
 export type AdminUser = {
-    id: string; username: string; displayName: string; role: PlatformRole; status: "active" | "disabled";
+    id: string; username: string; displayName: string; role: PlatformRole; status: "active" | "disabled"; source?: PlatformAccountSource;
     createdAt: string; lastActiveAt: string | null;
     relay: { bound: boolean; hint: string; updatedAt: string | null };
 };

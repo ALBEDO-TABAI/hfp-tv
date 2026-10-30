@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, App, Button, Form, Input, InputNumber, Popconfirm, Select, Space, Table, Tabs, Typography } from "antd";
+import { Alert, App, Button, Form, Input, InputNumber, Popconfirm, Select, Space, Table, Tabs, Tag, Typography } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { platformErrorMessage, platformPasswordRules, platformUsernameRules } from "@/lib/platform-account";
@@ -74,22 +74,27 @@ export default function AdminUsersPage() {
             { key: "users", label: "用户", children: <>
                 {users.isError && <Alert type="error" showIcon title={platformErrorMessage(users.error)} action={<Button onClick={() => void users.refetch()}>重试</Button>} className="mb-4" />}
                 <Table<AdminUser> rowKey="id" dataSource={users.data?.items} loading={users.isFetching} scroll={{ x: 1050 }} pagination={{ pageSize: 20 }} columns={[
-                    { title: "用户名", dataIndex: "username" },
+                    { title: "用户名", key: "username", render: (_, user) => <Space size={6}>{user.username}{user.source === "file" && <Tag title="密码、密钥和启停由服务器上的账号文件管理">账号文件</Tag>}</Space> },
                     { title: "显示名称", dataIndex: "displayName" },
                     { title: "角色", key: "role", render: (_, user) => user.role === "admin" ? "管理员" : "成员" },
                     { title: "状态", key: "status", render: (_, user) => user.status === "active" ? "启用" : "停用" },
                     { title: "中转密钥", key: "relay", render: (_, user) => user.relay.bound ? user.relay.hint || "等待绑定" : "未绑定" },
                     { title: "最近活跃", key: "lastActiveAt", render: (_, user) => time(user.lastActiveAt) },
-                    { title: "操作", key: "actions", render: (_, user) => <Space wrap size="small">
-                        <Button size="small" disabled={busy} onClick={() => openEditor({ kind: "password", user })}>重置密码</Button>
-                        <Button size="small" disabled={busy} onClick={() => openEditor({ kind: "relay", user })}>{user.relay.bound ? "更换密钥" : "绑定密钥"}</Button>
+                    { title: "操作", key: "actions", render: (_, user) => {
+                        // Account-file users change password, key and status only in the file.
+                        const fileManaged = user.source === "file";
+                        const fileHint = fileManaged ? "请修改服务器上的账号文件" : undefined;
+                        return <Space wrap size="small">
+                        <Button size="small" title={fileHint} disabled={busy || fileManaged} onClick={() => openEditor({ kind: "password", user })}>重置密码</Button>
+                        <Button size="small" title={fileHint} disabled={busy || fileManaged} onClick={() => openEditor({ kind: "relay", user })}>{user.relay.bound ? "更换密钥" : "绑定密钥"}</Button>
                         <Popconfirm title={`确定${user.status === "active" ? "停用" : "启用"} ${user.username}？`} onConfirm={() => mutation.mutateAsync(() => updatePlatformUser(user.id, { status: user.status === "active" ? "disabled" : "active" }))}>
-                            <Button size="small" disabled={busy || user.id === me?.user.id}>{user.status === "active" ? "停用" : "启用"}</Button>
+                            <Button size="small" title={fileHint} disabled={busy || fileManaged || user.id === me?.user.id}>{user.status === "active" ? "停用" : "启用"}</Button>
                         </Popconfirm>
                         <Popconfirm title={`将 ${user.username} 改为${user.role === "admin" ? "成员" : "管理员"}？`} onConfirm={() => mutation.mutateAsync(() => updatePlatformUser(user.id, { role: user.role === "admin" ? "member" : "admin" }))}>
                             <Button size="small" disabled={busy || user.id === me?.user.id}>改为{user.role === "admin" ? "成员" : "管理员"}</Button>
                         </Popconfirm>
-                    </Space> },
+                    </Space>;
+                    } },
                 ]} />
             </> },
             { key: "audit", label: "操作记录", children: <>

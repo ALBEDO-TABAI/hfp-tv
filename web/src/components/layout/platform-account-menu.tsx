@@ -46,7 +46,7 @@ export function PlatformAccountMenu({ collapsed }: { collapsed: boolean }) {
     };
     return <>
         <Dropdown trigger={["click"]} menu={{ items: [
-            { key: "password", label: "修改密码", onClick: () => setOpen(true) },
+            ...(me.user.source === "file" ? [] : [{ key: "password", label: "修改密码", onClick: () => setOpen(true) }]),
             ...(me.user.role === "admin" && me.capabilities.userAdmin ? [{ key: "users", label: "用户管理", onClick: () => navigate("/admin/users") }] : []),
             ...(me.user.role === "admin" && me.capabilities.skillReview ? [{ key: "skill-reviews", label: "技能审核", onClick: () => navigate("/admin/skill-reviews") }] : []),
             ...(me.user.role === "admin" && me.capabilities.workshopReview ? [{ key: "workshop-reviews", label: "作品审核", onClick: () => navigate("/admin/workshop-reviews") }] : []),
