@@ -78,7 +78,7 @@ func seedProject(t *testing.T, runtime *Runtime) (ownerID, rootID string) {
 			"directMedia": map[string]any{"id": "clip-media", "kind": "image", "storageKey": "resource:" + imageID, "assetId": "asset-seed"}}}},
 	}
 	sibling := map[string]any{"id": "sibling-canvas", "title": "角色设定", "canvasTitle": "角色设定", "revision": 0, "workspaceProjectId": "root-canvas",
-		"nodes": []any{map[string]any{"id": "n2", "type": "text", "title": "设定", "position": map[string]any{"x": 0, "y": 0}, "metadata": map[string]any{"content": "主角是一名出租车司机"}}},
+		"nodes":       []any{map[string]any{"id": "n2", "type": "text", "title": "设定", "position": map[string]any{"x": 0, "y": 0}, "metadata": map[string]any{"content": "主角是一名出租车司机"}}},
 		"connections": []any{}}
 	for _, canvas := range []map[string]any{root, sibling} {
 		raw, _ := json.Marshal(canvas)

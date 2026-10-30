@@ -17,7 +17,7 @@ import (
 func (s *Server) meView(principal *accounts.Principal) gin.H {
 	relay := s.opts.Accounts.RelayStatus(principal.Workspace)
 	return gin.H{
-		"user":      gin.H{"id": principal.User.ID, "username": principal.User.Username, "displayName": principal.User.DisplayName, "role": principal.User.Role},
+		"user":      gin.H{"id": principal.User.ID, "username": principal.User.Username, "displayName": principal.User.DisplayName, "role": principal.User.Role, "source": principal.User.Source},
 		"workspace": gin.H{"id": principal.Workspace.ID, "status": principal.Workspace.Status},
 		"relay":     gin.H{"bound": relay.Bound, "hint": relay.Hint},
 		"capabilities": gin.H{

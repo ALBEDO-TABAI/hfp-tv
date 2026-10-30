@@ -49,7 +49,7 @@ FROM node:24-bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata ffmpeg wget \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system app && useradd --system --gid app --home-dir /data app \
+    && groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --home-dir /data app \
     && mkdir -p /data && chown app:app /data && chmod 0750 /data
 WORKDIR /app
 COPY --from=backend-build /out/teamserver /usr/local/bin/teamserver

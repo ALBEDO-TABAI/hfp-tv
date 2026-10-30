@@ -34,6 +34,7 @@ var (
 	ErrInvitationInvalid  = newError(http.StatusNotFound, "invitation_invalid", "邀请链接无效或已过期")
 	ErrInvalidRelayKey    = newError(http.StatusBadRequest, "invalid_relay_key", "中转站密钥无效")
 	ErrWorkspaceMissing   = newError(http.StatusConflict, "workspace_unavailable", "工作区不可用")
+	ErrManagedByFile      = newError(http.StatusConflict, "account_managed_by_file", "这个账号的密码、密钥和启停由服务器上的账号文件管理，请修改账号文件")
 )
 
 // AsError maps any error to an accounts.Error; unknown errors become 500.

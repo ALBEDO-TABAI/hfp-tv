@@ -100,4 +100,4 @@ web/node_modules/
 
 # Team server deployment settings (may hold object-storage keys); keep only examples.
 deploy/teamserver/config/*
-!deploy/teamserver/config/*.example.json
+!deploy/teamserver/config/*.example.*

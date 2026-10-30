@@ -11,6 +11,10 @@ const (
 
 	StatusActive   = "active"
 	StatusDisabled = "disabled"
+
+	// SourceFile marks accounts owned by the server-side account files; their
+	// password, relay key and active state change only through those files.
+	SourceFile = "file"
 )
 
 type User struct {
@@ -20,6 +24,7 @@ type User struct {
 	PasswordHash string     `gorm:"size:255;not null" json:"-"`
 	Role         string     `gorm:"size:16;not null" json:"role"`
 	Status       string     `gorm:"size:16;not null" json:"status"`
+	Source       string     `gorm:"size:16;not null;default:''" json:"source"`
 	CreatedAt    time.Time  `json:"createdAt"`
 	UpdatedAt    time.Time  `json:"updatedAt"`
 	LastActiveAt *time.Time `json:"lastActiveAt"`

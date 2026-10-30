@@ -1,0 +1,10 @@
+# 账号文件：一行一个账号，格式 用户名:密码
+# - 用户名：3–32 位字母、数字、下划线、点或短横线
+# - 密码：至少 8 个字符，可以含冒号；也可以写 teamserver hash-password 生成的哈希
+# - 以 # 开头的行和空行会被忽略
+# 加一行即新建账号，改密码会让此人重新登录，删掉一行会停用账号（项目和素材保留）。
+# 保存后约 5 秒生效；文件有错时整份不生效，日志会指出第几行。
+zhangsan:change-me-please
+# 不想写明文密码时，先生成哈希再写进来，例如：
+#   printf '%s\n' '李四的密码' | docker compose exec -T teamserver teamserver hash-password
+# lisi:$argon2id$v=19$m=65536,t=3,p=2$...（粘贴上面命令输出的整行）

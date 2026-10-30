@@ -17,7 +17,9 @@
 ### 准备
 
 - 一台 Linux 服务器，Docker 24 以上（含 Compose 插件），建议 4 核 8 GB 内存起步；每个在线成员的创作助手会占用一个 Node 进程。
-- 一个解析到这台服务器的域名，开放 80 和 443 端口。Caddy 会自动申请 HTTPS 证书；只在内网时，可以改用你们自己的证书或内网 CA。
+- 访问方式二选一：
+  - **只在公司内网用 IP 访问**（最简单）：不需要域名和证书，浏览器用 `http://服务器IP` 打开。账号密码在内网以明文传输，适合可信的办公网络。
+  - **有域名**：解析到这台服务器并开放 80 和 443 端口，Caddy 自动申请 HTTPS 证书。
 - 公司中转站的地址和可用模型清单，以及给每个成员发的中转站密钥。
 
 ### 步骤
@@ -26,34 +28,52 @@
 git clone https://github.com/ALBEDO-TABAI/hfp-tv.git
 cd hfp-tv/deploy/teamserver
 cp config/relay-channel.example.json config/relay-channel.json   # 按中转站实际情况修改
+cp config/users.example.txt config/users.txt                     # 成员账号，见第 3 步
+cp config/user-keys.example.txt config/user-keys.txt             # 成员的中转站密钥
 ```
 
 1. **编辑公司中转站渠道** `config/relay-channel.json`：`baseUrl`、`apiFormat`、`models` 和 `modelProfiles` 与模型配置页里的渠道格式相同，不要写密钥。最省事的做法是先在桌面版里把中转站配好、能出图，再按那个渠道的字段抄过来。
 2. **写部署变量**：在 `deploy/teamserver/.env`（不要提交）里写：
 
    ```bash
-   TEAMSERVER_DOMAIN=studio.example.com
+   # 内网用 IP 访问：Caddy 只开 HTTP，登录 Cookie 不要求 HTTPS
+   TEAMSERVER_DOMAIN=:80
+   TEAMSERVER_COOKIE_SECURE=false
+   # TEAMSERVER_HTTP_PORT=8080          # 80 端口被占用时改用其他端口
+   # 有域名时改成下面这行，并删掉上面两行（自动 HTTPS）
+   # TEAMSERVER_DOMAIN=studio.example.com
+
    TEAMSERVER_RELAY_CHANNEL_FILE=/config/relay-channel.json
+   TEAMSERVER_USERS_FILE=/config/users.txt
+   TEAMSERVER_USER_KEYS_FILE=/config/user-keys.txt
    # 中转站在内网时，只放行它这一个主机名，不要打开整个私网出站
    CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS=relay.internal.example.com
    # 需要公网素材地址的模型（部分视频模型）要配置 S3 兼容存储，可选
    # TEAMSERVER_REFERENCE_STORAGE_FILE=/config/reference-storage.json
    ```
 
-3. **构建并启动**：
+3. **写成员名单**：`config/users.txt` 一行一个 `用户名:密码`，`config/user-keys.txt` 一行一个 `用户名:中转站密钥`（格式说明在示例文件开头）。文件里有明文密码，收紧权限：
+
+   ```bash
+   sudo chown 10001 config/users.txt config/user-keys.txt && chmod 600 config/users.txt config/user-keys.txt
+   ```
+
+   以后加人、改密码、换密钥、停用都只改这两个文件，保存后约 5 秒生效，不用重启。文件写错时整份不生效，`docker compose logs teamserver` 会指出第几行。也可以不用文件，改由管理员在网页“用户管理”里开账号。
+
+4. **构建并启动**：
 
    ```bash
    docker compose up -d --build
-   docker compose logs -f teamserver   # 看到 “team server listening” 和 “内置技能市场” 两行即可
+   docker compose logs -f teamserver   # 看到 “账号文件已同步”“team server listening” 和 “内置技能市场” 即可
    ```
 
-4. **创建首个管理员**（密码从标准输入读，不进 shell 历史）：
+5. **创建管理员**（审核创意工坊作品和技能、查看操作记录需要；密码从标准输入读，不进 shell 历史）：
 
    ```bash
    read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver admin create --username admin --display-name 管理员
    ```
 
-5. 用浏览器打开 `https://<域名>`，以管理员登录，在账号菜单的“用户管理”里创建成员或生成邀请链接，并为每个成员绑定中转站密钥。
+6. 用浏览器打开 `http://服务器IP`（有域名时为 `https://<域名>`），用账号文件里的账号或管理员登录。
 
 ### 上线前验收
 
@@ -65,7 +85,7 @@ cp config/relay-channel.example.json config/relay-channel.json   # 按中转站�
 - [ ] 创作助手能回复，并能在画布上新建节点。
 - [ ] 创意工坊：A 投稿 → 管理员审核通过 → B 浏览并复制到自己的项目 → B 能继续编辑和生成。
 - [ ] 技能市场：A 连接投稿账号、投稿 → 管理员在“技能审核”通过 → B 能安装。
-- [ ] 停用一个账号后，他的浏览器立即回到登录页。
+- [ ] 从账号文件删掉一个人（或在“用户管理”停用）后，他的浏览器立即回到登录页；加回来后项目都还在。
 
 ## 升级
 
@@ -95,7 +115,7 @@ docker run --rm -v teamserver_teamserver-data:/data -v "$PWD":/backup alpine tar
 docker compose start teamserver
 ```
 
-卷名以 `docker volume ls` 的实际输出为准。不停服时，可以对 `platform.db` 和每个 `workspaces/*/open_ai_canvas.db` 用 `sqlite3 <db> ".backup <目标>"` 做在线备份，再增量复制其余文件。恢复时先停服，把归档解回同一个卷，再启动。
+账号文件、密钥文件和中转站渠道定义在 `deploy/teamserver/config/`，不在数据卷里，要一起备份。卷名以 `docker volume ls` 的实际输出为准。不停服时，可以对 `platform.db` 和每个 `workspaces/*/open_ai_canvas.db` 用 `sqlite3 <db> ".backup <目标>"` 做在线备份，再增量复制其余文件。恢复时先停服，把归档解回同一个卷，再启动。
 
 ## 日常运维
 
@@ -103,7 +123,8 @@ docker compose start teamserver
 | --- | --- |
 | 看日志 | `docker compose logs -f teamserver` |
 | 重启 | `docker compose restart teamserver`；进行中的生成任务会在重启后继续 |
-| 停用成员 | 管理员在“用户管理”里停用；会话立即失效、他的工作区内核关闭，数据保留；记得到中转站吊销他的密钥 |
+| 加人、改密码、换密钥 | 改 `config/users.txt` / `config/user-keys.txt`，约 5 秒生效；改密码会让此人重新登录 |
+| 停用成员 | 从账号文件删掉他那一行（网页创建的账号在“用户管理”里停用）；会话立即失效、工作区内核关闭，数据保留；记得到中转站吊销他的密钥 |
 | 忘记管理员密码 | `printf '%s\n' "新密码" \| docker compose exec -T teamserver teamserver admin reset-password --username admin` |
 | 审核作品与技能 | 管理员账号菜单里的“作品审核”“技能审核” |
 | 查谁做了什么 | “用户管理 → 操作记录” |
@@ -126,6 +147,8 @@ sh plugin-packages/build-packages.sh
 TEAMSERVER_DATA_DIR=/var/lib/hfp \
 TEAMSERVER_ADDR=127.0.0.1:8080 \
 TEAMSERVER_WEB_DIR=/path/to/hfp-tv/web/dist \
+TEAMSERVER_USERS_FILE=/etc/hfp/users.txt \
+TEAMSERVER_USER_KEYS_FILE=/etc/hfp/user-keys.txt \
 TEAMSERVER_AGENT_HOST_COMMAND=/usr/bin/node \
 TEAMSERVER_AGENT_HOST_ARGS='["/path/to/hfp-tv/agent-host/server.mjs"]' \
 CANVAS_OFFICIAL_PLUGIN_DIR=/path/to/hfp-tv/plugin-packages \

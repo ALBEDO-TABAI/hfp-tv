@@ -319,6 +319,9 @@ func (s *Service) revokeUserSessions(tx *gorm.DB, userID, keepTokenHash string) 
 
 // ChangePassword requires the current password and signs out other devices.
 func (s *Service) ChangePassword(ctx context.Context, principal *Principal, current, next string) error {
+	if principal.User.Source == SourceFile {
+		return ErrManagedByFile
+	}
 	if !verifyPassword(principal.User.PasswordHash, current) {
 		return ErrInvalidCredentials
 	}
@@ -348,6 +351,7 @@ type UserView struct {
 	DisplayName  string     `json:"displayName"`
 	Role         string     `json:"role"`
 	Status       string     `json:"status"`
+	Source       string     `json:"source"`
 	CreatedAt    time.Time  `json:"createdAt"`
 	LastActiveAt *time.Time `json:"lastActiveAt"`
 	Relay        RelayView  `json:"relay"`
@@ -366,7 +370,7 @@ func relayView(workspace Workspace) RelayView {
 
 func viewOf(user User, workspace Workspace) UserView {
 	return UserView{ID: user.ID, Username: user.Username, DisplayName: user.DisplayName, Role: user.Role, Status: user.Status,
-		CreatedAt: user.CreatedAt, LastActiveAt: user.LastActiveAt, Relay: relayView(workspace), WorkspaceID: workspace.ID}
+		Source: user.Source, CreatedAt: user.CreatedAt, LastActiveAt: user.LastActiveAt, Relay: relayView(workspace), WorkspaceID: workspace.ID}
 }
 
 func (s *Service) RelayStatus(workspace Workspace) RelayView { return relayView(workspace) }
@@ -443,6 +447,9 @@ func (s *Service) UpdateUser(ctx context.Context, actor *Principal, userID strin
 		if userID == actor.User.ID && *patch.Status != StatusActive {
 			return nil, ErrCannotModifySelf
 		}
+		if err := s.rejectFileManaged(ctx, userID); err != nil {
+			return nil, err
+		}
 		updates["status"] = *patch.Status
 		details = append(details, "status="+*patch.Status)
 	}
@@ -467,8 +474,27 @@ func (s *Service) UpdateUser(ctx context.Context, actor *Principal, userID strin
 	return s.userView(ctx, userID)
 }
 
+// rejectFileManaged keeps the web console from fighting the account files:
+// the next file sync would silently undo such an edit.
+func (s *Service) rejectFileManaged(ctx context.Context, userID string) error {
+	var user User
+	if err := s.db.WithContext(ctx).Select("id", "source").Where("id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrUserNotFound
+		}
+		return err
+	}
+	if user.Source == SourceFile {
+		return ErrManagedByFile
+	}
+	return nil
+}
+
 // SetPassword is the admin reset; it signs the user out everywhere.
 func (s *Service) SetPassword(ctx context.Context, actor *Principal, userID, password string) error {
+	if err := s.rejectFileManaged(ctx, userID); err != nil {
+		return err
+	}
 	if err := validatePassword(password); err != nil {
 		return err
 	}
@@ -518,6 +544,9 @@ func (s *Service) sealRelayKey(key string) (string, string, error) {
 // SetRelayKey binds (or with an empty key clears) the user's company relay key.
 // Returns the workspace so the caller can push the channel into the kernel.
 func (s *Service) SetRelayKey(ctx context.Context, actor *Principal, userID, key string) (*UserView, *Workspace, error) {
+	if err := s.rejectFileManaged(ctx, userID); err != nil {
+		return nil, nil, err
+	}
 	ciphertext, hint, err := s.sealRelayKey(key)
 	if err != nil {
 		return nil, nil, err
@@ -703,7 +732,11 @@ func (s *Service) Audit(ctx context.Context, limit int) ([]AuditView, error) {
 	}
 	views := make([]AuditView, 0, len(events))
 	for _, event := range events {
-		views = append(views, AuditView{ID: event.ID, ActorUsername: names[event.ActorUserID], Action: event.Action,
+		actor := names[event.ActorUserID]
+		if event.ActorUserID == fileActorID {
+			actor = "账号文件"
+		}
+		views = append(views, AuditView{ID: event.ID, ActorUsername: actor, Action: event.Action,
 			TargetUsername: names[event.TargetUserID], Detail: event.Detail, CreatedAt: event.CreatedAt})
 	}
 	return views, nil

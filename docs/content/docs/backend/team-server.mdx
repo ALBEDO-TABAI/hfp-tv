@@ -59,14 +59,16 @@ TEAMSERVER_DOMAIN=studio.example.com docker compose up -d --build
 read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver admin create --username admin --display-name 管理员
 ```
 
-管理员登录后，在侧栏账号菜单进入“用户管理”，创建账号、发邀请链接、绑定中转站密钥。忘记管理员密码时运行 `teamserver admin reset-password --username admin`（同样从标准输入读密码），这会使该账号的所有会话失效。
+成员账号可以用两种方式管理，可以混用：在服务器上维护账号文件（见下节），或者管理员登录后在侧栏账号菜单进入“用户管理”，创建账号、发邀请链接、绑定中转站密钥。忘记管理员密码时运行 `teamserver admin reset-password --username admin`（同样从标准输入读密码），这会使该账号的所有会话失效。
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `TEAMSERVER_DATA_DIR` | `/data` | 数据根目录 |
 | `TEAMSERVER_ADDR` | `:8080` | 监听地址；只由反向代理访问，不要直接暴露到公网 |
 | `TEAMSERVER_WEB_DIR` | 镜像内 `/app/web` | 前端构建产物；为空时只提供 API |
-| `TEAMSERVER_COOKIE_SECURE` | `true` | 仅在本机 HTTP 试用时设为 `false` |
+| `TEAMSERVER_COOKIE_SECURE` | `true` | 不走 HTTPS 时（内网用 IP 访问、本机试用）设为 `false`，否则浏览器不保存登录 Cookie |
+| `TEAMSERVER_USERS_FILE` | 空 | 账号文件，每行 `用户名:密码`，见下节 |
+| `TEAMSERVER_USER_KEYS_FILE` | 空 | 密钥文件，每行 `用户名:中转站密钥`；只能和账号文件一起用 |
 | `TEAMSERVER_TRUSTED_PROXIES` | `127.0.0.1,::1`（Compose 中为 `172.16.0.0/12`） | 允许其 `X-Forwarded-For` / `X-Forwarded-Host` 生效的反向代理 |
 | `TEAMSERVER_ALLOWED_ORIGINS` | 空 | 除本站外允许发写请求的来源，逗号分隔 |
 | `TEAMSERVER_AGENT_HOST_COMMAND` / `TEAMSERVER_AGENT_HOST_ARGS` | 镜像内为 `node` 与 `["/app/agent-host/server.mjs"]` | 助手子进程命令；`ARGS` 是 JSON 字符串数组 |
@@ -77,6 +79,16 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 | `CANVAS_SHUTDOWN_TIMEOUT` | `2m` | 每个内核关闭时等待后台任务的上限 |
 
 团队模式下前端用 `fetch` 读取画布事件流（`web/src/services/api/canvas-events.ts`），能拿到 401 并在 HTTPS 下工作。Caddy 示例配置对流式响应设置了 `flush_interval -1`。改用 nginx 时，`/api/` 需要关闭缓冲（`proxy_buffering off`），并把读超时设到 1 小时，否则任务事件流和助手对话会被截断。
+
+### 账号文件
+
+设置 `TEAMSERVER_USERS_FILE` 后，团队服务器在启动时和之后每 5 秒检查账号文件，把文件内容同步进平台库。登录仍走登录页和会话 Cookie，每人仍是独立工作区；文件只是另一种开账号的方式，适合由运维直接在服务器上维护名单。
+
+- **格式**：账号文件每行 `用户名:密码`，密钥文件（`TEAMSERVER_USER_KEYS_FILE`）每行 `用户名:中转站密钥`。按第一个冒号分隔，所以密码和密钥本身可以含冒号；`#` 开头的行和空行忽略。用户名规则与网页创建相同，密码至少 8 位。密码可以写明文，也可以写 `teamserver hash-password` 生成的 argon2id 哈希（从标准输入读一行密码，输出整行哈希）。示例见 `deploy/teamserver/config/users.example.txt` 与 `user-keys.example.txt`。
+- **生效方式**：加一行即创建账号（成员角色）和工作区；改密码后此人所有会话失效、需重新登录；改密钥立即写入此人的工作区；删掉一行即停用账号并关闭其工作区内核，数据保留，再加回来恢复原工作区。内容要连续两次读取一致才同步，编辑器写到一半的文件不会被应用。
+- **出错时**：任何一行有问题，整份文件都不生效，现有账号保持原样，日志指出文件和行号，不会打印密码或密钥。启动时文件有误则进程直接退出。账号文件里一个账号也没有也算错误，防止误清空把所有人停用。
+- **与用户管理的分工**：文件里的账号在“用户管理”中带“账号文件”标记，密码、密钥和启用状态只能改文件；显示名称和角色仍可在网页修改。成员本人也不能在账号菜单里改密码。网页创建的账号（包括 `admin create` 创建的管理员）不受文件影响；如果文件写了一个已有的用户名，该账号转为由文件管理。
+- **文件权限**：文件里可能有明文密码和密钥。容器内以 UID 10001 运行，建议 `chown 10001 users.txt user-keys.txt && chmod 600 users.txt user-keys.txt`；文件对其他用户可读时日志会提醒。
 
 ### 公司中转站渠道
 

@@ -40,6 +40,12 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "hash-password" {
+		if err := runHashPassword(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx); err != nil {
@@ -126,11 +132,6 @@ func run(ctx context.Context) error {
 		return err
 	}
 	defer users.Close()
-	if hasUsers, err := users.HasUsers(ctx); err != nil {
-		return err
-	} else if !hasUsers {
-		log.Printf("还没有任何账号：先运行 teamserver admin create --username <name> 创建管理员")
-	}
 	relayTemplate, err := kernelpool.LoadRelayTemplate(os.Getenv("TEAMSERVER_RELAY_CHANNEL_FILE"))
 	if err != nil {
 		return err
@@ -184,6 +185,30 @@ func run(ctx context.Context) error {
 	})
 	if err != nil {
 		return err
+	}
+	accountFiles := teamserver.AccountFiles{UsersPath: strings.TrimSpace(os.Getenv("TEAMSERVER_USERS_FILE")), KeysPath: strings.TrimSpace(os.Getenv("TEAMSERVER_USER_KEYS_FILE"))}
+	if accountFiles.UsersPath == "" && accountFiles.KeysPath != "" {
+		return errors.New("设置了 TEAMSERVER_USER_KEYS_FILE 就必须同时设置 TEAMSERVER_USERS_FILE")
+	}
+	if accountFiles.UsersPath != "" {
+		// A broken account file at startup is fatal: running with a stale or
+		// partial account list would silently lock people out.
+		fingerprint, err := accountFiles.Fingerprint()
+		if err != nil {
+			return fmt.Errorf("读取账号文件失败：%w", err)
+		}
+		result, err := server.SyncAccountFiles(ctx, accountFiles)
+		if err != nil {
+			return err
+		}
+		teamserver.LogAccountSync(result)
+		accountFiles.WarnLoosePermissions()
+		go server.WatchAccountFiles(ctx, accountFiles, 5*time.Second, fingerprint)
+	}
+	if hasUsers, err := users.HasUsers(ctx); err != nil {
+		return err
+	} else if !hasUsers {
+		log.Printf("还没有任何账号：设置 TEAMSERVER_USERS_FILE，或运行 teamserver admin create --username <name> 创建管理员")
 	}
 
 	// Open every active workspace in the background so queued generation tasks
@@ -363,6 +388,21 @@ func runAdmin(args []string) error {
 	default:
 		return fmt.Errorf("未知子命令 %q", command)
 	}
+	return nil
+}
+
+// runHashPassword prints the stored hash for one stdin line, so the users file
+// can hold "name:$argon2id$..." instead of a plaintext password.
+func runHashPassword() error {
+	password, err := readPassword()
+	if err != nil {
+		return err
+	}
+	hash, err := accounts.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	fmt.Println(hash)
 	return nil
 }
 
