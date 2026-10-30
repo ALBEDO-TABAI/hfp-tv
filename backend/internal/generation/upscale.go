@@ -67,7 +67,7 @@ func PrepareUpscale(ctx context.Context, input Input) (Input, error) {
 		return input, err
 	}
 	if !IsBeefAPIVideoConfig(ctx, input.Config) {
-		return input, errors.New("AI 超分需要连接官方算力账号")
+		return input, errors.New("AI 超分需要连接内置模型服务")
 	}
 	runtime, _ := RuntimeFromContext(ctx)
 	if err := HydrateMedia(ctx, runtime.Call.UserID, &input, MediaHydrationPolicy{KeepLocal: true}); err != nil {
@@ -181,7 +181,7 @@ func RunUpscaleTask(ctx context.Context, input Input) (map[string]any, error) {
 		return nil, RequestPreparationError{Cause: err}
 	}
 	if !IsBeefAPIVideoConfig(ctx, input.Config) {
-		return nil, RequestPreparationError{Cause: errors.New("AI 超分需要连接官方算力账号")}
+		return nil, RequestPreparationError{Cause: errors.New("AI 超分需要连接内置模型服务")}
 	}
 	id := ResumedProviderRequestID(ctx)
 	if id == "" {

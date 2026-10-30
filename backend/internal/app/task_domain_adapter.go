@@ -87,7 +87,7 @@ func (a taskCatalogAdapter) Select(userID string, req localtask.SelectRequest) (
 			return localtask.SelectResult{}, err
 		}
 		if stringValue(config["credentialRef"]) != managedBeefAPIRef || stringValue(config["apiKey"]) != managed.APIKey || stringValue(config["baseUrl"]) != managed.BaseURL {
-			return localtask.SelectResult{}, BadAuthRequest("AI 超分需要使用已连接的官方算力账号")
+			return localtask.SelectResult{}, BadAuthRequest("AI 超分需要连接内置模型服务")
 		}
 	}
 	if modelcatalog.TaskInputUsesWorkflowProvider(input) {

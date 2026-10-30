@@ -52,8 +52,6 @@ export type DesktopRuntimeBinding = {
     DownloadUpdate?: () => Promise<DesktopUpdateState>;
     InstallUpdate?: () => Promise<void>;
     ConfirmUpdateStartup?: () => Promise<void>;
-    OpenBeefTVX?: () => Promise<void>;
-    OpenBeefTVWebsite?: () => Promise<void>;
     OpenBeefTVGitHub?: () => Promise<void>;
 };
 

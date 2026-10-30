@@ -20,7 +20,7 @@ func (s *Service) upscaleConfig(name string) (generation.Config, error) {
 		return generation.Config{}, err
 	}
 	if key == "" {
-		return generation.Config{}, BadAuthRequest("请先连接官方算力账号")
+		return generation.Config{}, BadAuthRequest("请先在模型配置中连接内置模型服务")
 	}
 	return generation.Config{BaseURL: base, APIKey: key, Model: name, InterfaceType: "newapi"}, nil
 }

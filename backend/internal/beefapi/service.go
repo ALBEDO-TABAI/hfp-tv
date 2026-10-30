@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	errRevoked      = errors.New("hfp - all in one 连接已失效，请重新连接")
-	errNotConnected = errors.New("尚未连接 hfp - all in one")
+	errRevoked      = errors.New("内置模型服务连接已失效，请重新连接")
+	errNotConnected = errors.New("请先在模型配置中连接内置模型服务")
 	errStore        = errors.New("保存连接失败，请重试")
 )
 
@@ -334,7 +334,7 @@ func (s *Service) Start(ctx context.Context) (Summary, error) {
 	s.state.AuthorizationOrigin = s.origin
 	s.state.ProviderBaseURL = ""
 	s.state.Status = StateConnecting
-	s.state.LastError = "正在连接 hfp - all in one"
+	s.state.LastError = "正在连接内置模型服务"
 	s.mu.Unlock()
 
 	device, err := s.requestDeviceCode()

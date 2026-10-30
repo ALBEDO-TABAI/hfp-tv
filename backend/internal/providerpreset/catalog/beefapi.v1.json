@@ -1,6 +1,6 @@
 {
   "id": "beefapi",
-  "displayName": "BeefTV",
+  "displayName": "内置模型服务",
   "baseUrl": "https://beeftv.app",
   "catalogProtocol": "openai",
   "presetVersion": 1,

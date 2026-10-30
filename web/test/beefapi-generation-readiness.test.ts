@@ -80,7 +80,7 @@ describe("managed BeefAPI generation readiness", () => {
         expect(ready(config, config.imageModel)).toBe(false);
         expect(ready(config, config.videoModel)).toBe(false);
         expect(listVideoReferenceModels(config)).toEqual([]);
-        expect(() => assertVideoConfig(resolveModelRequestConfig(config, config.videoModel), config.videoModel)).toThrow("请先连接 hfp - all in one");
+        expect(() => assertVideoConfig(resolveModelRequestConfig(config, config.videoModel), config.videoModel)).toThrow("请先在模型配置中连接内置模型服务");
     });
 
     test("manual provider keys stay required and are not treated as managed", () => {

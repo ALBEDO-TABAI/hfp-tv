@@ -29,7 +29,7 @@ func (s *Service) CanvasWorkflowOperations() []cw.Operation {
 	if snapshot, err := s.canvasWorkflowProviderConfig(); err == nil {
 		upscaleChannels := []cw.FieldOption{}
 		if _, err := s.upscaleConfig(""); err == nil {
-			upscaleChannels = append(upscaleChannels, cw.FieldOption{Label: "官方算力", Value: "beefapi"})
+			upscaleChannels = append(upscaleChannels, cw.FieldOption{Label: "内置模型服务", Value: "beefapi"})
 		}
 		textModels := []cw.FieldOption{}
 		for _, model := range workflowDescribeModels(snapshot) {

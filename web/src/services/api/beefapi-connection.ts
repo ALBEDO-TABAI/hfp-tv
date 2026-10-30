@@ -60,9 +60,9 @@ export function beefAPIConnectionLabel(summary: BeefAPIConnectionSummary | null 
     const state = summary?.state || "disconnected";
     switch (state) {
         case "connecting":
-            return summary?.errorReason || "正在连接 hfp - all in one";
+            return summary?.errorReason || "正在连接内置模型服务";
         case "connection_error":
-            return summary?.errorReason || "无法连接 hfp - all in one 服务，请检查网络后重试";
+            return summary?.errorReason || "无法连接内置模型服务，请检查网络后重试";
         case "pending":
             return summary?.errorReason || (summary?.userCode ? `请在浏览器中确认 ${summary.userCode}` : "请在浏览器中确认授权");
         case "connected":

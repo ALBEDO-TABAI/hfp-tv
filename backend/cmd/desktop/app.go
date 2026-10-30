@@ -139,25 +139,7 @@ func (a *DesktopApp) OpenBeefTVGitHub() error {
 	if err != nil {
 		return err
 	}
-	wailsruntime.BrowserOpenURL(ctx, "https://github.com/glanderness/BeefTV")
-	return nil
-}
-
-func (a *DesktopApp) OpenBeefTVWebsite() error {
-	ctx, err := a.dialogContext()
-	if err != nil {
-		return err
-	}
-	wailsruntime.BrowserOpenURL(ctx, "https://beeftv.app/")
-	return nil
-}
-
-func (a *DesktopApp) OpenBeefTVX() error {
-	ctx, err := a.dialogContext()
-	if err != nil {
-		return err
-	}
-	wailsruntime.BrowserOpenURL(ctx, "https://x.com/beefnoode")
+	wailsruntime.BrowserOpenURL(ctx, "https://github.com/ALBEDO-TABAI/hfp-tv")
 	return nil
 }
 

@@ -72,7 +72,7 @@ func (s *Service) InstallMarket(ctx context.Context, user, id, version string) (
 		return nil, e
 	}
 	if !marketClientCompatible(buildinfo.Current().Version, r.MinClientVersion) {
-		return nil, kernel.BadAuthRequest("请先更新 BeefTV，再安装这个技能")
+		return nil, kernel.BadAuthRequest("请先更新应用，再安装这个技能")
 	}
 	c, e := marketClient()
 	if e != nil {
