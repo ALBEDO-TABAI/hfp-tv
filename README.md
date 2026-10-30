@@ -4,18 +4,18 @@
 
 **High-Performance · Local-First · AI-Native Video Screening Room & Infinite Canvas Studio**
 
-**hfp - all in one** 是基于开源项目 [BeefTV](https://github.com/glanderness/BeefTV) 构建的 AI 视频与短剧创作工作台，并以 **「藏书阁 (Ready Library)」** 的艺术指导（Art Direction）与设计系统进行了全面重构：采用 Inter / Inter Tight / Instrument Serif / Geist Mono / Noto Sans & Serif SC 混排体系、点阵放映桌面、液态玻璃光学表面（Liquid Glass）、信号橙（Print Signal `#ff5a1f` / `#ff6a2c`）焦点系统以及严格的 12 列响应式栅格。
+**hfp - all in one** 是基于开源项目 [BeefTV](https://github.com/glanderness/BeefTV) 构建的 AI 视频与短剧创作工作台，并以 **「Ready Library」** 的艺术指导（Art Direction）与设计系统进行了全面重构：采用 Inter / Inter Tight / Instrument Serif / Geist Mono / Noto Sans & Serif SC 混排体系、点阵放映桌面、液态玻璃光学表面（Liquid Glass）、信号橙（Print Signal `#ff5a1f` / `#ff6a2c`）焦点系统以及严格的 12 列响应式栅格。
 
 ---
 
 ## 非官方衍生版本声明 · Unofficial Derivative Notice
 
 **中文说明**
-- **非官方独立修改版**：`hfp - all in one`（仓库地址：`https://github.com/ALBEDO-TABAI/hfp-tv`）是基于上游公开项目 [glanderness/BeefTV](https://github.com/glanderness/BeefTV) 独立修改而成的衍生版本，**并非 BeefTV 官方发布版本，亦未获得 BeefTV 官方背书或商业授权**。
+- **非官方独立修改版**：`hfp - all in one`（仓库地址：`https://github.com/ALBEDO-TABAI/hfp-tv`）是基于上游公开项目 [glanderness/BeefTV](https://github.com/glanderness/BeefTV) 独立修改而成的衍生版本。
 - **主要变更摘要**：
   1. 产品品牌与用户界面全面重命名为 `hfp - all in one`（含全新胶片书脊标志、斜体衬线字标与海报式启动幕布）。
   2. 保留上游 100% 功能与本地优先架构（详见 [`docs/FEATURES.md`](docs/FEATURES.md)）。
-  3. 依据「藏书阁 (Ready Library)」设计语言对全部视觉、UI 组件、液态玻璃材质、双主题色板、12 列响应式栅格与交互动效进行了彻底重做（详见设计规范 [`docs/DESIGN.md`](docs/DESIGN.md)）。
+  3. 依据「Ready Library」设计语言对全部视觉、UI 组件、液态玻璃材质、双主题色板、12 列响应式栅格与交互动效进行了彻底重做（详见设计规范 [`docs/DESIGN.md`](docs/DESIGN.md)）。
 - **开源与源码可用许可**：本仓库免费公开分发，并严格遵循与上游相同的许可证条款——即 [`LICENSE`](LICENSE)（**Part A: `BeefTV Source Available License 1.0`** 与 **Part B: 历史 `MIT` 许可证**），完整保留 [`NOTICE`](NOTICE)、[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 及 [`licenses/`](licenses/) 下的全部第三方与字体/光学算法许可文件。
 
 **English Notice**
@@ -66,4 +66,4 @@
 ## 许可证与致谢 (License & Attribution)
 
 - 本项目基于 [glanderness/BeefTV](https://github.com/glanderness/BeefTV) 衍生开发，完整保留上游 [`LICENSE`](LICENSE)（Part A: `BeefTV Source Available License 1.0` 与 Part B: 历史 `MIT` 许可）、[`NOTICE`](NOTICE) 与 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
-- 视觉设计语言、UI 字体打包（Inter、Inter Tight、Instrument Serif、Geist Mono、Noto Sans SC、Noto Serif SC，SIL OFL 1.1）与液态玻璃折射贴图算法（源自 `Glass-HQ/liquid-glass`，MIT）承袭自「藏书阁 (Ready Library)」，相关许可证完整保留于 [`licenses/ui/`](licenses/ui/)。
+- 视觉设计语言、UI 字体打包（Inter、Inter Tight、Instrument Serif、Geist Mono、Noto Sans SC、Noto Serif SC，SIL OFL 1.1）与液态玻璃折射贴图算法（源自 `Glass-HQ/liquid-glass`，MIT）承袭自「Ready Library」，相关许可证完整保留于 [`licenses/ui/`](licenses/ui/)。
