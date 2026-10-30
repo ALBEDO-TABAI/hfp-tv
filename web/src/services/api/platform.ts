@@ -16,6 +16,8 @@ export type PlatformMe = {
         diagnostics: false;
         userAdmin: boolean;
         skillReview: boolean;
+        workshop: boolean;
+        workshopReview: boolean;
     };
 };
 export type AdminUser = {

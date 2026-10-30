@@ -11,6 +11,7 @@ import { ExpandableSearch } from "@/components/layout/expandable-search";
 import { WorkspaceLoadingState, WorkspaceState } from "@/components/layout/workspace-state";
 
 import { CanvasFolderCard } from "@/components/canvas/canvas-folder-card";
+import { WorkshopSubmitDialog } from "./workshop-submit-dialog";
 import { CanvasDeleteConfirmation } from "@/components/canvas/canvas-delete-confirmation";
 import { RecycleBinDialog } from "@/components/canvas/recycle-bin-dialog";
 import { LibraryCardShell } from "@/components/canvas/library-card-shell";
@@ -48,6 +49,7 @@ export default function CanvasPage() {
     const inputRef = useRef<HTMLInputElement>(null);
     const autoOpenRef = useRef(false);
     const [keyword, setKeyword] = useState("");
+    const [submissionProjectId, setSubmissionProjectId] = useState<string | null>(null);
     const [sort, setSort] = useState<"updated" | "name" | "nodes">("updated");
     const [projectFilter, setProjectFilter] = useState("all");
     const [folderFilter, setFolderFilter] = useState("all");
@@ -380,6 +382,7 @@ export default function CanvasPage() {
                             <CanvasFolderCard
                                 key={project.id}
                                 project={project}
+                                onSubmitWorkshop={() => setSubmissionProjectId(project.id)}
                                 projectName={project.projectId ? projectNames.get(project.projectId) || "未同步项目" : undefined}
                                 folders={folders}
                                 onMoveToFolder={async (folderId) => {
@@ -460,6 +463,7 @@ export default function CanvasPage() {
                 />
             </Modal>
             <RecycleBinDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
+            {submissionProjectId && <WorkshopSubmitDialog projectId={submissionProjectId} onClose={() => setSubmissionProjectId(null)} />}
             {deletingFolder ? <CanvasDeleteConfirmation scope={deletingFolder.scope} title={`删除文件夹「${deletingFolder.name}」？`}
                 description={`将删除此文件夹及其中 ${localProjects.filter((project) => project.folderId === deletingFolder.id).length} 个画布，画布里的节点和连线也会一起移除。`}
                 onCancel={() => setDeletingFolder(null)} onConfirm={async (assertCurrent) => {

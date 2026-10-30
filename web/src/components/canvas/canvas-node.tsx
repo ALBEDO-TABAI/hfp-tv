@@ -42,6 +42,7 @@ type CanvasNodeProps = {
     resourceLabel?: CanvasResourceReference;
     mentionReferences?: CanvasResourceReference[];
     renderNodeContent?: (node: CanvasNodeData) => ReactNode;
+    renderReadOnlyContent?: (node: CanvasNodeData) => ReactNode;
     drawingProjectId?: string;
     batchCount?: number;
     batchPreviewNodes?: CanvasNodeData[];
@@ -101,6 +102,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     readOnly = false,
     mentionReferences = [],
     renderNodeContent,
+    renderReadOnlyContent,
     drawingProjectId,
     batchCount = 0,
     batchPreviewNodes,
@@ -429,7 +431,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                     {data.metadata?.status && data.metadata.status !== "idle" && data.metadata.status !== "success" && data.type !== CanvasNodeType.Frame ? (
                         <NodeStatusBadge status={data.metadata.status} resultPending={data.metadata.taskStatus === "succeeded" && data.metadata.resourceReloadAvailable === true} />
                     ) : null}
-                    <CanvasNodeContent
+                    {readOnly && renderReadOnlyContent ? renderReadOnlyContent(data) : <CanvasNodeContent
                         node={data}
                         theme={theme}
                         isEditingContent={isEditingContent}
@@ -455,7 +457,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                         mediaActive={mediaActive}
                         scale={scale}
                         onMediaPlayRequest={onMediaPlayRequest}
-                    />
+                    />}
                     {imageCropActive && hasImageContent ? (
                         <CanvasImageCropEditor
                             imageUrl={data.metadata?.content || ""}
@@ -600,6 +602,7 @@ function areCanvasNodePropsEqual(previous: CanvasNodeProps, next: CanvasNodeProp
         previous.showImageInfo === next.showImageInfo &&
         previous.reduceMediaEffects === next.reduceMediaEffects &&
         previous.readOnly === next.readOnly &&
+        previous.renderReadOnlyContent === next.renderReadOnlyContent &&
         previous.resourceLabel === next.resourceLabel &&
         previous.mentionReferences === next.mentionReferences &&
         (!usesCanvasCustomNodeContent(next.data) || previous.renderNodeContent === next.renderNodeContent) &&

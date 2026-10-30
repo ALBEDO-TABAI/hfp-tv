@@ -15,6 +15,9 @@ const LoginPage = lazy(() => import("@/pages/login"));
 const InvitePage = lazy(() => import("@/pages/invite"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/users"));
 const AdminSkillReviewsPage = lazy(() => import("@/pages/admin/skill-reviews"));
+const AdminWorkshopReviewsPage = lazy(() => import("@/pages/admin/workshop-reviews"));
+const WorkshopPage = lazy(() => import("@/pages/workshop"));
+const WorkshopDetailPage = lazy(() => import("@/pages/workshop/detail"));
 const SkillAuthorizePage = lazy(() => import("@/pages/skills/authorize"));
 
 function PlatformRoute({ children, publicPage = false }: { children: ReactNode; publicPage?: boolean }) {
@@ -27,7 +30,9 @@ function PlatformRoute({ children, publicPage = false }: { children: ReactNode; 
 
 function CapabilityRoute({ capability, children }: { capability: keyof PlatformMe["capabilities"]; children: ReactNode }) {
     const { mode, me } = usePlatformSession();
-    const allowed = capability === "userAdmin" || capability === "skillReview" ? mode === "hosted" && me?.user.role === "admin" && me.capabilities[capability] : hostedCapability(capability);
+    const adminOnly = capability === "userAdmin" || capability === "skillReview" || capability === "workshopReview";
+    const allowed = adminOnly ? mode === "hosted" && me?.user.role === "admin" && me.capabilities[capability]
+        : capability === "workshop" ? mode === "hosted" && me?.capabilities.workshop === true : hostedCapability(capability);
     return allowed ? children : <Navigate to="/" replace />;
 }
 
@@ -125,6 +130,9 @@ export const router = createWorkspaceRouter([
             { path: "/agents", element: <CapabilityRoute capability="externalAgents">{deferred(<AgentsPage />)}</CapabilityRoute> },
             { path: "/admin/users", element: <CapabilityRoute capability="userAdmin">{deferred(<AdminUsersPage />)}</CapabilityRoute> },
             { path: "/admin/skill-reviews", element: <CapabilityRoute capability="skillReview">{deferred(<AdminSkillReviewsPage />)}</CapabilityRoute> },
+            { path: "/admin/workshop-reviews", element: <CapabilityRoute capability="workshopReview">{deferred(<AdminWorkshopReviewsPage />)}</CapabilityRoute> },
+            { path: "/workshop", element: <CapabilityRoute capability="workshop">{deferred(<WorkshopPage />)}</CapabilityRoute> },
+            { path: "/workshop/:id", element: <CapabilityRoute capability="workshop">{deferred(<WorkshopDetailPage />)}</CapabilityRoute> },
             { path: "/test-voice-recording", element: deferred(<TestVoiceRecording />) },
             {
                 path: "/projects",

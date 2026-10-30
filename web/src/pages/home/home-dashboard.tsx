@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router";
 import type { CanvasLibrarySummary } from "@/services/api/workspace-data";
 import { ProjectPreview } from "@/components/canvas/canvas-project-card";
 import { beefTVCapabilityItems } from "./home-data";
+import { HomeWorkshop } from "./home-workshop";
+import { usePlatformSession } from "@/stores/use-platform-session";
 
 function formatDate(value: string) {
     const date = new Date(value);
@@ -13,6 +15,7 @@ function formatDate(value: string) {
 export function HomeDashboard({ projects, loading, error, onRetry }: { projects: CanvasLibrarySummary[]; loading: boolean; error: boolean; onRetry: () => void }) {
     const navigate = useNavigate();
     const latestProject = projects[0];
+    const { mode, me } = usePlatformSession();
 
     return (
         <main className="beeftv-home hfp-home" aria-label="hfp - all in one 首页">
@@ -79,11 +82,11 @@ export function HomeDashboard({ projects, loading, error, onRetry }: { projects:
                 </section>
 
                 {/* Studio Capability Shelf — 12-Col Responsive Grid */}
-                <section className="hfp-shelf-section" aria-label="创作工坊架">
+                <section className="hfp-shelf-section" aria-label="快速开始">
                     <header className="beeftv-section-heading hfp-section-head">
                         <div className="hfp-section-title-group">
                             <span className="lbl">STUDIOS &amp; TOOLS</span>
-                            <h2>创作工坊</h2>
+                            <h2>快速开始</h2>
                         </div>
                         <Link to="/create" className="hfp-section-link">
                             进入独立创作室 <ArrowRight />
@@ -112,6 +115,7 @@ export function HomeDashboard({ projects, loading, error, onRetry }: { projects:
                 </section>
 
                 {/* Recent Projects Screening Reels */}
+                {mode === "hosted" && me?.capabilities.workshop && <HomeWorkshop />}
                 <section className="beeftv-home-section beeftv-recents hfp-recents-section">
                     <header className="beeftv-section-heading hfp-section-head">
                         <div className="hfp-section-title-group">

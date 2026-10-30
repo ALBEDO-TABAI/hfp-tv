@@ -9,6 +9,7 @@ import type { CanvasLibrarySummary } from "@/services/api/workspace-data";
 import { hasRemoteUserDataSyncSession, loadCanvasProjectForEditing, saveRemoteUserDataNow } from "@/services/local-workspace-sync";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { cn } from "@/lib/utils";
+import { usePlatformSession } from "@/stores/use-platform-session";
 
 type CanvasFolderCardProps = {
     project: CanvasLibrarySummary;
@@ -16,6 +17,7 @@ type CanvasFolderCardProps = {
     folders?: Array<{ id: string; name: string }>;
     onMoveToFolder?: (folderId?: string) => void;
     onDuplicate?: () => Promise<void>;
+    onSubmitWorkshop?: () => void;
     onDelete?: () => void;
     onClick: () => void;
     onPrefetch?: () => void;
@@ -23,8 +25,9 @@ type CanvasFolderCardProps = {
 };
 
 /** 画布库中的文件夹封面：单一卡片表面承载预览和信息，避免相邻卡片互相侵入。 */
-export function CanvasFolderCard({ project, projectName, folders = [], onMoveToFolder, onDuplicate, onDelete, onClick, onPrefetch, opening = false }: CanvasFolderCardProps) {
+export function CanvasFolderCard({ project, projectName, folders = [], onMoveToFolder, onDuplicate, onSubmitWorkshop, onDelete, onClick, onPrefetch, opening = false }: CanvasFolderCardProps) {
     const { message } = App.useApp();
+    const { mode, me } = usePlatformSession();
     const renameProject = useCanvasStore((state) => state.renameProject);
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const editingId = useCanvasUiStore((state) => state.editingProjectId);
@@ -133,6 +136,7 @@ export function CanvasFolderCard({ project, projectName, folders = [], onMoveToF
                             { key: "rename", label: "重命名", onClick: () => startEditing(project.id, project.title) },
                             { key: "cover", label: "修改封面", onClick: () => coverInputRef.current?.click() },
                             { key: "duplicate", label: "创建副本", onClick: () => void onDuplicate?.() },
+                            ...(mode === "hosted" && me?.capabilities.workshop && onSubmitWorkshop ? [{ key: "workshop", label: "投稿到创意工坊", onClick: onSubmitWorkshop }] : []),
                             { key: "move", label: "移动至文件夹", children: [{ key: "root", label: "未分类", onClick: () => onMoveToFolder?.(undefined) }, ...folders.map((folder) => ({ key: folder.id, label: folder.name, onClick: () => onMoveToFolder?.(folder.id) }))] },
                             { type: "divider" },
                             { key: "delete", danger: true, label: "删除项目", onClick: () => onDelete?.() },
