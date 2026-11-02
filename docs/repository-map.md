@@ -81,7 +81,7 @@
 | 插件 `/plugins` | `web/src/pages/plugins/`、`web/src/services/plugin-host.ts` | 页面受功能开关约束；团队模式不能安装或卸载 |
 | 登录 `/login`、邀请 `/invite/:token` | `web/src/pages/login/`、`web/src/pages/invite/`、`web/src/services/api/platform.ts` | 团队模式启动与 401 处理在 `bootstrap-workspace.ts`、`request.ts` |
 | 创意工坊 `/workshop`、`/workshop/:id` | `web/src/pages/workshop/`、`web/src/components/workshop/`、`web/src/services/api/workshop.ts` | 只读查看器不接保存、生成和助手；投稿入口在项目卡片菜单 |
-| 管理后台 `/admin/users`、`/admin/skill-reviews`、`/admin/workshop-reviews` | `web/src/pages/admin/` | 由账号菜单进入，只对管理员显示 |
+| 管理后台 `/admin/users`、`/admin/skill-reviews`、`/admin/workshop-reviews`、`/admin/service` | `web/src/pages/admin/` | 侧栏“管理”分组，只对管理员显示；服务状态页读 `GET /api/platform/admin/service-status` |
 | 主题、字体与组件外观 | `web/src/styles/`、`web/src/lib/app-theme.ts`、`web/src/components/ui/` | [设计规范](DESIGN.md)，不要增加无范围的全局样式覆盖 |
 
 `/tasks` 当前跳转首页；生成记录通过画布内入口查看。开发实验页位于 `/dev/*`，只在开发构建注册。浏览器使用普通路径，原生桌面窗口使用 hash 路由。

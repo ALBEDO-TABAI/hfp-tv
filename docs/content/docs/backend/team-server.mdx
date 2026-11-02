@@ -38,14 +38,14 @@ title: 团队服务器
 - 每个内核另开一个 `127.0.0.1` 随机端口，只供自己的助手子进程回调，要求该内核独有的启动令牌。助手回调地址由内核钉住，不从浏览器请求推导。
 - 托管内核不提供下列接口，内核和网关两层都会拒绝，返回 404 `hosted_unavailable`：`PUT /assistant/host/config`、`/agent-clients*`、`/ops/clients`、`/plugins/eagle/*`、`POST /plugins`、`DELETE /plugins/:id`、`POST /depth-captures`、`/diagnostics/*`、`POST /beefapi/connection/start|cancel`。
 - 助手子进程的启动命令由部署配置固定（`TEAMSERVER_AGENT_HOST_COMMAND`/`ARGS`），只继承白名单环境变量（PATH、HOME、语言、时区、临时目录、证书、代理）。
-- 写请求必须带本站 `Origin`（或 `Sec-Fetch-Site: same-origin`）；会话 Cookie 为 `HttpOnly`、`Secure`、`SameSite=Lax`。
+- 写请求必须带本站 `Origin`（或 `Sec-Fetch-Site: same-origin`）；会话 Cookie 为 `HttpOnly`、`SameSite=Lax`，HTTPS 访问时加 `Secure`（默认按 TLS 或可信代理的 `X-Forwarded-Proto` 自动判断）。
 - 后台任务和事件循环的 panic 会被捕获并记录。一个工作区的任务出错不会让整个进程退出。
 
 ### 进程级环境变量
 
 `internal/outbound` 在每次连接时读取私网出站开关，所以它对所有工作区生效。团队服务器启动时：
 
-- `CANVAS_ALLOW_PRIVATE_UPSTREAMS` 未设置时自动设为 `false`；显式设为其他值会拒绝启动。内网中转站用 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS` 按主机名精确放行。
+- `CANVAS_ALLOW_PRIVATE_UPSTREAMS` 未设置时自动设为 `false`；显式设为其他值会拒绝启动。公司中转站渠道 `baseUrl` 的主机自动加入放行名单（渠道文件由运维写，不由成员写）；其他内网主机用 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS` 按主机名或 IP 精确放行。链路本地地址（含云元数据）始终拒绝。
 - 下列变量会让所有工作区共用同一凭据或信任，设置了就拒绝启动：`BEEFTV_AGENT_HOST_TOKEN`、`BEEFTV_OWNER_TOKEN`、`BEEFTV_UI_BOOTSTRAP`、`BEEFTV_ALLOWED_ORIGINS`、`BEEFTV_AGENT_BASE_URL`、`BEEFTV_AGENT_API_KEY`、`BEEFTV_AGENT_MODEL`、`BEEFTV_AGENT_PROTOCOL`、`BEEFTV_AGENT_HOST_URL`。
 
 ## 部署
@@ -54,22 +54,27 @@ title: 团队服务器
 
 ```bash
 cd deploy/teamserver
-TEAMSERVER_DOMAIN=studio.example.com docker compose up -d --build
+cp .env.example .env   # 默认内网 HTTP；有域名时按注释启用 docker-compose.https.yml
+docker compose up -d --build
 # 创建首个管理员（密码从标准输入读一行，不进 shell 历史）
 read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver admin create --username admin --display-name 管理员
 ```
 
-成员账号可以用两种方式管理，可以混用：在服务器上维护账号文件（见下节），或者管理员登录后在侧栏账号菜单进入“用户管理”，创建账号、发邀请链接、绑定中转站密钥。忘记管理员密码时运行 `teamserver admin reset-password --username admin`（同样从标准输入读密码），这会使该账号的所有会话失效。
+`docker-compose.yml` 默认只让 Caddy 在 `TEAMSERVER_HTTP_PORT`（默认 80）上提供 HTTP；叠加 `docker-compose.https.yml`（在 `.env` 写 `COMPOSE_FILE=docker-compose.yml:docker-compose.https.yml` 和 `TEAMSERVER_DOMAIN`）后改为域名自动 HTTPS 并开放 443。`.env` 通过 `env_file` 整体传进团队服务器容器；容器内监听地址 `TEAMSERVER_ADDR=:8080` 和数据目录在 Compose 里固定。启动日志开头会打印实际读到的公司模型服务、内网放行名单、Cookie 模式和空闲回收设置。
+
+成员账号可以用两种方式管理，可以混用：在服务器上维护账号文件（见下节），或者管理员登录后在侧栏“管理”分组进入“用户管理”，创建账号、发邀请链接、绑定中转站密钥。忘记管理员密码时运行 `teamserver admin reset-password --username admin`（同样从标准输入读密码），这会使该账号的所有会话失效。
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `TEAMSERVER_DATA_DIR` | `/data` | 数据根目录 |
-| `TEAMSERVER_ADDR` | `:8080` | 监听地址；只由反向代理访问，不要直接暴露到公网 |
+| `TEAMSERVER_ADDR` | `:8080` | 监听地址；只由反向代理访问，不要直接暴露到公网。Compose 中固定，对外端口用 `TEAMSERVER_HTTP_PORT` |
+| `TEAMSERVER_HTTP_PORT` / `TEAMSERVER_HTTPS_PORT` | `80` / `443` | 仅 Compose：Caddy 对外端口；HTTPS 端口只在叠加 `docker-compose.https.yml` 时开放 |
 | `TEAMSERVER_WEB_DIR` | 镜像内 `/app/web` | 前端构建产物；为空时只提供 API |
-| `TEAMSERVER_COOKIE_SECURE` | `true` | 不走 HTTPS 时（内网用 IP 访问、本机试用）设为 `false`，否则浏览器不保存登录 Cookie |
+| `TEAMSERVER_COOKIE_SECURE` | `auto` | `auto`：直接 TLS 或可信代理的 `X-Forwarded-Proto: https` 时加 `Secure`；`true` 始终加（只走 HTTPS）；`false` 始终不加 |
+| `TEAMSERVER_IDLE_TIMEOUT` | `30m` | 工作区内核最后一次请求后空闲多久关闭（至少 `1m`）；没有排队或运行中的任务、助手不在回复时才关闭，下次请求自动打开。`off` 表示不回收 |
 | `TEAMSERVER_USERS_FILE` | 空 | 账号文件，每行 `用户名:密码`，见下节 |
 | `TEAMSERVER_USER_KEYS_FILE` | 空 | 密钥文件，每行 `用户名:中转站密钥`；只能和账号文件一起用 |
-| `TEAMSERVER_TRUSTED_PROXIES` | `127.0.0.1,::1`（Compose 中为 `172.16.0.0/12`） | 允许其 `X-Forwarded-For` / `X-Forwarded-Host` 生效的反向代理 |
+| `TEAMSERVER_TRUSTED_PROXIES` | `127.0.0.1,::1`（Compose 中为 `172.16.0.0/12`） | 允许其 `X-Forwarded-For` / `X-Forwarded-Host` / `X-Forwarded-Proto` 生效的反向代理 |
 | `TEAMSERVER_ALLOWED_ORIGINS` | 空 | 除本站外允许发写请求的来源，逗号分隔 |
 | `TEAMSERVER_AGENT_HOST_COMMAND` / `TEAMSERVER_AGENT_HOST_ARGS` | 镜像内为 `node` 与 `["/app/agent-host/server.mjs"]` | 助手子进程命令；`ARGS` 是 JSON 字符串数组 |
 | `TEAMSERVER_RELAY_CHANNEL_FILE` | 空 | 公司中转站渠道定义文件，见下节 |
@@ -94,13 +99,12 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 
 `TEAMSERVER_RELAY_CHANNEL_FILE` 指向一个模型渠道 JSON 对象，格式与模型配置里的渠道相同，但不能包含 `apiKey`、`secretKey` 或 `credentialRef`。示例见 `deploy/teamserver/config/relay-channel.example.json`；Compose 把 `deploy/teamserver/config` 挂载到容器的 `/config`，因此可设为 `/config/relay-channel.json`。
 
-服务端会把它写进每个工作区的模型配置，渠道 ID 固定为 `company-relay`，密钥用管理员为该成员绑定的中转站密钥。规则如下：
+服务端会把它写进每个工作区的模型配置，渠道 ID 固定为 `company-relay`，密钥用管理员为该成员绑定的中转站密钥。所有成员的请求都发往同一个 `baseUrl`，各自带自己的密钥。管理员在自己的“模型配置”里添加的服务只属于自己的工作区，不会分发给其他成员。规则如下：
 
 - 未绑定密钥时渠道处于停用状态；绑定、换绑或清除后立即改写配置。助手子进程在下次状态检查时用新密钥重启。
 - 成员保存模型配置时，这个渠道总会恢复成平台写入的样子，成员不能修改或删除它，也不能伪造同 ID 的渠道。
 - 中转站密钥在平台库里加密保存，管理界面只显示末四位。
-
-**已知限制**：模型配置接口会把渠道密钥返回给当前成员的浏览器（本地模式就是这样设计的，浏览器发起的部分请求需要它），所以成员能看到自己被绑定的中转站密钥。要做到密钥只留在服务端，需要把 BeefAPI 的 `credentialRef` 服务端注入机制推广到公司渠道，这一项在后续阶段处理。
+- **密钥只在服务端**：`GET /api/workspace/model-config` 返回的平台渠道 `apiKey`、`secretKey` 为空，另带 `hasApiKey` 表示是否已绑定。服务端在三处补上密钥，并始终改用渠道保存的 `baseUrl`，密钥只会发往管理员配置的地址：创建任务时 `config.channelId` 为 `company-relay`；`POST /api/ai/models` 带 `channelId: "company-relay"`；`/api/ai/custom` 中转请求没带密钥、且目标与该渠道同协议同主机端口。成员自己添加的渠道仍由浏览器携带本人填写的密钥。实现见 `internal/app/platform_credential.go` 与 `internal/handler/workspace.go` 的 `redactPlatformChannels`。
 
 ### 参考素材
 
@@ -164,6 +168,7 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 | `PUT/DELETE /api/platform/admin/users/:id/relay-key` | 绑定或清除中转站密钥 |
 | `POST /api/platform/admin/invitations` | `{role, expiresInHours}`，返回一次性邀请链接 |
 | `GET /api/platform/admin/audit` | 管理员操作记录，只增不改 |
+| `GET /api/platform/admin/service-status` | 本次启动实际读到的部署设置：公司模型服务（名称、地址、模型与能力、文件路径、自动放行的主机）、账号文件路径、内网放行名单、Cookie 模式、空闲回收时长、已打开/总工作区数、启用成员数与已绑定密钥的成员数。不含任何密钥 |
 | `GET /api/health/live` | 进程存活，不需要登录 |
 
 ## 备份
@@ -173,8 +178,7 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 ## 尚未完成的部分
 
 - 没有存储配额和跨工作区的生成总并发上限：每个内核各自按默认并发 3 执行。
-- 助手子进程不会空闲回收。
-- 公司中转站密钥对本人可见（见上文）。
-- 镜像和 Compose 尚未在真实服务器上构建与压测。
+- 空闲回收以整个工作区内核为单位（含助手子进程），没有单独提前停掉助手；浏览器标签页保持打开并持续请求时，内核不会被回收。
+- 镜像和 Compose 已在内网服务器试部署，尚未压测。
 - 创意工坊复制是同步请求，大作品需要等待；文件直接复制进目标工作区，没有用硬链接省空间；被替代或驳回的版本文件不会自动清理。复制前不检查目标工作区是否配置了作品用到的模型。
 - 技能市场没有上游的 MCP 查询端点和发布历史页（`GET /skills/:skillId`），现有客户端都不调用它们；审核结果只有站内状态，没有通知。

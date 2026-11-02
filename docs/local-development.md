@@ -109,7 +109,7 @@ BUN="$PWD/.local/node_modules/.bin/bun"
 (cd backend && go build -o /tmp/hfp-teamserver ./cmd/teamserver)
 export TEAMSERVER_DATA_DIR="$(mktemp -d)"
 printf '%s\n' 'trial-admin-pass' | /tmp/hfp-teamserver admin create --username admin --display-name 管理员
-TEAMSERVER_ADDR=127.0.0.1:43191 TEAMSERVER_COOKIE_SECURE=false \
+TEAMSERVER_ADDR=127.0.0.1:43191 \
 TEAMSERVER_WEB_DIR="$PWD/web/dist" /tmp/hfp-teamserver
 ```
 

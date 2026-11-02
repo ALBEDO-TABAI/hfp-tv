@@ -26,14 +26,17 @@
 | 现象 | 先检查什么 | 对应处理 |
 | --- | --- | --- |
 | 登录或任何写操作返回 403 `origin_forbidden` / `origin_required` | 反向代理是否保留了 `Host`，`X-Forwarded-Host` 是否来自 `TEAMSERVER_TRUSTED_PROXIES` 里的地址 | Caddy 默认保留 `Host`；nginx 需 `proxy_set_header Host $host`；Compose 外的代理把它的地址加进 `TEAMSERVER_TRUSTED_PROXIES`。不要关掉来源校验 |
-| 用 `http://` 访问时，登录后马上又回到登录页 | `TEAMSERVER_COOKIE_SECURE` | 内网 IP 访问或本机试运行不走 HTTPS 时设为 `false`；有域名时走 HTTPS 并保持 `true` |
+| 用 `http://` 访问时，登录后马上又回到登录页 | `.env` 里是否写了 `TEAMSERVER_COOKIE_SECURE=true` | 删掉这一行（默认 `auto` 会按访问方式处理）；Compose 外自建代理时要转发 `X-Forwarded-Proto` |
+| 端口冲突，或改了端口仍占用 80 | `.env` 里的 `TEAMSERVER_HTTP_PORT` | 对外端口只认 `TEAMSERVER_HTTP_PORT`（例如 `180`），改完 `docker compose up -d`；不要用 `TEAMSERVER_ADDR` 或 `TEAMSERVER_DOMAIN=:180` 改端口。默认部署不再占用 443 |
+| 成员的“模型配置”里没有公司中转站 | 启动日志开头的“公司模型服务”一行，或管理员“管理 → 服务状态” | 显示“未配置”说明 `TEAMSERVER_RELAY_CHANNEL_FILE` 没设或没写进 `deploy/teamserver/.env`；路径要写容器内的 `/config/relay-channel.json`。管理员在自己“模型配置”里添加的服务不会分发给其他人 |
 | 改了账号文件没生效 | `docker compose logs teamserver` 里的“账号文件有误”行 | 按提示的行号改正（常见：缺冒号、密码不足 8 位、用户名重复、密钥文件里的用户不在账号文件中）；整份改对之前沿用原有账号 |
 | 启动即退出，提示读取账号文件失败 | 文件路径和权限 | 路径是容器内的 `/config/...`；文件需对 UID 10001 可读（`chown 10001` 后 `chmod 600`） |
 | “用户管理”里重置密码提示由账号文件管理 | 该账号带“账号文件”标记 | 改服务器上的账号文件；显示名称和角色仍可在网页修改 |
 | 进程启动即退出，提示环境变量 | 日志里列出的变量（如 `CANVAS_ALLOW_PRIVATE_UPSTREAMS`、`BEEFTV_AGENT_HOST_TOKEN`） | 团队服务器拒绝会让各工作区共用凭据或打开私网出站的设置；删掉这些变量，内网中转站用 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS` 精确放行 |
 | 页面提示“工作区暂时无法打开”（503 `workspace_unavailable`） | `docker compose logs teamserver` 里的 `open workspace=…` 行 | 常见原因是官方插件目录缺失、数据卷权限或磁盘已满；修好后刷新即可重试 |
 | “公司中转站”渠道显示“等待管理员绑定” | 用户管理里该成员的中转站密钥 | 管理员绑定后无需重启，下次打开模型配置即生效 |
-| 中转站请求失败、提示地址不允许 | 中转站是否在内网 | 把中转站主机名写进 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS`，不要打开整个私网出站 |
+| 读取模型或生成提示“不允许访问本机、内网或链路本地地址” | 目标地址是否在“服务状态”的内网放行名单里 | 公司中转站渠道的地址会自动放行；成员自己添加的其他内网服务要把主机名或 IP（如 `10.10.10.45`，不写端口）写进 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS`，不要打开整个私网出站 |
+| 公司中转站提示“管理员还没有为你绑定公司模型服务的密钥” | 用户管理里该成员的“中转密钥”列 | 在 `user-keys.txt` 加一行或在“用户管理”绑定；密钥只保存在服务器，浏览器里看不到 |
 | 任务进度、助手回复卡住或中途断开 | 反向代理是否缓冲了流式响应 | Caddy 示例已设 `flush_interval -1`；nginx 需对 `/api/` 关闭缓冲并把读超时设到 1 小时 |
 | 技能页提示“未配置技能市场” | 是否在团队服务器上访问 | 桌面版和单工作区开发服务没有默认市场；团队服务器会自动接入站内市场 |
 | 投稿到创意工坊被预检拦下 | 预检列出的问题和节点 | “只保存在浏览器里”的素材需重新上传；“文件不存在”需恢复或删掉对应节点；画板未保存需打开画板保存一次 |

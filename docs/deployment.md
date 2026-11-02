@@ -16,9 +16,9 @@
 
 ### 准备
 
-- 一台 Linux 服务器，Docker 24 以上（含 Compose 插件），建议 4 核 8 GB 内存起步；每个在线成员的创作助手会占用一个 Node 进程。
+- 一台 Linux 服务器，Docker 24 以上（Compose 插件 2.24 以上），建议 4 核 8 GB 内存起步。每个正在使用的成员占一个工作区内核，用过创作助手的再多一个 Node 进程；工作区空闲 30 分钟后自动关闭释放内存，下次访问自动打开。
 - 访问方式二选一：
-  - **只在公司内网用 IP 访问**（最简单）：不需要域名和证书，浏览器用 `http://服务器IP` 打开。账号密码在内网以明文传输，适合可信的办公网络。
+  - **只在公司内网用 IP 访问**（默认，最简单）：不需要域名和证书，只占一个端口，浏览器用 `http://服务器IP:端口` 打开。账号密码在内网以明文传输，适合可信的办公网络。
   - **有域名**：解析到这台服务器并开放 80 和 443 端口，Caddy 自动申请 HTTPS 证书。
 - 公司中转站的地址和可用模型清单，以及给每个成员发的中转站密钥。
 
@@ -27,29 +27,33 @@
 ```bash
 git clone https://github.com/ALBEDO-TABAI/hfp-tv.git
 cd hfp-tv/deploy/teamserver
+cp .env.example .env                                             # 部署设置，见第 2 步
 cp config/relay-channel.example.json config/relay-channel.json   # 按中转站实际情况修改
 cp config/users.example.txt config/users.txt                     # 成员账号，见第 3 步
 cp config/user-keys.example.txt config/user-keys.txt             # 成员的中转站密钥
 ```
 
-1. **编辑公司中转站渠道** `config/relay-channel.json`：`baseUrl`、`apiFormat`、`models` 和 `modelProfiles` 与模型配置页里的渠道格式相同，不要写密钥。最省事的做法是先在桌面版里把中转站配好、能出图，再按那个渠道的字段抄过来。
-2. **写部署变量**：在 `deploy/teamserver/.env`（不要提交）里写：
+1. **编辑公司中转站渠道** `config/relay-channel.json`：`baseUrl`、`apiFormat`、`models` 和 `modelProfiles` 与模型配置页里的渠道格式相同，不要写密钥。最省事的做法是先在桌面版里把中转站配好、能出图，再按那个渠道的字段抄过来。这个渠道会出现在每个成员的“模型配置”里，请求都发往这个地址，各自用自己的密钥；`baseUrl` 是内网地址（如 `http://10.10.10.45:3000/v1`）时会自动加入内网放行名单。管理员自己在“模型配置”里添加的服务只属于管理员本人的工作区，不会分发给其他成员。
+2. **改部署设置** `.env`（不要提交）：示例文件里已经写好内网部署需要的几项，通常只需要改端口：
 
    ```bash
-   # 内网用 IP 访问：Caddy 只开 HTTP，登录 Cookie 不要求 HTTPS
-   TEAMSERVER_DOMAIN=:80
-   TEAMSERVER_COOKIE_SECURE=false
-   # TEAMSERVER_HTTP_PORT=8080          # 80 端口被占用时改用其他端口
-   # 有域名时改成下面这行，并删掉上面两行（自动 HTTPS）
-   # TEAMSERVER_DOMAIN=studio.example.com
-
+   TEAMSERVER_HTTP_PORT=80                      # 80 被占用时改成别的，例如 180
    TEAMSERVER_RELAY_CHANNEL_FILE=/config/relay-channel.json
    TEAMSERVER_USERS_FILE=/config/users.txt
    TEAMSERVER_USER_KEYS_FILE=/config/user-keys.txt
-   # 中转站在内网时，只放行它这一个主机名，不要打开整个私网出站
-   CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS=relay.internal.example.com
+   # 除公司中转站外还要访问的内网地址（主机名或 IP，逗号分隔，不写端口）
+   # CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS=10.10.10.46
    # 需要公网素材地址的模型（部分视频模型）要配置 S3 兼容存储，可选
    # TEAMSERVER_REFERENCE_STORAGE_FILE=/config/reference-storage.json
+   ```
+
+   `.env` 里的每一项都会原样传进容器；对外端口只认 `TEAMSERVER_HTTP_PORT`，容器内的监听端口固定，不要再设 `TEAMSERVER_ADDR` 或 `TEAMSERVER_DOMAIN=:端口`。登录 Cookie 默认按访问方式自动处理（HTTP 访问不加 Secure、HTTPS 访问加 Secure），不需要设置 `TEAMSERVER_COOKIE_SECURE`。
+
+   **有域名时**再加两行，Caddy 会改为自动 HTTPS 并开放 443（此时 `TEAMSERVER_HTTP_PORT` 保持 80）：
+
+   ```bash
+   COMPOSE_FILE=docker-compose.yml:docker-compose.https.yml
+   TEAMSERVER_DOMAIN=studio.example.com
    ```
 
 3. **写成员名单**：`config/users.txt` 一行一个 `用户名:密码`，`config/user-keys.txt` 一行一个 `用户名:中转站密钥`（格式说明在示例文件开头）。文件里有明文密码，收紧权限：
@@ -64,8 +68,10 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
 
    ```bash
    docker compose up -d --build
-   docker compose logs -f teamserver   # 看到 “账号文件已同步”“team server listening” 和 “内置技能市场” 即可
+   docker compose logs -f teamserver
    ```
+
+   日志里应该看到：“公司模型服务：<地址>，N 个模型”、“允许访问的内网地址：…”、“账号文件已同步”、“内置技能市场”和 “team server listening”。看到“公司模型服务：未配置”说明 `.env` 里的 `TEAMSERVER_RELAY_CHANNEL_FILE` 没有生效。
 
 5. **创建管理员**（审核创意工坊作品和技能、查看操作记录需要；密码从标准输入读，不进 shell 历史）：
 
@@ -73,7 +79,7 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
    read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver admin create --username admin --display-name 管理员
    ```
 
-6. 用浏览器打开 `http://服务器IP`（有域名时为 `https://<域名>`），用账号文件里的账号或管理员登录。
+6. 用浏览器打开 `http://服务器IP:端口`（端口为 80 时可省略；有域名时为 `https://<域名>`），用账号文件里的账号或管理员登录。管理员在侧栏“管理 → 服务状态”能看到服务器实际读到的公司模型服务、成员密钥绑定情况、内网放行名单和工作区数量。
 
 ### 上线前验收
 
@@ -82,6 +88,7 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
 - [ ] 登录、退出；A 退出后在同一浏览器登录 B，看不到 A 的项目。
 - [ ] 新建画布、上传图片、刷新后内容还在。
 - [ ] 用“公司中转站”渠道出一张图、一段视频，中转站后台能看到用量记在本人的密钥下。
+- [ ] 打开浏览器开发者工具的“网络”面板，生成和读取模型时请求里看不到公司中转站的密钥（密钥只在服务器上补上）。
 - [ ] 创作助手能回复，并能在画布上新建节点。
 - [ ] 创意工坊：A 投稿 → 管理员审核通过 → B 浏览并复制到自己的项目 → B 能继续编辑和生成。
 - [ ] 技能市场：A 连接投稿账号、投稿 → 管理员在“技能审核”通过 → B 能安装。
@@ -126,8 +133,11 @@ docker compose start teamserver
 | 加人、改密码、换密钥 | 改 `config/users.txt` / `config/user-keys.txt`，约 5 秒生效；改密码会让此人重新登录 |
 | 停用成员 | 从账号文件删掉他那一行（网页创建的账号在“用户管理”里停用）；会话立即失效、工作区内核关闭，数据保留；记得到中转站吊销他的密钥 |
 | 忘记管理员密码 | `printf '%s\n' "新密码" \| docker compose exec -T teamserver teamserver admin reset-password --username admin` |
-| 审核作品与技能 | 管理员账号菜单里的“作品审核”“技能审核” |
+| 审核作品与技能 | 侧栏“管理”分组里的“作品审核”“技能审核” |
 | 查谁做了什么 | “用户管理 → 操作记录” |
+| 确认服务器读到的配置 | 侧栏“管理 → 服务状态”，或 `docker compose logs teamserver` 开头几行 |
+| 换端口 | 改 `.env` 的 `TEAMSERVER_HTTP_PORT`，再 `docker compose up -d` |
+| 调整空闲回收 | `.env` 设置 `TEAMSERVER_IDLE_TIMEOUT`（默认 `30m`，`off` 表示不回收）；有任务在跑或助手在回复时不会回收 |
 
 ## 不用 Docker 部署
 
@@ -155,8 +165,8 @@ CANVAS_OFFICIAL_PLUGIN_DIR=/path/to/hfp-tv/plugin-packages \
 /opt/hfp/teamserver
 ```
 
-前面放 Caddy 或 nginx 做 HTTPS 反向代理。用 nginx 时要对 `/api/` 关闭缓冲（`proxy_buffering off`）、把读超时设到 1 小时，否则任务事件流和助手对话会被截断；同时把 `TEAMSERVER_TRUSTED_PROXIES` 设为 nginx 的地址。用 systemd 托管时，以独立的低权限用户运行，并给数据目录设置 `0750`。
+前面放 Caddy 或 nginx 做 HTTPS 反向代理。用 nginx 时要对 `/api/` 关闭缓冲（`proxy_buffering off`）、把读超时设到 1 小时，否则任务事件流和助手对话会被截断；同时把 `TEAMSERVER_TRUSTED_PROXIES` 设为 nginx 的地址，并转发 `X-Forwarded-Proto`（登录 Cookie 据此判断是否走 HTTPS）。用 systemd 托管时，以独立的低权限用户运行，并给数据目录设置 `0750`。
 
 ## 尚未验证的部分
 
-镜像和 Compose 还没有在真实服务器上构建和压测；按人数调整的内存和并发上限、配额也还没有实现（见[方案第 9、12 节](team-server-and-workshop.md)）。首次部署建议先给少数人试用。
+镜像已在内网服务器上开始试部署，但还没有压测；按人数调整的并发上限和配额还没有实现（见[方案第 9、12 节](team-server-and-workshop.md)）。首次部署建议先给少数人试用。
