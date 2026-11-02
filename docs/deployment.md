@@ -34,6 +34,18 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
 ```
 
 1. **编辑公司中转站渠道** `config/relay-channel.json`：`baseUrl`、`apiFormat`、`models` 和 `modelProfiles` 与模型配置页里的渠道格式相同，不要写密钥。最省事的做法是先在桌面版里把中转站配好、能出图，再按那个渠道的字段抄过来。这个渠道会出现在每个成员的“模型配置”里，请求都发往这个地址，各自用自己的密钥；`baseUrl` 是内网地址（如 `http://10.10.10.45:3000/v1`）时会自动加入内网放行名单。管理员自己在“模型配置”里添加的服务只属于管理员本人的工作区，不会分发给其他成员。
+
+   每个模型在 `modelProfiles` 里写明能力和接口协议，否则视频模型会按旧的通用视频接口发送：
+
+   | 模型 | `capability` | `protocol` | 其他 |
+   | --- | --- | --- | --- |
+   | 文本 / 助手 | `text` | `chat-completion` | |
+   | OpenAI 兼容生图 | `image` | `openai-image` | |
+   | Seedance（经 New API 的豆包任务插件） | `video` | `volcengine-ark-video` | `baseUrl` 写中转站的豆包入口，例如 `http://10.10.10.45:3000/doubao/api/v3`；`referenceAssetService` 写公司参考图服务，例如 `http://10.10.10.45:8787/v1/reference-images` |
+
+   模型自己的 `baseUrl` 必须与渠道 `baseUrl` 同协议、同主机和端口，否则启动时报错；成员密钥只会发往这个中转站。模型名以中转站 `/v1/models` 实际返回的为准。
+
+   **Seedance 参考图自动登记**：Seedance 只接受已登记的德云素材编号（`asset://…`），不接受图片地址。配置了 `referenceAssetService` 后，成员用画布或素材库里的图片做参考时，团队服务器在提交视频前把图片发给公司参考图服务（旧项目的 `services/reference-upload-relay`，8787 端口）：它用成员自己的中转站密钥鉴权，把图片存进公司对象存储，登记进预设的德云素材组，等素材可用后返回素材编号；团队服务器按图片缓存这个编号，同一张图下次直接复用。参考图服务的地址会自动加入内网放行名单。服务自身的对象存储、德云密钥和素材组编号仍在它的 `.env` 里配置，见旧项目该目录的 README。纯文生视频不需要它。中转站没有取消接口，取消 Seedance 任务时会提示结果不明确。
 2. **改部署设置** `.env`（不要提交）：示例文件里已经写好内网部署需要的几项，通常只需要改端口：
 
    ```bash

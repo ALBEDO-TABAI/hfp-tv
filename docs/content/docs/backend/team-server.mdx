@@ -83,7 +83,7 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 | `TEAMSERVER_WORKSHOP_MAX_MB` | `2048` | 单次创意工坊投稿的文件总大小上限 |
 | `CANVAS_SHUTDOWN_TIMEOUT` | `2m` | 每个内核关闭时等待后台任务的上限 |
 
-团队模式下前端用 `fetch` 读取画布事件流（`web/src/services/api/canvas-events.ts`），能拿到 401 并在 HTTPS 下工作。Caddy 示例配置对流式响应设置了 `flush_interval -1`。改用 nginx 时，`/api/` 需要关闭缓冲（`proxy_buffering off`），并把读超时设到 1 小时，否则任务事件流和助手对话会被截断。
+团队模式下前端用 `fetch` 读取画布事件流（`web/src/services/api/canvas-events.ts`），能拿到 401 并在 HTTPS 下工作。画布里的图片和视频直接使用 `/api/resources/<id>/file`（由会话 Cookie 认证），浏览器只加载屏幕上可见的媒体，视频按 Range 流式播放；桌面版因为资源接口需要启动令牌头，仍先下载到浏览器缓存。画布改动经事件流推送，事件流每 250 毫秒只查画布的 revision 列，不再整份读取；团队模式下兜底的整画布轮询为 60 秒一次（桌面版 4 秒）。团队模式下上传的图片、视频与素材库、画板等都写入工作区的服务器资源（与桌面版相同的后端路径），不使用浏览器本地存储；修复前上传、只留在浏览器里的素材需要重新上传。Caddy 示例配置对流式响应设置了 `flush_interval -1`。改用 nginx 时，`/api/` 需要关闭缓冲（`proxy_buffering off`），并把读超时设到 1 小时，否则任务事件流和助手对话会被截断。
 
 ### 账号文件
 
@@ -104,6 +104,8 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 - 未绑定密钥时渠道处于停用状态；绑定、换绑或清除后立即改写配置。助手子进程在下次状态检查时用新密钥重启。
 - 成员保存模型配置时，这个渠道总会恢复成平台写入的样子，成员不能修改或删除它，也不能伪造同 ID 的渠道。
 - 中转站密钥在平台库里加密保存，管理界面只显示末四位。
+- `modelProfiles[].baseUrl` 可以给单个模型指定中转站上的其他入口（例如 Seedance 走 `/doubao/api/v3`，其余走 `/v1`），但必须与渠道 `baseUrl` 同协议、同主机和端口，加载渠道文件时校验。服务端为该模型补密钥时改用这个地址；模型目录仍读渠道 `baseUrl`。Seedance 用 `protocol: "volcengine-ark-video"`。
+- `modelProfiles[].referenceAssetService` 指向公司参考图服务（`POST` 图片原始字节，`Authorization: Bearer <成员中转站密钥>`、`X-HFP-Reference-Mode: seedance-asset`，返回 `{"url":"asset://…"}`）。只有平台渠道的模型会带上它，成员任务里自带的同名字段在创建任务时被丢弃。视频任务执行前，`app/platform_reference_assets.go` 把素材库里的参考图逐张登记并改写为 `asset://`，成功的编号按资源缓存在 `ark_private_asset_bindings`（`project_name` 为 `reference-service:<地址>`）；不是素材库资源的参考图会被拒绝。`POST /api/resources/:id/ark-private-asset`（预先登记）在团队服务器上也走这条路径。服务地址启动时校验并自动加入内网放行名单。
 - **密钥只在服务端**：`GET /api/workspace/model-config` 返回的平台渠道 `apiKey`、`secretKey` 为空，另带 `hasApiKey` 表示是否已绑定。服务端在三处补上密钥，并始终改用渠道保存的 `baseUrl`，密钥只会发往管理员配置的地址：创建任务时 `config.channelId` 为 `company-relay`；`POST /api/ai/models` 带 `channelId: "company-relay"`；`/api/ai/custom` 中转请求没带密钥、且目标与该渠道同协议同主机端口。成员自己添加的渠道仍由浏览器携带本人填写的密钥。实现见 `internal/app/platform_credential.go` 与 `internal/handler/workspace.go` 的 `redactPlatformChannels`。
 
 ### 参考素材
@@ -179,6 +181,8 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 
 - 没有存储配额和跨工作区的生成总并发上限：每个内核各自按默认并发 3 执行。
 - 空闲回收以整个工作区内核为单位（含助手子进程），没有单独提前停掉助手；浏览器标签页保持打开并持续请求时，内核不会被回收。
+- 每次整页加载都会把成员的全部画布读入浏览器（画布仓库按“全部在内存”设计），画布很多时首次加载较慢；生成任务进行中，画布每约 2 秒提交一次进度。两者都需要改画布存储结构，暂未处理。
+- AI 超分只接上游 BeefTV 内置服务：团队模式隐藏了节点工具栏入口，“添加节点”菜单里仍有该节点，但会显示“暂无可用超分模型”。
 - 镜像和 Compose 已在内网服务器试部署，尚未压测。
 - 创意工坊复制是同步请求，大作品需要等待；文件直接复制进目标工作区，没有用硬链接省空间；被替代或驳回的版本文件不会自动清理。复制前不检查目标工作区是否配置了作品用到的模型。
 - 技能市场没有上游的 MCP 查询端点和发布历史页（`GET /skills/:skillId`），现有客户端都不调用它们；审核结果只有站内状态，没有通知。
