@@ -1,10 +1,19 @@
 {
   "name": "公司中转站",
-  "baseUrl": "https://relay.example.com/v1",
+  "baseUrl": "http://10.10.10.45:3000/v1",
   "apiFormat": "openai",
-  "models": ["gpt-image-2", "seedance-2.0"],
+  "models": [
+    "gpt-image-2",
+    "doubao-seedance-2-0-260128",
+    "doubao-seedance-2-0-fast-260128",
+    "doubao-seedance-2-5-260628",
+    "gpt-5.5"
+  ],
   "modelProfiles": [
-    { "model": "gpt-image-2", "capability": "image" },
-    { "model": "seedance-2.0", "capability": "video" }
+    {"model": "gpt-image-2", "capability": "image", "protocol": "openai-image"},
+    {"model": "doubao-seedance-2-0-260128", "displayName": "Seedance 2.0", "capability": "video", "protocol": "volcengine-ark-video", "baseUrl": "http://10.10.10.45:3000/doubao/api/v3", "referenceAssetService": "http://10.10.10.45:8787/v1/reference-images"},
+    {"model": "doubao-seedance-2-0-fast-260128", "displayName": "Seedance 2.0 Fast", "capability": "video", "protocol": "volcengine-ark-video", "baseUrl": "http://10.10.10.45:3000/doubao/api/v3", "referenceAssetService": "http://10.10.10.45:8787/v1/reference-images"},
+    {"model": "doubao-seedance-2-5-260628", "displayName": "Seedance 2.5", "capability": "video", "protocol": "volcengine-ark-video", "baseUrl": "http://10.10.10.45:3000/doubao/api/v3", "referenceAssetService": "http://10.10.10.45:8787/v1/reference-images"},
+    {"model": "gpt-5.5", "capability": "text", "protocol": "chat-completion"}
   ]
 }

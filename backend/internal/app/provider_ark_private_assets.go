@@ -27,6 +27,10 @@ func (s *Service) prepareArkPrivateAssetReferences(ctx context.Context, userID s
 	if input == nil || input.Mode != "video" || !isArkPrivateAssetVideoConfig(input.Config) || !parseBool(input.Config.ArkPrivateAssetUpload, true) {
 		return nil
 	}
+	// 公司中转站的 Seedance 模型由公司参考图服务登记素材（团队服务器下发配置）。
+	if strings.TrimSpace(input.Config.ReferenceAssetService) != "" {
+		return s.registerReferenceServiceAssets(ctx, userID, input)
+	}
 	// The desktop profile owns the source media locally. Never copy a local
 	// resource into Ark's hosted trusted-asset service as a side effect of
 	// generation; the normal provider path will handle compatible inline media.
@@ -98,6 +102,13 @@ func (s *Service) prepareArkPrivateAssetReferences(ctx context.Context, userID s
 // 它与任务 worker 共用团队资源归属、就绪状态和审核规则，客户端不能借此向方舟提交任意 URL。
 func (s *Service) SyncResourceToArkPrivateAsset(ctx context.Context, actor *model.User, resourceID string) (*ArkPrivateAssetSyncResult, error) {
 	if s.IsLocalMode() {
+		// 团队服务器配置了公司参考图服务时，提前把图片登记进预设素材组，生成时直接复用。
+		if service, apiKey, ok := s.platformReferenceService(); ok && actor != nil {
+			if _, err := s.ensureReferenceServiceAsset(ctx, actor.ID, strings.TrimSpace(resourceID), service, apiKey); err != nil {
+				return nil, BadAuthRequest(err.Error())
+			}
+			return &ArkPrivateAssetSyncResult{ResourceID: strings.TrimSpace(resourceID), Status: arkPrivateAssetStatusLive}, nil
+		}
 		return nil, BadAuthRequest("本地工作区不支持将素材同步到云端可信素材库")
 	}
 	resourceID = strings.TrimSpace(resourceID)

@@ -2,6 +2,7 @@ package modelcatalog
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 
 	"infinite-canvas/backend/internal/model"
@@ -32,6 +33,7 @@ func ParseLocalChannelModels(body []byte) []LocalChannelModel {
 			Models        []string `json:"models"`
 			ModelProfiles []struct {
 				Model                    string          `json:"model"`
+				BaseURL                  string          `json:"baseUrl"`
 				DisplayName              string          `json:"displayName"`
 				Capability               string          `json:"capability"`
 				Protocol                 string          `json:"protocol"`
@@ -53,7 +55,7 @@ func ParseLocalChannelModels(body []byte) []LocalChannelModel {
 		profiles := map[string]LocalChannelModel{}
 		for _, profile := range channel.ModelProfiles {
 			item := LocalChannelModel{
-				ChannelID: channel.ID, BaseURL: channel.BaseURL, Enabled: enabled,
+				ChannelID: channel.ID, BaseURL: modelBaseURL(channel.BaseURL, profile.BaseURL), Enabled: enabled,
 				Model: profile.Model, DisplayName: strings.TrimSpace(profile.DisplayName),
 				Capability: profile.Capability, Protocol: profile.Protocol,
 				VideoPricing:             profile.VideoPricing,
@@ -68,9 +70,11 @@ func ParseLocalChannelModels(body []byte) []LocalChannelModel {
 			profiles[profile.Model] = item
 		}
 		for _, name := range channel.Models {
-			item := profiles[name]
+			item, profiled := profiles[name]
 			item.ChannelID = channel.ID
-			item.BaseURL = channel.BaseURL
+			if !profiled {
+				item.BaseURL = channel.BaseURL
+			}
 			item.Enabled = enabled
 			item.Model = name
 			if item.DisplayName == "" {
@@ -115,4 +119,19 @@ func localSnapshotChannelModel(item LocalChannelModel) model.ChannelModel {
 		}
 	}
 	return cm
+}
+
+// modelBaseURL lets a model live on its own path of the channel's server (a
+// relay serving Seedance under /doubao/api/v3); another host is ignored.
+func modelBaseURL(channelBase, profileBase string) string {
+	profileBase = strings.TrimSpace(profileBase)
+	if profileBase == "" {
+		return channelBase
+	}
+	channel, channelErr := url.Parse(strings.TrimSpace(channelBase))
+	profile, profileErr := url.Parse(profileBase)
+	if channelErr != nil || profileErr != nil || !strings.EqualFold(channel.Scheme, profile.Scheme) || !strings.EqualFold(channel.Host, profile.Host) {
+		return channelBase
+	}
+	return profileBase
 }

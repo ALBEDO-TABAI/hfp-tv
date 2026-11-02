@@ -458,6 +458,12 @@ func trustRelayHost(template map[string]any) (string, error) {
 	}
 	host := parsed.Hostname()
 	outbound.TrustPrivateUpstreamHost(host)
+	// The reference-image service usually runs next to the relay (e.g. :8787).
+	for _, service := range kernelpool.RelayReferenceServices(template) {
+		if parsed, err := url.Parse(service); err == nil {
+			outbound.TrustPrivateUpstreamHost(parsed.Hostname())
+		}
+	}
 	return host, nil
 }
 

@@ -265,6 +265,14 @@ func (s *Service) UserCanvasProject(userID string, id string) (json.RawMessage, 
 	return s.canvasDomain().UserCanvasProject(userID, id)
 }
 
+func (s *Service) UserCanvasProjectRevision(userID string, id string) (int64, error) {
+	revision, err := s.canvasDomain().UserCanvasProjectRevision(userID, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, NotFound("画布不存在或无权访问")
+	}
+	return revision, err
+}
+
 func (s *Service) UpsertUserCanvasProject(userID string, raw json.RawMessage) (UserDataSummary, error) {
 	return s.canvasDomain().UpsertUserCanvasProject(userID, raw)
 }

@@ -162,6 +162,7 @@ func redactPlatformChannels(config map[string]any, ids []string) map[string]any 
 	if len(ids) == 0 || len(channels) == 0 {
 		return config
 	}
+	secrets := map[string]bool{}
 	next := make([]any, 0, len(channels))
 	for _, raw := range channels {
 		channel, ok := raw.(map[string]any)
@@ -174,6 +175,12 @@ func redactPlatformChannels(config map[string]any, ids []string) map[string]any 
 			redacted[key] = value
 		}
 		key, _ := channel["apiKey"].(string)
+		secret, _ := channel["secretKey"].(string)
+		for _, value := range []string{key, secret} {
+			if strings.TrimSpace(value) != "" {
+				secrets[value] = true
+			}
+		}
 		redacted["hasApiKey"] = strings.TrimSpace(key) != ""
 		redacted["apiKey"] = ""
 		redacted["secretKey"] = ""
@@ -184,7 +191,36 @@ func redactPlatformChannels(config map[string]any, ids []string) map[string]any 
 		out[key] = value
 	}
 	out["channels"] = next
-	return out
+	// Older builds copied the selected channel's key into top-level fields;
+	// a platform key must not leak through any such copy.
+	return scrubSecretValues(out, secrets).(map[string]any)
+}
+
+func scrubSecretValues(value any, secrets map[string]bool) any {
+	if len(secrets) == 0 {
+		return value
+	}
+	switch typed := value.(type) {
+	case string:
+		if secrets[typed] {
+			return ""
+		}
+		return typed
+	case map[string]any:
+		next := make(map[string]any, len(typed))
+		for key, item := range typed {
+			next[key] = scrubSecretValues(item, secrets)
+		}
+		return next
+	case []any:
+		next := make([]any, len(typed))
+		for index, item := range typed {
+			next[index] = scrubSecretValues(item, secrets)
+		}
+		return next
+	default:
+		return value
+	}
 }
 
 func preserveManagedModelConfig(c *gin.Context, svc *app.Service, raw json.RawMessage) json.RawMessage {

@@ -1093,6 +1093,14 @@ func (r *Repository) CanvasProjectForUser(userID string, id string) (*model.Canv
 	return &project, nil
 }
 
+// CanvasProjectRevisionForUser reads only the revision, for change polling
+// that must not load and rebuild the whole canvas document.
+func (r *Repository) CanvasProjectRevisionForUser(userID string, id string) (int64, error) {
+	var project model.CanvasProject
+	err := r.db.Select("revision").Where("id = ? AND user_id = ?", id, userID).First(&project).Error
+	return project.Revision, err
+}
+
 func (r *Repository) UpsertCanvasProject(project *model.CanvasProject) error {
 	expected := project.Revision
 	if expected < 0 {

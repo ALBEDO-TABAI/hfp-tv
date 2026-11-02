@@ -137,6 +137,7 @@ func (s *Service) resolveChannelModelsRequest(input *ChannelModelsRequest) error
 			return BadAuthRequest("管理员还没有为你绑定公司模型服务的密钥")
 		}
 		input.APIKey = credential.apiKey
+		// Model catalogs live on the channel endpoint, not on per-model ones.
 		input.BaseURL = credential.baseURL
 		return nil
 	}

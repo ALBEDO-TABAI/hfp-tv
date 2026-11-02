@@ -73,3 +73,31 @@ func TestPlatformChannelWithoutBoundKeyFailsClearly(t *testing.T) {
 		t.Fatal("model listing without a bound key was accepted")
 	}
 }
+
+func TestPlatformChannelModelEndpointStaysOnTheRelayOrigin(t *testing.T) {
+	s, _, _, _ := creationTestService(t)
+	if err := s.SaveLocalModelConfig([]byte(`{"channels":[{"id":"company-relay","baseUrl":"http://10.10.10.45:3000/v1","apiKey":"sk-member-relay","pinned":true,
+		"modelProfiles":[
+			{"model":"doubao-seedance-2-0-260128","capability":"video","protocol":"volcengine-ark-video","baseUrl":"http://10.10.10.45:3000/doubao/api/v3"},
+			{"model":"elsewhere","capability":"video","baseUrl":"http://203.0.113.9/doubao/api/v3"}]}]}`)); err != nil {
+		t.Fatal(err)
+	}
+	s.SetPlatformChannels([]string{"company-relay"})
+	for model, want := range map[string]string{
+		"doubao-seedance-2-0-260128": "http://10.10.10.45:3000/doubao/api/v3",
+		"elsewhere":                  "http://10.10.10.45:3000/v1", // another host never receives the key
+		"gpt-image-2":                "http://10.10.10.45:3000/v1",
+	} {
+		resolved, err := s.resolvePlatformChannelSecrets(map[string]any{"config": map[string]any{"channelId": "company-relay", "model": model}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := resolved["config"].(map[string]any)["baseUrl"]; got != want {
+			t.Errorf("%s baseUrl = %v, want %s", model, got, want)
+		}
+	}
+	models := ChannelModelsRequest{ChannelID: "company-relay"}
+	if err := s.resolveChannelModelsRequest(&models); err != nil || models.BaseURL != "http://10.10.10.45:3000/v1" {
+		t.Fatalf("catalog must stay on the channel endpoint: %+v %v", models, err)
+	}
+}

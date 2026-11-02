@@ -24,6 +24,28 @@ func (s *Service) IsPlatformChannel(channelID string) bool {
 type platformChannelCredential struct {
 	apiKey  string
 	baseURL string
+	// modelBaseURLs are per-model endpoints on the same origin, e.g. a relay
+	// that serves Seedance under /doubao/api/v3 next to its OpenAI /v1.
+	modelBaseURLs map[string]string
+	// modelReferenceServices register a model's reference images as assets.
+	modelReferenceServices map[string]string
+}
+
+func platformModelKey(model string) string {
+	return strings.TrimPrefix(strings.TrimSpace(model), "models/")
+}
+
+func (c platformChannelCredential) referenceServiceFor(model string) string {
+	return c.modelReferenceServices[platformModelKey(model)]
+}
+
+// baseURLFor returns the model's own endpoint when it shares the channel's
+// origin, otherwise the channel base URL.
+func (c platformChannelCredential) baseURLFor(model string) string {
+	if base := c.modelBaseURLs[platformModelKey(model)]; base != "" && sameCredentialOrigin(base, c.baseURL) {
+		return base
+	}
+	return c.baseURL
 }
 
 func (s *Service) platformChannelCredentials() []platformChannelCredential {
@@ -48,9 +70,14 @@ func (s *Service) platformChannelCredentialsMatching(match func(id string) bool)
 	}
 	var config struct {
 		Channels []struct {
-			ID      string `json:"id"`
-			APIKey  string `json:"apiKey"`
-			BaseURL string `json:"baseUrl"`
+			ID            string `json:"id"`
+			APIKey        string `json:"apiKey"`
+			BaseURL       string `json:"baseUrl"`
+			ModelProfiles []struct {
+				Model                 string `json:"model"`
+				BaseURL               string `json:"baseUrl"`
+				ReferenceAssetService string `json:"referenceAssetService"`
+			} `json:"modelProfiles"`
 		} `json:"channels"`
 	}
 	if json.Unmarshal(body, &config) != nil {
@@ -59,21 +86,38 @@ func (s *Service) platformChannelCredentialsMatching(match func(id string) bool)
 	var out []platformChannelCredential
 	for _, channel := range config.Channels {
 		if s.IsPlatformChannel(channel.ID) && match(channel.ID) {
-			out = append(out, platformChannelCredential{apiKey: strings.TrimSpace(channel.APIKey), baseURL: strings.TrimSpace(channel.BaseURL)})
+			credential := platformChannelCredential{apiKey: strings.TrimSpace(channel.APIKey), baseURL: strings.TrimSpace(channel.BaseURL),
+				modelBaseURLs: map[string]string{}, modelReferenceServices: map[string]string{}}
+			for _, profile := range channel.ModelProfiles {
+				model := platformModelKey(profile.Model)
+				if base := strings.TrimSpace(profile.BaseURL); model != "" && base != "" {
+					credential.modelBaseURLs[model] = base
+				}
+				if service := strings.TrimSpace(profile.ReferenceAssetService); model != "" && service != "" {
+					credential.modelReferenceServices[model] = service
+				}
+			}
+			out = append(out, credential)
 		}
 	}
 	return out
 }
 
 // resolvePlatformChannelSecrets completes a task that names a team-server
-// channel with the stored key. The stored base URL always wins, so the key is
-// only ever sent to the origin the administrator configured. Like the managed
+// channel with the stored key. The stored base URL (or the model's own
+// same-origin endpoint) always wins, so the key is only ever sent to the
+// origin the administrator configured. Like the managed
 // BeefAPI channel, the channel ID is then dropped: admission treats any task
 // with a channel ID as a system-catalog channel.
 func (s *Service) resolvePlatformChannelSecrets(input map[string]any) (map[string]any, error) {
 	config, _ := input["config"].(map[string]any)
+	if config == nil {
+		return input, nil
+	}
 	channelID := strings.TrimSpace(stringValue(config["channelId"]))
-	if config == nil || !s.IsPlatformChannel(channelID) {
+	if !s.IsPlatformChannel(channelID) {
+		// Members' own channels never reach the reference-image service.
+		delete(config, "referenceAssetService")
 		return input, nil
 	}
 	credential, found := s.platformChannelCredential(channelID)
@@ -90,8 +134,13 @@ func (s *Service) resolvePlatformChannelSecrets(input map[string]any) (map[strin
 		}
 	}
 	next["apiKey"] = credential.apiKey
-	next["baseUrl"] = credential.baseURL
+	next["baseUrl"] = credential.baseURLFor(stringValue(config["model"]))
 	next["secretKey"] = ""
+	if service := credential.referenceServiceFor(stringValue(config["model"])); service != "" {
+		next["referenceAssetService"] = service
+	} else {
+		delete(next, "referenceAssetService")
+	}
 	input["config"] = next
 	return input, nil
 }

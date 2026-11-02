@@ -29,8 +29,8 @@ func newHarness(t *testing.T, configure ...func(*Options)) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	relayTemplate := map[string]any{"name": "公司中转站", "baseUrl": "https://relay.example.com/v1", "apiFormat": "openai", "models": []any{"relay-model"},
-		"modelProfiles": []any{map[string]any{"model": "relay-model", "capability": "image"}}}
+	relayTemplate := map[string]any{"name": "公司中转站", "baseUrl": "https://relay.example.com/v1", "apiFormat": "openai", "models": []any{"relay-model", "relay-text"},
+		"modelProfiles": []any{map[string]any{"model": "relay-model", "capability": "image"}, map[string]any{"model": "relay-text", "capability": "text", "protocol": "chat-completion"}}}
 	pool := kernelpool.New(kernelpool.Options{
 		RelayTemplate:   relayTemplate,
 		ShutdownTimeout: 5 * time.Second,
@@ -357,7 +357,7 @@ func TestServiceStatusShowsDeploymentToAdminsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	status := envelope.Data
-	if !status.Relay.Configured || status.Relay.BaseURL != "https://relay.example.com/v1" || len(status.Relay.Models) != 1 || status.Relay.Models[0].Capability != "image" || status.Relay.AutoAllowedHost != "relay.example.com" {
+	if !status.Relay.Configured || status.Relay.BaseURL != "https://relay.example.com/v1" || len(status.Relay.Models) != 2 || status.Relay.Models[0].Capability != "image" || status.Relay.AutoAllowedHost != "relay.example.com" {
 		t.Fatalf("relay status = %+v", status.Relay)
 	}
 	if status.CookieSecure != "always" || status.IdleTimeoutSeconds != 1800 || status.Members.Active != 3 || status.Members.WithRelayKey != 1 || status.Workspaces.Total != 3 {
@@ -378,5 +378,55 @@ func TestMembersCanCreateTasksThroughTheGateway(t *testing.T) {
 		if response.Code == http.StatusForbidden {
 			t.Fatalf("%s rejected the workspace owner: %s", path, response.Body.String())
 		}
+	}
+}
+
+func TestProvisionedWorkspaceIsReadyAndNeverEchoesTheRelayKey(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	alice, err := h.users.CreateUser(ctx, "", accounts.CreateUserInput{Username: "alice", Password: "alice-pass", RelayKey: "sk-alice-relay-5555"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := h.users.CreateUser(ctx, "", accounts.CreateUserInput{Username: "bob", Password: "bob-pass1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	aliceCookie := h.login("alice", "alice-pass")
+	body := h.do(call{method: http.MethodGet, path: "/api/workspace/model-config", cookie: aliceCookie}).Body.String()
+	if !strings.Contains(body, `"textModel":"company-relay::relay-text"`) {
+		t.Fatalf("a new member got no text model for the assistant: %s", body)
+	}
+
+	// An older build copied the selected channel's key into top-level fields.
+	workspace, _ := h.users.WorkspaceForUser(ctx, alice.ID)
+	spec, _ := h.server.WorkspaceSpec(*workspace)
+	store, err := workspacecfg.NewProviderConfig(spec.DataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective, _, err := store.LoadEffectiveModelConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective.Config["apiKey"] = "sk-alice-relay-5555"
+	effective.Config["legacy"] = map[string]any{"nested": []any{"sk-alice-relay-5555"}}
+	raw, _ := json.Marshal(effective.Config)
+	if err := store.SaveLocalModelConfig(raw); err != nil {
+		t.Fatal(err)
+	}
+	body = h.do(call{method: http.MethodGet, path: "/api/workspace/model-config", cookie: aliceCookie}).Body.String()
+	if strings.Contains(body, "sk-alice-relay") {
+		t.Fatalf("stale copy of the relay key reached the browser: %s", body)
+	}
+
+	// Another member's canvas event stream is a plain 404, not a server error.
+	_ = bob
+	project := `{"project":{"id":"alice-canvas","revision":0,"title":"A","nodes":[],"connections":[]}}`
+	if response := h.do(call{method: http.MethodPut, path: "/api/canvas-projects/alice-canvas", cookie: aliceCookie, body: project}); response.Code != http.StatusOK {
+		t.Fatalf("save canvas = %d %s", response.Code, response.Body.String())
+	}
+	if response := h.do(call{method: http.MethodGet, path: "/api/canvas-projects/alice-canvas/events", cookie: h.login("bob", "bob-pass1")}); response.Code != http.StatusNotFound {
+		t.Fatalf("foreign canvas events = %d %s", response.Code, response.Body.String())
 	}
 }

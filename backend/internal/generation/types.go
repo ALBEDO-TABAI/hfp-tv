@@ -84,6 +84,9 @@ type Config struct {
 	BaseURL                  string                    `json:"baseUrl"`
 	ReferenceAssetOrigin     string                    `json:"referenceAssetOrigin,omitempty"`
 	ReferenceMediaTransport  map[string]string         `json:"referenceMediaTransport,omitempty"`
+	// ReferenceAssetService is the company reference-image service that turns
+	// a local reference image into an asset:// ID; only team-server channels set it.
+	ReferenceAssetService string `json:"referenceAssetService,omitempty"`
 	APIKey                   string                    `json:"apiKey"`
 	SecretKey                string                    `json:"secretKey"`
 	Headers                  []outbound.OutboundHeader `json:"headers"`

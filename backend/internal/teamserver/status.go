@@ -25,25 +25,36 @@ type DeploymentStatus struct {
 }
 
 type relayModelView struct {
-	Model      string `json:"model"`
-	Capability string `json:"capability"`
+	Model                 string `json:"model"`
+	Capability            string `json:"capability"`
+	Protocol              string `json:"protocol"`
+	BaseURL               string `json:"baseUrl"`
+	ReferenceAssetService string `json:"referenceAssetService"`
 }
 
 func relayModels(template map[string]any) []relayModelView {
-	capabilities := map[string]string{}
+	text := func(profile map[string]any, key string) string {
+		value, _ := profile[key].(string)
+		return strings.TrimSpace(value)
+	}
+	byModel := map[string]relayModelView{}
 	profiles, _ := template["modelProfiles"].([]any)
 	for _, raw := range profiles {
 		if profile, ok := raw.(map[string]any); ok {
-			model, _ := profile["model"].(string)
-			capability, _ := profile["capability"].(string)
-			capabilities[strings.TrimSpace(model)] = strings.TrimSpace(capability)
+			model := text(profile, "model")
+			byModel[model] = relayModelView{Model: model, Capability: text(profile, "capability"), Protocol: text(profile, "protocol"),
+				BaseURL: text(profile, "baseUrl"), ReferenceAssetService: text(profile, "referenceAssetService")}
 		}
 	}
 	models := []relayModelView{}
 	listed, _ := template["models"].([]any)
 	for _, raw := range listed {
 		if model := strings.TrimSpace(fmt.Sprint(raw)); model != "" {
-			models = append(models, relayModelView{Model: model, Capability: capabilities[model]})
+			view, ok := byModel[model]
+			if !ok {
+				view = relayModelView{Model: model}
+			}
+			models = append(models, view)
 		}
 	}
 	return models

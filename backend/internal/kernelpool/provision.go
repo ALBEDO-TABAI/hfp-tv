@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -39,7 +40,56 @@ func LoadRelayTemplate(path string) (map[string]any, error) {
 			return nil, fmt.Errorf("公司中转站渠道定义不能包含 %s，密钥按成员单独绑定", secret)
 		}
 	}
+	if err := checkModelBaseURLs(template); err != nil {
+		return nil, err
+	}
 	return template, nil
+}
+
+// checkModelBaseURLs allows a model its own endpoint on the relay (for example
+// Seedance under /doubao/api/v3) but never another host: members' keys are
+// sent to whatever URL the model resolves to.
+func checkModelBaseURLs(template map[string]any) error {
+	base, err := url.Parse(strings.TrimSpace(fmt.Sprint(template["baseUrl"])))
+	if err != nil || base.Host == "" {
+		return errors.New("公司中转站渠道定义的 baseUrl 无效")
+	}
+	profiles, _ := template["modelProfiles"].([]any)
+	for _, raw := range profiles {
+		profile, _ := raw.(map[string]any)
+		modelBase, _ := profile["baseUrl"].(string)
+		if strings.TrimSpace(modelBase) == "" {
+			continue
+		}
+		parsed, err := url.Parse(strings.TrimSpace(modelBase))
+		if err != nil || !strings.EqualFold(parsed.Scheme, base.Scheme) || !strings.EqualFold(parsed.Host, base.Host) {
+			return fmt.Errorf("公司中转站渠道里模型 %v 的 baseUrl 必须与渠道 baseUrl 同协议、同主机和端口", profile["model"])
+		}
+	}
+	for _, service := range RelayReferenceServices(template) {
+		parsed, err := url.Parse(service)
+		if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return fmt.Errorf("公司中转站渠道里的 referenceAssetService 必须是 http:// 或 https:// 开头的完整地址：%s", service)
+		}
+	}
+	return nil
+}
+
+// RelayReferenceServices lists the reference-image service URLs named by the
+// template's model profiles, deduplicated.
+func RelayReferenceServices(template map[string]any) []string {
+	var services []string
+	seen := map[string]bool{}
+	profiles, _ := template["modelProfiles"].([]any)
+	for _, raw := range profiles {
+		profile, _ := raw.(map[string]any)
+		service, _ := profile["referenceAssetService"].(string)
+		if service = strings.TrimSpace(service); service != "" && !seen[service] {
+			seen[service] = true
+			services = append(services, service)
+		}
+	}
+	return services
 }
 
 func cloneJSONMap(value map[string]any) (map[string]any, error) {
@@ -96,6 +146,13 @@ func applyRelayChannel(dataDir string, template map[string]any, apiKey string) e
 		next = append(next, raw)
 	}
 	config["channels"] = next
+	// The assistant reads the stored text model; the page only displays a
+	// fallback. Give a member who never picked one the relay's text model.
+	if current, _ := config["textModel"].(string); strings.TrimSpace(current) == "" {
+		if model := firstRelayModel(template, "text"); model != "" {
+			config["textModel"] = RelayChannelID + "::" + model
+		}
+	}
 	body, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -109,4 +166,17 @@ func applyReferenceStorage(dataDir string, config *referencestorage.Config) erro
 	}
 	_, err := referencestorage.Save(dataDir, *config)
 	return err
+}
+
+func firstRelayModel(template map[string]any, capability string) string {
+	profiles, _ := template["modelProfiles"].([]any)
+	for _, raw := range profiles {
+		profile, _ := raw.(map[string]any)
+		if value, _ := profile["capability"].(string); strings.EqualFold(strings.TrimSpace(value), capability) {
+			if model, _ := profile["model"].(string); strings.TrimSpace(model) != "" {
+				return strings.TrimSpace(model)
+			}
+		}
+	}
+	return ""
 }

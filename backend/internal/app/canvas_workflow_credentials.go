@@ -210,5 +210,12 @@ func (s *Service) refreshCanvasWorkflowCredentials(input map[string]any, channel
 			delete(config, key)
 		}
 	}
+	delete(config, "referenceAssetService")
+	if credential, ok := s.platformChannelCredential(channelID); ok {
+		config["baseUrl"] = credential.baseURLFor(model)
+		if service := credential.referenceServiceFor(model); service != "" {
+			config["referenceAssetService"] = service
+		}
+	}
 	return nil
 }

@@ -87,6 +87,21 @@ func TestHostedKernelsStayIsolatedInOneProcess(t *testing.T) {
 	}
 }
 
+func TestHostedGatewayOwnerReachesTaskCreationAdmission(t *testing.T) {
+	runtime := openHostedKernel(t, t.TempDir())
+
+	// Invalid JSON stops at request binding after the write-principal check. This
+	// covers the production gateway/runtime trust chain without creating a task
+	// or calling a paid model.
+	response := hostedCall(t, runtime, http.MethodPost, "/tasks", `{`, nil)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("hosted owner task creation = %d %s, want request binding failure", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "任务只能由当前桌面界面创建") {
+		t.Fatalf("hosted owner was rejected by desktop UI trust: %s", response.Body.String())
+	}
+}
+
 func TestHostedKernelRefusesServerLocalCapabilities(t *testing.T) {
 	runtime := openHostedKernel(t, t.TempDir())
 	cases := []struct{ method, path string }{
