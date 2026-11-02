@@ -8,6 +8,7 @@ import { acceptExternalCanvasRevision, pendingExternalCanvasRevision, syncLocalC
 import { canvasExternalRevisionVersion, subscribeCanvasExternalRevision, useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { canvasSyncProgressKey, useSyncProgressStore, type SyncProjectProgress } from "@/stores/use-sync-progress-store";
 import { workspaceCapabilities } from "@/services/workspace-mode";
+import { isHostedMode } from "@/stores/use-platform-session";
 
 export type CanvasSyncStatusView = {
     label: string;
@@ -31,9 +32,11 @@ export function canvasSyncStatusView(localOnly: boolean, progress: Pick<SyncProj
                 action: "use-latest",
             };
         }
-        if (phase === "error") return { label: "保存失败", tone: "failed", detail: "保存没有完成，修改仍保留在本机。", action: "retry-save" };
-        if (saving) return { label: "正在保存", tone: "saving", detail: "正在保存到本机。" };
-        return { label: "已保存在本地", tone: "saved", detail: "画布已保存在本机。" };
+        // 团队服务器的“本地工作区”在服务器上；“本机”只对桌面版成立。
+        const hosted = isHostedMode();
+        if (phase === "error") return { label: "保存失败", tone: "failed", detail: hosted ? "保存没有完成，修改仍保留在这个浏览器里。" : "保存没有完成，修改仍保留在本机。", action: "retry-save" };
+        if (saving) return { label: "正在保存", tone: "saving", detail: hosted ? "正在保存到服务器。" : "正在保存到本机。" };
+        return hosted ? { label: "已保存", tone: "saved", detail: "画布已保存到服务器。" } : { label: "已保存在本地", tone: "saved", detail: "画布已保存在本机。" };
     }
     const conflict = phase === "conflict";
     const failed = phase === "error" || conflict || !phase;

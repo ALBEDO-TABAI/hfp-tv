@@ -24,7 +24,7 @@ export default function AdminServicePage() {
                         { key: "name", label: "名称", children: data.relay.name },
                         { key: "url", label: "服务地址", children: data.relay.baseUrl },
                         { key: "format", label: "接口格式", children: data.relay.apiFormat },
-                        { key: "models", label: "模型", children: data.relay.models.length ? <div className="flex flex-wrap gap-2">{data.relay.models.map(({ model, capability }) => <Tag key={`${model}:${capability}`} className="whitespace-normal break-all">{model} · {capabilityLabels[capability] ?? capability}</Tag>)}</div> : "尚未配置模型" },
+                        { key: "models", label: "模型", children: data.relay.models.length ? <div className="flex flex-wrap gap-2">{data.relay.models.map(({ model, capability, referenceAssetService }) => <Tag key={`${model}:${capability}`} className="whitespace-normal break-all" title={referenceAssetService ? `参考图登记：${referenceAssetService}` : undefined}>{model} · {capabilityLabels[capability] ?? capability}{referenceAssetService ? " · 参考图自动登记" : ""}</Tag>)}</div> : "尚未配置模型" },
                         { key: "file", label: "渠道文件", children: data.relay.file },
                     ]} />
                     <p style={{ color: "var(--ink-2)" }}>成员的请求都发往这个地址，各自使用自己的中转密钥</p>

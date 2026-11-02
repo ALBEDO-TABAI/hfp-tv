@@ -1,18 +1,19 @@
 import { isLocalRuntimeMode, isNativeDesktopRuntime } from "@/lib/runtime-mode";
 import { resourceIdFromStorageKey } from "@/services/api/resources";
+import { isHostedMode } from "@/stores/use-platform-session";
 
 /**
- * Resource storage policy for the two local runtimes:
- * - native desktop: Go resource service is the durable local store;
+ * Resource storage policy for the local runtimes:
+ * - native desktop and team server: the Go resource service is the durable store
+ *   (the team server's kernels are local-profile workspaces reached over HTTP);
  * - browser local: IndexedDB is the durable local store.
- * Hosted mode always attempts the remote resource API first.
  */
 export function usesBrowserLocalResourceStore() {
-    return isLocalRuntimeMode() && !isNativeDesktopRuntime();
+    return isLocalRuntimeMode() && !isNativeDesktopRuntime() && !isHostedMode();
 }
 
 export function usesNativeLocalResourceStore() {
-    return isLocalRuntimeMode() && isNativeDesktopRuntime();
+    return isLocalRuntimeMode() && (isNativeDesktopRuntime() || isHostedMode());
 }
 
 const WORKSPACE_MEDIA_KINDS = new Set(["image", "video", "audio", "model"]);

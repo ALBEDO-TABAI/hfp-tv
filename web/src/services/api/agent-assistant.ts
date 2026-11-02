@@ -83,9 +83,9 @@ export type AssistantGenerationProposal = {
 };
 
 export async function confirmAssistantProduction(canvasId: string, turnId: string, proposal: AssistantGenerationProposal) {
-    return http.post<{ taskIds: string[]; continuationId: string }>(`/assistant/turns/${encodeURIComponent(turnId)}/proposals/${encodeURIComponent(proposal.proposalId)}/production`, {
+    return withUiSession((config) => http.post<{ taskIds: string[]; continuationId: string }>(`/assistant/turns/${encodeURIComponent(turnId)}/proposals/${encodeURIComponent(proposal.proposalId)}/production`, {
         canvasId, kind: proposal.kind, nodeIds: proposal.nodeIds, targets: proposal.production?.targets,
-    }, await uiSessionConfig());
+    }, config));
 }
 
 export type AssistantPlan = {
@@ -230,30 +230,40 @@ export async function getAgentHostStatus(): Promise<AgentHostStatus> {
     return data;
 }
 
-/** UI 会话头由页面内存里的凭据提供；助手的每条路由都走同一套认证。 */
-async function uiSessionConfig() {
+/**
+ * UI 会话头由页面内存里的凭据提供；助手的每条路由都走同一套认证。
+ * 凭据只存在于工作区内核内存里：内核重启或空闲回收后旧凭据会被 403 unauthenticated
+ * 拒绝（此时请求在认证层被拦下，没有执行任何操作），换一次新凭据再试。
+ */
+async function withUiSession<T>(send: (config: { headers: Record<string, string> }) => Promise<T>): Promise<T> {
     const token = await ensureAgentUiSession();
-    return { headers: { "X-Beeftv-Ui-Session": token } };
+    try {
+        return await send({ headers: { "X-Beeftv-Ui-Session": token } });
+    } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 403 || error.reason !== "unauthenticated") throw error;
+        if (uiSession?.token === token) resetAgentUiSession();
+        return send({ headers: { "X-Beeftv-Ui-Session": await ensureAgentUiSession() } });
+    }
 }
 
 /** 重新拉起助手运行环境。失败必须抛出，界面才不会把「没启动」显示成「已就绪」。 */
 export async function restartAgentHost(): Promise<void> {
-    await http.post<{ restarted: boolean }>("/assistant/host/restart", {}, await uiSessionConfig());
+    await withUiSession((config) => http.post<{ restarted: boolean }>("/assistant/host/restart", {}, config));
 }
 
 /** 读取失败必须与空历史区分，由界面保留原内容并提供重新读取。 */
 export async function listAssistantSessions(canvasId: string): Promise<AssistantSessionList> {
-    return http.get<AssistantSessionList>(`/assistant/sessions?canvasId=${encodeURIComponent(canvasId)}`, await uiSessionConfig());
+    return withUiSession((config) => http.get<AssistantSessionList>(`/assistant/sessions?canvasId=${encodeURIComponent(canvasId)}`, config));
 }
 
 export async function createAssistantSession(canvasId: string): Promise<string | null> {
-    const data = await http.post<{ sessionId: string }>("/assistant/sessions", { canvasId }, await uiSessionConfig());
+    const data = await withUiSession((config) => http.post<{ sessionId: string }>("/assistant/sessions", { canvasId }, config));
     if (!data?.sessionId) throw new Error("没能新建对话，请重试");
     return data.sessionId;
 }
 
 export async function activateAssistantSession(canvasId: string, sessionId: string): Promise<string | null> {
-    const data = await http.post<{ sessionId: string }>("/assistant/sessions/activate", { canvasId, sessionId }, await uiSessionConfig());
+    const data = await withUiSession((config) => http.post<{ sessionId: string }>("/assistant/sessions/activate", { canvasId, sessionId }, config));
     if (!data?.sessionId) throw new Error("没能切换对话，请重试");
     return data.sessionId;
 }
@@ -261,7 +271,7 @@ export async function activateAssistantSession(canvasId: string, sessionId: stri
 export async function getAssistantHistory(canvasId: string, sessionId?: string): Promise<AssistantHistory> {
     const query = new URLSearchParams({ canvasId });
     if (sessionId) query.set("sessionId", sessionId);
-    const data = await http.get<AssistantHistory>(`/assistant/history?${query.toString()}`, await uiSessionConfig());
+    const data = await withUiSession((config) => http.get<AssistantHistory>(`/assistant/history?${query.toString()}`, config));
     if (!data || !Array.isArray(data.turns)) throw new Error("没能读取对话，请重试");
     return { sessionId: data.sessionId || sessionId || "", active: data.active, plan: data.plan ?? null, turns: data.turns.map((turn) => ({
         ...turn,
@@ -280,7 +290,7 @@ export type AssistantUndoResult = { ok: true; revision: number } | { ok: false; 
  */
 export async function undoAssistantTurn(turnId: string, canvasId: string): Promise<AssistantUndoResult> {
     try {
-        const data = await http.post<{ revision: number }>(`/assistant/turns/${encodeURIComponent(turnId)}/undo`, { canvasId }, await uiSessionConfig());
+        const data = await withUiSession((config) => http.post<{ revision: number }>(`/assistant/turns/${encodeURIComponent(turnId)}/undo`, { canvasId }, config));
         return { ok: true, revision: data?.revision ?? 0 };
     } catch (error) {
         return { ok: false, failure: assistantUndoFailure(error) };
@@ -297,7 +307,7 @@ export const ASSISTANT_PROPOSAL_INVALIDATED_TEXT = "已失效，请让助手重�
  */
 export async function confirmAssistantProposalRunnable(turnId: string, proposalId: string, canvasId: string): Promise<string | null> {
     try {
-        await http.post<{ runnable: boolean }>(`/assistant/turns/${encodeURIComponent(turnId)}/proposals/${encodeURIComponent(proposalId)}/run`, { canvasId }, await uiSessionConfig());
+        await withUiSession((config) => http.post<{ runnable: boolean }>(`/assistant/turns/${encodeURIComponent(turnId)}/proposals/${encodeURIComponent(proposalId)}/run`, { canvasId }, config));
         return null;
     } catch (error) {
         const reason = error instanceof ApiError ? error.reason : undefined;

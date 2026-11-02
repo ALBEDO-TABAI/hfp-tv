@@ -15,6 +15,7 @@ import { ChannelModelSettings } from "./channel-model-settings";
 import { currentModelConnectionReceipt, useModelConnectionTests } from "@/stores/use-model-connection-tests";
 import "./model-service-editor.css";
 import { getTransportFailureKind } from "@/services/api/request";
+import { isHostedMode } from "@/stores/use-platform-session";
 
 export function ModelServiceEditor({ initial, onClose, onSave }: { initial?: ModelChannel; onClose: () => void; onSave: (channel: ModelChannel) => Promise<void> }) {
     const [draft, setDraft] = useState<ModelChannel>(() => initial ? structuredClone(initial) : { ...createModelChannel(), name: "", baseUrl: "" });
@@ -181,7 +182,7 @@ export function ModelServiceEditor({ initial, onClose, onSave }: { initial?: Mod
                         <span><strong>{preset.name}</strong><small>{preset.subtitle}</small></span>
                         {presetId === preset.id && <Check size={15} />}
                     </button>)}
-                    <div className="model-service-note"><ShieldCheck size={16} /><p>密钥保存在这台设备上。<br />生成费用由服务商结算。</p></div>
+                    <div className="model-service-note"><ShieldCheck size={16} /><p>{isHostedMode() ? "密钥保存在你的团队工作区，只有你本人可用。" : "密钥保存在这台设备上。"}<br />生成费用由服务商结算。</p></div>
                 </aside>
                 <Form layout="vertical" requiredMark={false} className="model-service-fields" disabled={busy} onFinish={() => void fetchModels()}>
                     <div className="model-service-form-title"><ModelLogo icon={selectedPreset.icon} size={28} /><div><h3>{selectedPreset.name}</h3>{presetId === "compatible" && <p>用户可以自行添加第三方模型服务，但是 hfp - all in one 无法确保所有第三方模型服务的兼容性</p>}</div></div>

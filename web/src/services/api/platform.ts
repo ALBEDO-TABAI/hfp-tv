@@ -35,7 +35,7 @@ export type PlatformServiceStatus = {
         name: string;
         baseUrl: string;
         apiFormat: string;
-        models: { model: string; capability: "image" | "video" | "text" | "audio" | "" }[];
+        models: { model: string; capability: "image" | "video" | "text" | "audio" | ""; protocol?: string; baseUrl?: string; referenceAssetService?: string }[];
         file: string;
         autoAllowedHost: string;
     };

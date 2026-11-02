@@ -123,6 +123,10 @@ function applyRefraction(el: HTMLElement) {
 
 let initialized = false;
 
+// The rim highlight follows the pointer in coarse steps; finer steps are not
+// visible but each one restyles every glass element.
+const LIGHT_ANGLE_STEP = 15;
+
 export function initHfpGlassRuntime() {
     if (typeof window === "undefined" || initialized) return;
     initialized = true;
@@ -130,17 +134,27 @@ export function initHfpGlassRuntime() {
     let lx = 0.3;
     let ly = 0.2;
     let raf = 0;
+    let lightAngle = "";
+    const glass = document.getElementsByClassName("lg");
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
     window.addEventListener(
         "pointermove",
         (e) => {
+            // Drags and canvas pans move the pointer every frame; skip the highlight then.
+            if (e.buttons !== 0 || reducedMotion?.matches || glass.length === 0) return;
             lx = e.clientX / Math.max(1, window.innerWidth) - 0.5;
             ly = e.clientY / Math.max(1, window.innerHeight) - 0.5;
             if (!raf) {
                 raf = requestAnimationFrame(() => {
                     raf = 0;
-                    const angle = (Math.atan2(ly, lx) * 180) / Math.PI + 270;
-                    document.documentElement.style.setProperty("--la", `${angle.toFixed(1)}deg`);
+                    const raw = (Math.atan2(ly, lx) * 180) / Math.PI + 270;
+                    const angle = `${Math.round(raw / LIGHT_ANGLE_STEP) * LIGHT_ANGLE_STEP}deg`;
+                    if (angle === lightAngle) return;
+                    lightAngle = angle;
+                    // --la is registered as non-inheriting: writing it on each glass element
+                    // restyles only those elements, not the whole document as on <html>.
+                    for (const element of glass) (element as HTMLElement).style.setProperty("--la", angle);
                 });
             }
         },
@@ -181,33 +195,52 @@ export function initHfpGlassRuntime() {
         { passive: true },
     );
 
+    // ResizeObserver reports every observed element once on observe and again on
+    // each size change, so it alone keeps the refraction overlay current.
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
             if (entry.target instanceof HTMLElement) applyRefraction(entry.target);
         }
     });
-
-    const scan = () => {
-        document.querySelectorAll<HTMLElement>("[data-refract], .lg").forEach((el) => {
-            if (!(el as HTMLElement & { __lgObserved?: boolean }).__lgObserved) {
-                (el as HTMLElement & { __lgObserved?: boolean }).__lgObserved = true;
-                ro.observe(el);
-            }
-            applyRefraction(el);
-        });
+    const GLASS_SELECTOR = "[data-refract], .lg";
+    const prepare = (el: HTMLElement) => {
+        const tracked = el as HTMLElement & { __lgObserved?: boolean };
+        if (!tracked.__lgObserved) {
+            tracked.__lgObserved = true;
+            ro.observe(el);
+        }
+        if (lightAngle && el.classList.contains("lg")) el.style.setProperty("--la", lightAngle);
+    };
+    const scanTree = (root: Element) => {
+        if (root instanceof HTMLElement && root.matches(GLASS_SELECTOR)) prepare(root);
+        root.querySelectorAll<HTMLElement>(GLASS_SELECTOR).forEach(prepare);
     };
 
+    // Only newly added subtrees are scanned. Re-measuring every glass element on any
+    // DOM change forced a layout per frame while the canvas mounted nodes during a pan.
+    const added = new Set<Element>();
     let scanFrame = 0;
-    const mo = new MutationObserver(() => {
-        if (!scanFrame) {
+    const mo = new MutationObserver((records) => {
+        for (const record of records) {
+            record.addedNodes.forEach((node) => {
+                if (node instanceof Element) added.add(node);
+            });
+        }
+        if (added.size && !scanFrame) {
             scanFrame = requestAnimationFrame(() => {
                 scanFrame = 0;
-                scan();
+                for (const element of added) if (element.isConnected) scanTree(element);
+                added.clear();
             });
         }
     });
+    // Theme and transparency changes alter the overlay without resizing anything.
+    const themeObserver = new MutationObserver(() => {
+        document.querySelectorAll<HTMLElement>(GLASS_SELECTOR).forEach(applyRefraction);
+    });
     if (document.body) {
         mo.observe(document.body, { childList: true, subtree: true });
-        scan();
+        themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] });
+        scanTree(document.body);
     }
 }

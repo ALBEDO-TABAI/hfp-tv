@@ -408,7 +408,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                             <ChannelStatus channel={channel} persistence={persistence} connection={builtinBeefAPI ? beefConnection : null} />
                                         </div>
                                         {topazUpscale ? <p className="mt-1 text-xs text-foreground/55">从图片或视频节点上方的「AI超分」使用</p> : null}
-                                        {platformManaged ? <p className="mt-1 text-xs text-foreground/55">{channel.hasApiKey !== true ? "等待管理员绑定中转站密钥" : "由管理员维护，按你的个人密钥计量"}</p> : null}
+                                        {platformManaged ? <p className="mt-1 text-xs text-foreground/55">{channel.hasApiKey !== true ? "由管理员维护，绑定密钥后即可使用" : "由管理员维护，按你的个人密钥计量"}</p> : null}
                                         {!builtinBeefAPI && !topazUpscale && !platformManaged && <p className="mt-1 break-all text-xs text-foreground/50">模型目录地址：{modelCatalogRequestURL(channel)}</p>}
                                     </div>
                                     <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto sm:shrink-0">

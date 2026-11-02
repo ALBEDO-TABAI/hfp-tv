@@ -4,6 +4,7 @@ import { getActiveUserScope } from "@/lib/user-scope";
 import { assertUserScope, captureUserScope, isUserScopeAbandonedError, type CapturedUserScope } from "@/lib/user-scope-guard";
 import { captureVideoPoster, detectVideoAudioTrackFromBlob } from "@/lib/video-poster";
 import { resourceFileUrl, resourceIdFromStorageKey, resourceStorageKey, ResourceUploadError, uploadResourceFile } from "@/services/api/resources";
+import { isHostedMode } from "@/stores/use-platform-session";
 import { apiBaseURL } from "@/services/api/request";
 import { uploadImage, type UploadedImage } from "@/services/image-storage";
 import { createChannelTransport } from "@/services/api/channel-transport";
@@ -177,6 +178,9 @@ export async function resolveMediaUrl(storageKey?: string, fallback = "") {
         // resource is not already cached, eagerly fetch it through the
         // authenticated client and hand the player a Blob URL.
         if (cached) return cached;
+        // The team server authenticates with its session cookie instead, so the
+        // player streams with range requests rather than downloading every file.
+        if (isHostedMode()) return resourceFileUrl(resourceId);
         const hydrated = await cacheResourceObjectUrl(storageKey).catch(() => "");
         return hydrated || resourceFileUrl(resourceId);
     }

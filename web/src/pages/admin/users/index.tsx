@@ -16,6 +16,13 @@ const roles = [{ value: "member", label: "成员" }, { value: "admin", label: "�
 const usersKey = ["platform", "users"];
 const auditKey = ["platform", "audit"];
 const time = (value: string | null) => value ? new Date(value).toLocaleString() : "尚未登录";
+const auditActions: Record<string, string> = {
+    "user.create": "创建账号", "user.update": "修改账号", "user.password.reset": "重置密码", "user.password.change": "修改密码",
+    "relay.bind": "绑定中转密钥", "relay.clear": "清除中转密钥", "invitation.create": "创建邀请", "market.authorize": "连接技能投稿",
+    "skill.approve": "通过技能", "skill.reject": "驳回技能", "skill.unlist": "下架技能", "skill.relist": "恢复技能",
+    "workshop.submit": "投稿作品", "workshop.approve": "通过作品", "workshop.reject": "驳回作品", "workshop.unlist": "下架作品",
+    "workshop.relist": "恢复作品", "workshop.feature": "设为精选", "workshop.unfeature": "取消精选", "workshop.official": "设为官方", "workshop.unofficial": "取消官方",
+};
 
 export default function AdminUsersPage() {
     const { message } = App.useApp();
@@ -102,7 +109,7 @@ export default function AdminUsersPage() {
                 <Table rowKey="id" dataSource={audit.data?.items} loading={audit.isFetching} scroll={{ x: 700 }} pagination={{ pageSize: 20 }} columns={[
                     { title: "时间", dataIndex: "createdAt", render: time },
                     { title: "操作人", dataIndex: "actorUsername" },
-                    { title: "操作", dataIndex: "action" },
+                    { title: "操作", dataIndex: "action", render: (action: string) => auditActions[action] ?? action },
                     { title: "对象", dataIndex: "targetUsername" },
                     { title: "详情", dataIndex: "detail" },
                 ]} />

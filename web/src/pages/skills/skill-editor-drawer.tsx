@@ -9,6 +9,7 @@ import { generateSkillDraft } from "@/lib/canvas/skill-drafting";
 import { navigateToSettings } from "@/lib/settings-navigation";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { createSkill, updateSkill, type Skill, type SkillMutationInput, type SkillShowcaseMedia } from "@/services/api/skills";
+import { isHostedMode } from "@/stores/use-platform-session";
 
 type SkillFormValues = Omit<SkillMutationInput, "isPrivate"> & { is_public: boolean };
 
@@ -142,7 +143,7 @@ export function SkillEditorDrawer({ open, skill, onClose, onSaved }: { open: boo
                     <Form.Item name="markdownUrl" label={isPackageSkill ? "来源地址" : "Markdown 地址"} rules={[{ type: "url", message: "请输入有效的 HTTP(S) 链接" }]}>
                         <Input type="url" inputMode="url" spellCheck={false} placeholder="https://example.com/SKILL.md" />
                     </Form.Item>
-                    <p className="text-sm text-foreground/60">保存到本机，仅自己使用。公开分享请到“我的投稿”确认送审。</p>
+                    <p className="text-sm text-foreground/60">{isHostedMode() ? "保存到你的工作区，仅自己使用。" : "保存到本机，仅自己使用。"}公开分享请到“我的投稿”确认送审。</p>
                 </div>
 
                 <Form.List name="showcaseMedia">

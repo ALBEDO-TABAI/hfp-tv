@@ -5,6 +5,7 @@ import { isLocalRuntimeMode } from "@/lib/runtime-mode";
 import { getActiveUserScope } from "@/lib/user-scope";
 import { assertUserScope, captureUserScope, isUserScopeAbandonedError, type CapturedUserScope } from "@/lib/user-scope-guard";
 import { importResourceFromUrl, isResourceUrl, resourceFileUrl, resourceIdFromStorageKey, resourceStorageKey, ResourceUploadError, uploadResourceFile } from "@/services/api/resources";
+import { isHostedMode } from "@/stores/use-platform-session";
 import { cacheResourceObjectUrl, getCachedResourceBlob, getCachedResourceObjectUrl, primeResourceBlobCache } from "@/services/resource-blob-cache";
 import { usesBrowserLocalResourceStore } from "@/services/workspace-resource-storage";
 import { startOperation } from "@/stores/use-operation-progress";
@@ -116,6 +117,9 @@ export async function resolveImageUrl(storageKey?: string, fallback = "", option
     if (resourceId) {
         const cached = await getCachedResourceObjectUrl(storageKey).catch(() => "");
         if (cached) return cached;
+        // The team server authenticates resource URLs with its session cookie, so the
+        // browser loads, caches and decodes only the images actually on screen.
+        if (isHostedMode()) return resourceFileUrl(resourceId);
         if (options?.cacheMiss) {
             const populated = await cacheResourceObjectUrl(storageKey).catch(() => "");
             if (populated) return populated;

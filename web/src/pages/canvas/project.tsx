@@ -255,8 +255,9 @@ function InfiniteCanvasPage() {
             void refreshLocalCanvasProjectIfChanged(projectId);
         };
         // 助手回合结束与外部改动画布都要立刻可见：助手回合回调会直接调 check，
-        // 这里的定时器只作为外部客户端改动的兜底。
-        const timer = window.setInterval(check, 4000);
+        // 这里的定时器只作为外部客户端改动的兜底。团队服务器没有外部客户端，
+        // 改动经事件流推送，兜底放宽，免得每个打开的画布每 4 秒整份下载一次。
+        const timer = window.setInterval(check, isHostedMode() ? 60_000 : 4000);
         return () => { disposed = true; window.clearInterval(timer); };
     }, [projectId, setNodes]);
     useEffect(() => {

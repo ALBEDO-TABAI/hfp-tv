@@ -174,7 +174,6 @@
 
     --amb: 255 110 60;
     --amb-alpha: 0.06;
-    --la: 135deg;
 }
 
 .dark,
@@ -380,7 +379,15 @@ kbd,
         box-shadow var(--d-3) var(--ease-out),
         transform var(--d-3) var(--ease-out);
 }
+/* Glass rim light angle, written per .lg element by hfp-glass.ts. Not inherited, so
+   updating it never restyles the content inside a glass panel. */
+@property --la {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 135deg;
+}
 .lg::before {
+    --la: inherit;
     content: "";
     position: absolute;
     inset: 0;
