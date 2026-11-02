@@ -10,11 +10,13 @@ import { ownedResourceIdFromMediaRef } from "@/services/api/resources";
 import { estimateUpscale, getUpscaleCapabilities, type UpscaleCapabilities, type UpscaleEstimate, type UpscaleMode } from "@/services/api/media-upscale";
 import { useCanvasNodeActions } from "../canvas-node-action-context";
 import { CanvasNodeGraphContext, useUpstreamNodes } from "../canvas-node-graph-context";
+import { usePlatformSession } from "@/stores/use-platform-session";
 
 const modeLabels: Partial<Record<UpscaleMode, string>> = { precision: "保真增强", generative: "细节重建" };
 const batchLabels = { waiting: "等待提交", submitting: "提交中", accepted: "已提交", rejected: "提交失败", unknown: "待确认" };
 
 export function UpscaleNodeContent({ node, theme }: { node: CanvasNodeData; theme: CanvasTheme }) {
+    const hosted = usePlatformSession((state) => state.mode === "hosted");
     const actions = useCanvasNodeActions();
     const { getNode } = useContext(CanvasNodeGraphContext);
     const upstream = useUpstreamNodes(node.id);
@@ -121,7 +123,7 @@ export function UpscaleNodeContent({ node, theme }: { node: CanvasNodeData; them
             {Object.keys(estimates).length ? <details><summary className="cursor-pointer" style={{ color: theme.node.muted }}>超分后的分辨率</summary><div className="mt-2 space-y-1">{inputs.map(input => { const estimate = estimates[input.id]; return estimate ? <div key={input.id} className="flex gap-2"><span className="min-w-0 flex-1 truncate">{input.title}</span><span className="shrink-0 tabular-nums">{estimate.output.width} × {estimate.output.height}</span></div> : null; })}</div></details> : null}
             <div className="space-y-3">
                 <Select getPopupContainer={trigger => trigger.parentElement || document.body} className="w-full" aria-label="超分模型" placeholder="暂无可用超分模型" disabled={!officialConnected} value={channelId || undefined} options={officialConnected ? [{ label: "内置超分模型", value: "beefapi" }] : []} onChange={channelId => patch({ channelId })} />
-                {!officialConnected ? <p role="status" style={{ color: theme.node.muted }}>暂无可用超分模型，请先在模型配置中连接内置模型服务。<a href="#/settings?section=channels" className="ml-1 underline">连接模型服务</a></p> : null}
+                {!officialConnected ? <p role="status" style={{ color: theme.node.muted }}>{hosted ? "暂无可用超分模型。" : <>暂无可用超分模型，请先在模型配置中连接内置模型服务。<a href="#/settings?section=channels" className="ml-1 underline">连接模型服务</a></>}</p> : null}
             </div>
             {notice ? <p role="alert" className="break-words" style={{ color: "var(--status-error)" }}>{notice}</p> : null}
             <Button type="primary" block loading={busy} disabled={!inputs.length || !channelId || !capabilities || !actions.startUpscaleBatch} onClick={() => void run()}>{batchButtonLabel}</Button>

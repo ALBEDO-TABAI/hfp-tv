@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { App, Avatar, Button, Dropdown, Form, Input } from "antd";
-import { useNavigate } from "react-router";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { platformErrorMessage, platformPasswordRules } from "@/lib/platform-account";
 import { appQueryClient } from "@/lib/query-client";
@@ -12,7 +11,6 @@ import { useUserStore } from "@/stores/use-user-store";
 export function PlatformAccountMenu({ collapsed }: { collapsed: boolean }) {
     const { mode, me } = usePlatformSession();
     const { message } = App.useApp();
-    const navigate = useNavigate();
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const [form] = Form.useForm();
@@ -47,9 +45,6 @@ export function PlatformAccountMenu({ collapsed }: { collapsed: boolean }) {
     return <>
         <Dropdown trigger={["click"]} menu={{ items: [
             ...(me.user.source === "file" ? [] : [{ key: "password", label: "修改密码", onClick: () => setOpen(true) }]),
-            ...(me.user.role === "admin" && me.capabilities.userAdmin ? [{ key: "users", label: "用户管理", onClick: () => navigate("/admin/users") }] : []),
-            ...(me.user.role === "admin" && me.capabilities.skillReview ? [{ key: "skill-reviews", label: "技能审核", onClick: () => navigate("/admin/skill-reviews") }] : []),
-            ...(me.user.role === "admin" && me.capabilities.workshopReview ? [{ key: "workshop-reviews", label: "作品审核", onClick: () => navigate("/admin/workshop-reviews") }] : []),
             { key: "logout", label: "退出登录", disabled: pending, onClick: () => void logout() },
         ] }}>
             <button type="button" aria-label="账号菜单" disabled={pending} className="app-workspace-nav-link mt-3 flex min-h-11 w-full items-center gap-2 rounded-[var(--r-md)] p-2" title={me.user.displayName}>

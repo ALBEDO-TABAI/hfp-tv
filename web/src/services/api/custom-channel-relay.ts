@@ -1,8 +1,8 @@
 import { isBeefAPIEndpoint } from "@/lib/beefapi-video-contracts";
 import { apiBaseURL } from "@/services/api/request";
-import { isSystemProxyBaseUrl, MANAGED_BEEFAPI_CREDENTIAL_REF, type AiConfig, type ChannelHeader } from "@/stores/use-config-store";
+import { isSystemProxyBaseUrl, MANAGED_BEEFAPI_CREDENTIAL_REF, PLATFORM_RELAY_CHANNEL_ID, type AiConfig, type ChannelHeader } from "@/stores/use-config-store";
 
-type RelayConfig = Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat"> & { headers?: ChannelHeader[]; credentialRef?: string };
+type RelayConfig = Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat"> & { headers?: ChannelHeader[]; credentialRef?: string; channelId?: string };
 
 export type ChannelRequest = {
     url: string;
@@ -41,7 +41,8 @@ export function channelRequest(config: RelayConfig, upstreamUrl: string, headers
     const normalizedUpstreamUrl = requireHttpUrl(upstreamUrl, "当前模型请求地址");
     normalizedHeaders.delete("X-Canvas-Upstream-Headers");
     normalizedHeaders.delete("x-goog-api-key");
-    normalizedHeaders.set("Authorization", `Bearer ${config.apiKey}`);
+    if (config.channelId === PLATFORM_RELAY_CHANNEL_ID && !config.apiKey) normalizedHeaders.delete("Authorization");
+    else normalizedHeaders.set("Authorization", `Bearer ${config.apiKey}`);
     normalizedHeaders.set("X-Canvas-Upstream-URL", normalizedUpstreamUrl);
     normalizedHeaders.set("X-Canvas-Upstream-Format", config.apiFormat === "gemini" ? "gemini" : config.apiFormat === "claude" ? "claude" : "openai");
     normalizedHeaders.set("X-Canvas-Upstream-Base-URL", normalizedBaseUrl);

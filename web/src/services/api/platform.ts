@@ -29,6 +29,23 @@ export type AdminUser = {
 };
 export type PlatformAuditItem = { id: string; actorUsername: string; action: string; targetUsername: string; detail: string; createdAt: string };
 export type PlatformSession = { mode: "local" } | { mode: "hosted"; me: PlatformMe | null };
+export type PlatformServiceStatus = {
+    relay: {
+        configured: boolean;
+        name: string;
+        baseUrl: string;
+        apiFormat: string;
+        models: { model: string; capability: "image" | "video" | "text" | "audio" | "" }[];
+        file: string;
+        autoAllowedHost: string;
+    };
+    accountFiles: { usersFile: string; keysFile: string };
+    allowedPrivateHosts: string[];
+    cookieSecure: "auto" | "always" | "never";
+    idleTimeoutSeconds: number;
+    workspaces: { open: number; total: number };
+    members: { active: number; withRelayKey: number };
+};
 
 // 记住本站上次识别出的模式：本地部署在后端暂不可用时仍按原样降级到浏览器缓存，
 // 团队服务器站点则不能降级成共享的本地身份。
@@ -77,6 +94,7 @@ export const changePlatformPassword = (input: { currentPassword: string; newPass
 export const getPlatformInvitation = (token: string) => http.get<{ role: PlatformRole; expiresAt: string }>(`/platform/invitations/${encodeURIComponent(token)}`);
 export const acceptPlatformInvitation = (token: string, input: { username: string; displayName: string; password: string }) => http.post<PlatformMe>(`/platform/invitations/${encodeURIComponent(token)}/accept`, input);
 export const listPlatformUsers = () => http.get<{ items: AdminUser[] }>("/platform/admin/users");
+export const getPlatformServiceStatus = (signal?: AbortSignal) => http.get<PlatformServiceStatus>("/platform/admin/service-status", { signal });
 export const createPlatformUser = (input: { username: string; displayName: string; password: string; role: PlatformRole; relayKey?: string }) => http.post<{ user: AdminUser }>("/platform/admin/users", input);
 export const updatePlatformUser = (id: string, input: { displayName?: string; role?: PlatformRole; status?: AdminUser["status"] }) => http.patch<{ user: AdminUser }>(`/platform/admin/users/${encodeURIComponent(id)}`, input);
 export const resetPlatformUserPassword = (id: string, password: string) => http.post<{ changed: true }>(`/platform/admin/users/${encodeURIComponent(id)}/password`, { password });

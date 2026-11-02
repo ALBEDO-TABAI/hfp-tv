@@ -14,6 +14,7 @@ import { platformLoginPath } from "@/lib/platform-navigation";
 const LoginPage = lazy(() => import("@/pages/login"));
 const InvitePage = lazy(() => import("@/pages/invite"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/users"));
+const AdminServicePage = lazy(() => import("@/pages/admin/service"));
 const AdminSkillReviewsPage = lazy(() => import("@/pages/admin/skill-reviews"));
 const AdminWorkshopReviewsPage = lazy(() => import("@/pages/admin/workshop-reviews"));
 const WorkshopPage = lazy(() => import("@/pages/workshop"));
@@ -129,6 +130,7 @@ export const router = createWorkspaceRouter([
             { path: "/settings", element: deferred(<SettingsPage />) },
             { path: "/agents", element: <CapabilityRoute capability="externalAgents">{deferred(<AgentsPage />)}</CapabilityRoute> },
             { path: "/admin/users", element: <CapabilityRoute capability="userAdmin">{deferred(<AdminUsersPage />)}</CapabilityRoute> },
+            { path: "/admin/service", element: <CapabilityRoute capability="userAdmin">{deferred(<AdminServicePage />)}</CapabilityRoute> },
             { path: "/admin/skill-reviews", element: <CapabilityRoute capability="skillReview">{deferred(<AdminSkillReviewsPage />)}</CapabilityRoute> },
             { path: "/admin/workshop-reviews", element: <CapabilityRoute capability="workshopReview">{deferred(<AdminWorkshopReviewsPage />)}</CapabilityRoute> },
             { path: "/workshop", element: <CapabilityRoute capability="workshop">{deferred(<WorkshopPage />)}</CapabilityRoute> },

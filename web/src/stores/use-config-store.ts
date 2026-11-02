@@ -664,6 +664,7 @@ export function channelHasManagedBeefAPICredential(channel: Pick<ModelChannel, "
 }
 
 export function channelHasGenerationCredential(channel: Pick<ModelChannel, "id" | "pinned" | "credentialRef" | "hasApiKey" | "apiKey" | "modelProfiles">, model = "") {
+    if (isPlatformManagedChannel(channel)) return channel.hasApiKey === true;
     if (model && channel.modelProfiles?.some((item) => item.model === modelOptionName(model) && item.authType === "none")) return true;
     return channelHasManagedBeefAPICredential(channel) || Boolean(channel.apiKey?.trim());
 }
@@ -1119,12 +1120,12 @@ export function resolveModelRequestConfig(config: AiConfig, value: string) {
         baseUrl: channel.baseUrl,
         referenceAssetOrigin: channel.referenceAssetOrigin,
         referenceMediaTransport: channel.scope === "system" ? undefined : modelProfile?.referenceMediaTransport,
-        apiKey: channel.credentialRef ? "" : channel.apiKey,
-        secretKey: channel.credentialRef ? "" : channel.secretKey,
+        apiKey: channel.credentialRef || isPlatformManagedChannel(channel) ? "" : channel.apiKey,
+        secretKey: channel.credentialRef || isPlatformManagedChannel(channel) ? "" : channel.secretKey,
         headers: channel.headers,
         apiFormat: interfaceType ? (interfaceType === "gemini-veo" || interfaceType === "gemini-image" || interfaceType === "gemini-generate-content" ? ("gemini" as const) : interfaceType === "claude-api" ? ("claude" as const) : ("openai" as const)) : channel.apiFormat,
         interfaceType,
-        channelId: channel.scope === "system" ? channel.id : "",
+        channelId: channel.scope === "system" || isPlatformManagedChannel(channel) ? channel.id : "",
         credentialRef: channel.credentialRef || (isBuiltinBeefAPIChannel(channel) ? MANAGED_BEEFAPI_CREDENTIAL_REF : undefined),
     };
 }

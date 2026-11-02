@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Home, Plug, Plus, Settings2, HardDrive, Sun, Moon, GalleryHorizontalEnd } from "lucide-react";
+import { Activity, BadgeCheck, ClipboardCheck, Users, ChevronLeft, ChevronRight, Home, Plug, Plus, Settings2, HardDrive, Sun, Moon, GalleryHorizontalEnd } from "lucide-react";
 import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
@@ -19,6 +19,7 @@ import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { OnboardingEntry } from "@/components/onboarding/first-creation-guide";
 import { PlatformAccountMenu } from "@/components/layout/platform-account-menu";
 import { hostedCapability, usePlatformSession } from "@/stores/use-platform-session";
+import type { PlatformMe } from "@/services/api/platform";
 
 export type WorkspaceNavItem = {
     id: string;
@@ -42,7 +43,7 @@ function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
     return { id: slug, title: tool?.label ?? slug, icon: tool?.icon, to };
 }
 
-function buildNav(features: FeatureAvailability, workshop: boolean): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
+function buildNav(features: FeatureAvailability, workshop: boolean, admin: PlatformMe | null): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
     const groups: WorkspaceNavGroup[] = [
         {
             items: [
@@ -63,8 +64,15 @@ function buildNav(features: FeatureAvailability, workshop: boolean): { groups: W
         },
     ];
 
-    // 管理、设置和退出登录不再占据参考站式侧栏底部，而是通过用户卡片菜单进入。
-    // 路由和写操作仍保留，避免把用户端导航变成无法访问的装饰。
+    if (admin) {
+        const items: WorkspaceNavItem[] = [
+            ...(admin.capabilities.userAdmin ? [{ id: "admin:users", title: "用户管理", icon: Users, to: "/admin/users" }] : []),
+            ...(admin.capabilities.skillReview ? [{ id: "admin:skill-reviews", title: "技能审核", icon: BadgeCheck, to: "/admin/skill-reviews" }] : []),
+            ...(admin.capabilities.workshopReview ? [{ id: "admin:workshop-reviews", title: "作品审核", icon: ClipboardCheck, to: "/admin/workshop-reviews" }] : []),
+            ...(admin.capabilities.userAdmin ? [{ id: "admin:service", title: "服务状态", icon: Activity, to: "/admin/service" }] : []),
+        ];
+        if (items.length) groups.push({ heading: "管理", items });
+    }
     return { groups, footer: [] };
 }
 
@@ -267,13 +275,14 @@ export function WorkspaceSidebarNav({ collapsed, onNavigate, onOpenSearch, onExp
     const features = useUserStore((state) => state.features);
     const { mode, me } = usePlatformSession();
     const workshop = mode === "hosted" && me?.capabilities.workshop === true;
-    const { groups, footer } = useMemo(() => buildNav(features, workshop), [features, workshop]);
+    const admin = mode === "hosted" && me?.user.role === "admin" ? me : null;
+    const { groups, footer } = useMemo(() => buildNav(features, workshop, admin), [features, workshop, admin]);
 
     const rawSlug = pathname.split("/").filter(Boolean)[0] || "home";
     // `/project` is the LibTV-compatible alias for the existing canvas library route.
     const slug = rawSlug === "project" ? "canvas" : rawSlug;
     const section = searchParams.get("section");
-    const activeId = slug === "settings" && section ? `settings:${section}` : slug;
+    const activeId = slug === "admin" ? `admin:${pathname.split("/").filter(Boolean)[1]}` : slug === "settings" && section ? `settings:${section}` : slug;
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const [scrollState, setScrollState] = useState({ hasTopFade: false, hasBottomFade: false });

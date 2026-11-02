@@ -25,6 +25,7 @@ import { createChannelCatalogRequests } from "@/services/channel-catalog-request
 import { getTransportFailureKind } from "@/services/api/request";
 import { beefAPIConnectionLabel, cancelBeefAPIConnection, disconnectBeefAPIConnection, getBeefAPIConnection, openBeefAPIWallet, startBeefAPIConnection, type BeefAPIConnectionSummary } from "@/services/api/beefapi-connection";
 import { recordChannelDelete, recordChannelDeleteConfirmOpen } from "./model-settings-diagnostics";
+import { usePlatformSession } from "@/stores/use-platform-session";
 
 type UserChannelConnection = "openai" | "gemini";
 type ChannelSettingsPaneProps = {
@@ -38,6 +39,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
     const config = useConfigStore((state) => state.config);
     const replaceConfig = useConfigStore((state) => state.replaceConfig);
     const localMode = workspaceCapabilities().local;
+    const hosted = usePlatformSession((state) => state.mode === "hosted");
     const persistence = useSyncExternalStore(subscribeModelConfigPersistence, getModelConfigPersistenceState, getModelConfigPersistenceState);
     const [loadingChannelIds, setLoadingChannelIds] = useState<string[]>([]);
     const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
@@ -85,6 +87,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
     };
 
     useEffect(() => {
+        if (hosted) return;
         let cancelled = false;
         void getBeefAPIConnection()
             .then((summary) => {
@@ -94,9 +97,10 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [hosted]);
 
     useEffect(() => {
+        if (hosted) return;
         if (beefConnection?.state !== "pending" && beefConnection?.state !== "connecting") return;
         let active = true;
         const timer = window.setInterval(() => {
@@ -105,7 +109,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                 .catch(() => undefined);
         }, 2000);
         return () => { active = false; window.clearInterval(timer); };
-    }, [beefConnection?.state]);
+    }, [hosted, beefConnection?.state]);
 
     const runBeefAction = async (action: () => Promise<BeefAPIConnectionSummary>, fallback: string) => {
         setBeefBusy(true);
@@ -136,7 +140,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
         }
         return beginBeefConnection();
     };
-    const userChannels = config.channels.filter((channel) => channel.scope !== "system");
+    const userChannels = config.channels.filter((channel) => channel.scope !== "system" && !(hosted && isBuiltinBeefAPIChannel(channel)));
     const runningHubReady = Boolean(config.runningHub.enabled && config.runningHub.baseUrl.trim() && config.runningHub.apiKey.trim() && config.runningHub.workflowId.trim());
 
     const updateChannels = (channels: ModelChannel[], baseConfig = config) => {
@@ -386,7 +390,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                         const platformManaged = isPlatformManagedChannel(channel);
                         const topazUpscale = isTopazUpscaleChannel(channel);
                         return (
-                            <section key={channel.id} data-onboarding={builtinBeefAPI ? "official-channel" : undefined} aria-labelledby={`channel-${channel.id}-title`} className="settings-channel p-2.5 sm:p-3">
+                            <section key={channel.id} data-onboarding={builtinBeefAPI ? "official-channel" : platformManaged ? "company-channel" : undefined} aria-labelledby={`channel-${channel.id}-title`} className="settings-channel p-2.5 sm:p-3">
                                 <div className="mb-2.5 flex flex-wrap items-start justify-between gap-2.5">
                                     <div className="min-w-0 flex-1 basis-52">
                                         <h3 id={`channel-${channel.id}-title`} className="flex items-center gap-2 text-sm font-semibold">
@@ -404,7 +408,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                             <ChannelStatus channel={channel} persistence={persistence} connection={builtinBeefAPI ? beefConnection : null} />
                                         </div>
                                         {topazUpscale ? <p className="mt-1 text-xs text-foreground/55">从图片或视频节点上方的「AI超分」使用</p> : null}
-                                        {platformManaged ? <p className="mt-1 text-xs text-foreground/55">{channel.enabled === false ? "等待管理员绑定中转站密钥" : "由管理员维护，按你的个人密钥计量"}</p> : null}
+                                        {platformManaged ? <p className="mt-1 text-xs text-foreground/55">{channel.hasApiKey !== true ? "等待管理员绑定中转站密钥" : "由管理员维护，按你的个人密钥计量"}</p> : null}
                                         {!builtinBeefAPI && !topazUpscale && !platformManaged && <p className="mt-1 break-all text-xs text-foreground/50">模型目录地址：{modelCatalogRequestURL(channel)}</p>}
                                     </div>
                                     <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto sm:shrink-0">
@@ -665,7 +669,7 @@ function ChannelStatus({ channel, persistence, connection }: { channel: ModelCha
     const failed = tested.filter((result) => result && !result.success).length;
     const error = channelValidationError(channel, connection);
     const label = modelConfigChannelStatusLabel(channel, persistence, connection);
-    const testLabel = failed ? `${failed} 个模型测试失败` : passed ? `${passed}/${channel.models.length} 个模型测试通过` : label;
+    const testLabel = isPlatformManagedChannel(channel) && channel.hasApiKey !== true ? label : failed ? `${failed} 个模型测试失败` : passed ? `${passed}/${channel.models.length} 个模型测试通过` : label;
     return (
         <span className={`settings-channel-status ${error || failed ? "is-warning" : "is-ready"}`}>
             <i aria-hidden="true" />
@@ -713,6 +717,7 @@ export function mergeManagedBeefAPICatalog(current: AiConfig, server: AiConfig, 
 }
 
 export function modelConfigChannelStatusLabel(channel: ModelChannel, persistence: ModelConfigPersistenceState, connection?: BeefAPIConnectionSummary | null) {
+    if (isPlatformManagedChannel(channel) && channel.hasApiKey !== true) return "等待管理员绑定中转站密钥";
     if (isBuiltinBeefAPIChannel(channel)) {
         if (connection?.state === "connected") return beefAPIConnectionLabel(connection);
         if (connection?.state && connection.state !== "disconnected") return beefAPIConnectionLabel(connection);
@@ -859,6 +864,7 @@ function channelConnectionError(channel: ModelChannel, connection?: BeefAPIConne
     } catch {
         return "Base URL 格式不正确";
     }
+    if (isPlatformManagedChannel(channel)) return channel.hasApiKey === true ? "" : "等待管理员绑定中转站密钥";
     if (isBuiltinBeefAPIChannel(channel)) {
         if (connection?.state === "connected" || channelHasManagedBeefAPICredential(channel)) return "";
         return "请先在模型配置中连接内置模型服务";

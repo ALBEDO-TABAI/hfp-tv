@@ -4,8 +4,9 @@ import { Button } from "antd";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, GripVertical, HelpCircle, X } from "lucide-react";
 import { useOnboardingStore, onboardingSteps } from "@/stores/use-onboarding-store";
-import { channelHasGenerationCredential, filterModelsByCapability, isBuiltinBeefAPIChannel, modelOptionsFromChannels, useConfigStore } from "@/stores/use-config-store";
+import { channelHasGenerationCredential, filterModelsByCapability, isBuiltinBeefAPIChannel, isPlatformManagedChannel, modelOptionsFromChannels, useConfigStore } from "@/stores/use-config-store";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
+import { usePlatformSession } from "@/stores/use-platform-session";
 import "./first-creation-guide.css";
 
 const lessons = [
@@ -28,6 +29,8 @@ export function OnboardingEntry({ compact = false }: { compact?: boolean }) {
 }
 
 export function FirstCreationGuide() {
+    const { mode, me } = usePlatformSession();
+    const hosted = mode === "hosted";
     const guide = useOnboardingStore();
     const config = useConfigStore((state) => state.config);
     const projects = useCanvasStore((state) => state.projects);
@@ -46,8 +49,8 @@ export function FirstCreationGuide() {
     const project = projects.find((item) => item.id === guide.projectId);
     const node = project?.nodes.find((item) => item.id === guide.nodeId);
     const result = project?.nodes.find((item) => item.type === "image" && item.metadata?.content && (item.id === guide.nodeId || item.metadata?.generatedFromNodeId === guide.nodeId) && (item.metadata?.resultOrigin === "generated" || Boolean(item.metadata?.taskId)));
-    const official = config.channels.find(isBuiltinBeefAPIChannel);
-    const connected = Boolean(official && channelHasGenerationCredential(official) && filterModelsByCapability(modelOptionsFromChannels([official]), "image", [official]).length);
+    const official = config.channels.find(hosted ? isPlatformManagedChannel : isBuiltinBeefAPIChannel);
+    const connected = Boolean(official && (hosted ? official.enabled !== false && me?.relay.bound : channelHasGenerationCredential(official)) && filterModelsByCapability(modelOptionsFromChannels([official]), "image", [official]).length);
     const ready = step === "official" ? connected : step === "project" ? Boolean(project) : step === "node" ? Boolean(node) : step === "generate" ? Boolean(result) : step === "assets" ? pathname === "/assets" && new URLSearchParams(search).get("tab") === "history" && Boolean(result) : guide.visitedLibrary && Boolean(project) && pathname === `/canvas/${project?.id}`;
 
     useEffect(() => {
@@ -110,7 +113,7 @@ export function FirstCreationGuide() {
         const update = () => {
             timer = null;
             let target: HTMLElement | null = null;
-            if (step === "official" && pathname === "/settings") target = connected ? visible('[aria-label="默认生图模型"]') || visible(".model-default-section") : visible('[data-onboarding="official-connect"]') || visible('[data-onboarding="official-channel"]');
+            if (step === "official" && pathname === "/settings") target = connected ? visible('[aria-label="默认生图模型"]') || visible(".model-default-section") : hosted ? visible('[data-onboarding="company-channel"]') : visible('[data-onboarding="official-connect"]') || visible('[data-onboarding="official-channel"]');
             if (step === "project") target = visible('[title="点击修改画布名称"]') || visible('[aria-label="画布名称"]') || visible('[data-nav-id="new"]') || visible('[aria-label="新建画布创作"]');
             if (step === "node" && !ready) target = visible('[data-onboarding="image-option"]') || visible('[aria-label="添加节点"]') || visible('[data-onboarding="canvas-tools"]') || visible('[data-nav-id="new"]');
             if (step === "generate") {
@@ -158,7 +161,7 @@ export function FirstCreationGuide() {
         document.addEventListener("input", schedule, true);
         update();
         return () => { observer.disconnect(); lastTarget?.classList.remove("is-onboarding-target"); if (timer !== null) window.clearTimeout(timer); if (settleTimer !== null) window.clearTimeout(settleTimer); window.removeEventListener("scroll", schedule, true); window.removeEventListener("resize", schedule); document.removeEventListener("input", schedule, true); };
-    }, [step, guide.status, welcome, collapsed, pathname, search, connected, ready, guide.nodeId, guide.projectId, result?.metadata?.taskId]);
+    }, [step, guide.status, welcome, collapsed, pathname, search, connected, ready, hosted, guide.nodeId, guide.projectId, result?.metadata?.taskId]);
     const dismiss = () => { setWelcome(false); guide.pause(); };
     const advance = (skip = false) => { guide.advance(skip); if (step === "return") setFinished(true); else goToLesson(onboardingSteps[guide.step + 1]); };
     const back = () => { guide.back(); goToLesson(onboardingSteps[guide.step - 1]); };
@@ -179,7 +182,7 @@ export function FirstCreationGuide() {
         </AppModal>
         {guide.status === "active" && !welcome && <aside className={`first-creation-guide${/^\/canvas\/[^/]+/.test(pathname) ? " is-canvas" : ""}${collapsed ? " is-collapsed" : ""}`} style={position ? { left: position.x, top: position.y, right: "auto", bottom: "auto" } : undefined} aria-label="新手引导" data-step={step} data-canvas-no-zoom onPointerDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()}>
             <div className="first-creation-heading"><button type="button" className="first-creation-move" aria-label="移动引导卡，可拖动或使用方向键" title="拖动以移动引导" onPointerDown={(event) => { const bounds = event.currentTarget.closest("aside")!.getBoundingClientRect(); setDrag({ x: event.clientX, y: event.clientY, left: bounds.left, top: bounds.top }); event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (!drag) return; const bounds = event.currentTarget.closest("aside")!.getBoundingClientRect(); setPosition({ x: Math.max(8, Math.min(window.innerWidth - bounds.width - 8, drag.left + event.clientX - drag.x)), y: Math.max(8, Math.min(window.innerHeight - bounds.height - 8, drag.top + event.clientY - drag.y)) }); }} onPointerUp={() => setDrag(null)} onPointerCancel={() => setDrag(null)} onKeyDown={(event) => { const delta: Record<string, [number, number]> = { ArrowUp: [0, -20], ArrowDown: [0, 20], ArrowLeft: [-20, 0], ArrowRight: [20, 0] }; if (!delta[event.key]) return; event.preventDefault(); const bounds = event.currentTarget.closest("aside")!.getBoundingClientRect(); setPosition({ x: Math.max(8, Math.min(window.innerWidth - bounds.width - 8, bounds.left + delta[event.key][0])), y: Math.max(8, Math.min(window.innerHeight - bounds.height - 8, bounds.top + delta[event.key][1])) }); }}><GripVertical size={15} /></button><button type="button" className="first-creation-expand" onClick={() => setCollapsed(!collapsed)} aria-expanded={!collapsed}><span>{collapsed ? lessons[guide.step].title : `新手引导 · ${guide.step + 1} / ${lessons.length}`}</span><ChevronDown size={15} /></button><button type="button" className="first-creation-close" aria-label="关闭引导" title="关闭引导" onClick={() => guide.pause()}><X size={17} /></button></div>
-            {!collapsed && <><h2>{lessons[guide.step].title}{ready && <Check size={16} className="first-creation-check" aria-label="已完成" />}</h2><p>{step === "official" && connected ? "已连接，选择你要使用的默认模型。" : step === "project" && project ? "点击项目名称，为它起个名字。" : lessons[guide.step].description}</p>
+            {!collapsed && <><h2>{lessons[guide.step].title}{ready && <Check size={16} className="first-creation-check" aria-label="已完成" />}</h2><p>{step === "official" && connected ? "已连接，选择你要使用的默认模型。" : step === "official" && hosted ? "公司模型服务由管理员配置。如暂无可用模型，请联系管理员配置服务并绑定你的中转密钥。" : step === "project" && project ? "点击项目名称，为它起个名字。" : lessons[guide.step].description}</p>
                 {notice && <p role="status">{notice}</p>}
                 <div className="first-creation-footer"><div className="first-creation-secondary">
                     {step === "generate" && <button type="button" className="first-creation-copy" title={sample} onClick={() => { void navigator.clipboard.writeText(sample).then(() => setNotice("已复制，粘贴到提示词输入框。")).catch(() => setNotice("复制失败，请手动输入描述。")); }}><Copy size={13} />示例提示词</button>}
