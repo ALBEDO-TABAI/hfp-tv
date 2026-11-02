@@ -22,16 +22,18 @@ func workshopFail(c *gin.Context, err error) {
 	c.AbortWithStatusJSON(typed.Status, body)
 }
 
-// snapshotKernel opens the viewer's own kernel for export or import.
+// snapshotKernel opens the viewer's own kernel for export or import. The
+// kernel stays marked in use until the request context ends.
 func (s *Server) snapshotKernel(ctx context.Context, workspace accounts.Workspace) (workshop.SnapshotPort, error) {
 	spec, err := s.workspaceSpec(workspace)
 	if err != nil {
 		return nil, err
 	}
-	kernel, err := s.opts.Pool.Get(ctx, spec)
+	kernel, release, err := s.opts.Pool.Acquire(ctx, spec)
 	if err != nil {
 		return nil, err
 	}
+	context.AfterFunc(ctx, release)
 	return kernel.ProjectSnapshots()
 }
 

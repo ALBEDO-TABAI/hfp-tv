@@ -27,11 +27,39 @@ import (
 
 const SessionCookie = "hfp_session"
 
-// WorkspacePool is the kernel lifecycle the gateway needs.
+// WorkspacePool is the kernel lifecycle the gateway needs. Acquire marks the
+// kernel in use until release, so idle reclaim never closes it mid-request.
 type WorkspacePool interface {
-	Get(ctx context.Context, spec kernelpool.Spec) (kernelpool.Kernel, error)
+	Acquire(ctx context.Context, spec kernelpool.Spec) (kernelpool.Kernel, func(), error)
 	Reprovision(spec kernelpool.Spec) error
 	Close(ctx context.Context, id string) error
+	OpenCount() int
+}
+
+// CookieSecurity decides the Secure flag of the session cookie.
+type CookieSecurity string
+
+const (
+	// CookieSecureAuto sets Secure when the browser reached the server over
+	// HTTPS (directly or through a trusted proxy), so one build serves both
+	// intranet HTTP and a domain with HTTPS.
+	CookieSecureAuto   CookieSecurity = "auto"
+	CookieSecureAlways CookieSecurity = "always"
+	CookieSecureNever  CookieSecurity = "never"
+)
+
+// ParseCookieSecurity reads TEAMSERVER_COOKIE_SECURE: empty or auto, true or
+// always, false or never.
+func ParseCookieSecurity(raw string) (CookieSecurity, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "auto":
+		return CookieSecureAuto, nil
+	case "true", "always":
+		return CookieSecureAlways, nil
+	case "false", "never":
+		return CookieSecureNever, nil
+	}
+	return "", errors.New("TEAMSERVER_COOKIE_SECURE 只能是 auto、true 或 false")
 }
 
 type Options struct {
@@ -41,8 +69,8 @@ type Options struct {
 	DataRoot string
 	// WebDir serves the built SPA when set; otherwise a reverse proxy does.
 	WebDir string
-	// CookieSecure must stay true behind HTTPS; false only for local HTTP trials.
-	CookieSecure bool
+	// CookieSecure defaults to CookieSecureAuto.
+	CookieSecure CookieSecurity
 	// TrustedProxies are the reverse proxies whose X-Forwarded-For is honoured.
 	TrustedProxies []string
 	// AllowedOrigins are extra browser origins (besides the request host) allowed
@@ -52,6 +80,8 @@ type Options struct {
 	Market *skillmarket.Service
 	// Workshop is the project workshop; nil disables its routes.
 	Workshop *workshop.Service
+	// Status describes the deployment for the admin service-status page.
+	Status DeploymentStatus
 }
 
 type Server struct {
@@ -69,6 +99,9 @@ func New(opts Options) (*Server, error) {
 		return nil, err
 	}
 	opts.DataRoot = root
+	if opts.CookieSecure == "" {
+		opts.CookieSecure = CookieSecureAuto
+	}
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	if err := engine.SetTrustedProxies(opts.TrustedProxies); err != nil {
@@ -173,14 +206,33 @@ func (s *Server) fromTrustedProxy(c *gin.Context) bool {
 	return false
 }
 
+// secureCookie reports whether the session cookie gets the Secure flag. In
+// auto mode the X-Forwarded-Proto of a trusted proxy (Caddy) decides.
+func (s *Server) secureCookie(c *gin.Context) bool {
+	switch s.opts.CookieSecure {
+	case CookieSecureAlways:
+		return true
+	case CookieSecureNever:
+		return false
+	}
+	if c.Request.TLS != nil {
+		return true
+	}
+	if !s.fromTrustedProxy(c) {
+		return false
+	}
+	proto := strings.TrimSpace(strings.Split(c.GetHeader("X-Forwarded-Proto"), ",")[0])
+	return strings.EqualFold(proto, "https")
+}
+
 func (s *Server) setSessionCookie(c *gin.Context, token string, expires time.Time) {
 	http.SetCookie(c.Writer, &http.Cookie{Name: SessionCookie, Value: token, Path: "/", Expires: expires,
-		MaxAge: int(time.Until(expires).Seconds()), HttpOnly: true, Secure: s.opts.CookieSecure, SameSite: http.SameSiteLaxMode})
+		MaxAge: int(time.Until(expires).Seconds()), HttpOnly: true, Secure: s.secureCookie(c), SameSite: http.SameSiteLaxMode})
 }
 
 func (s *Server) clearSessionCookie(c *gin.Context) {
 	http.SetCookie(c.Writer, &http.Cookie{Name: SessionCookie, Value: "", Path: "/", MaxAge: -1,
-		HttpOnly: true, Secure: s.opts.CookieSecure, SameSite: http.SameSiteLaxMode})
+		HttpOnly: true, Secure: s.secureCookie(c), SameSite: http.SameSiteLaxMode})
 }
 
 const principalKey = "teamserver.principal"
@@ -261,7 +313,7 @@ func (s *Server) gateway(c *gin.Context) {
 		failWith(c, http.StatusInternalServerError, "workspace_unavailable", "工作区不可用")
 		return
 	}
-	kernel, err := s.opts.Pool.Get(c.Request.Context(), spec)
+	kernel, release, err := s.opts.Pool.Acquire(c.Request.Context(), spec)
 	if err != nil {
 		if c.Request.Context().Err() == nil {
 			log.Printf("open workspace=%s: %v", spec.ID, err)
@@ -269,6 +321,7 @@ func (s *Server) gateway(c *gin.Context) {
 		failWith(c, http.StatusServiceUnavailable, "workspace_unavailable", "工作区暂时无法打开，请稍后重试")
 		return
 	}
+	defer release()
 	// Kernels never read cookies; keep the session token out of their logs and proxies.
 	c.Request.Header.Del("Cookie")
 	kernel.GatewayHandler().ServeHTTP(c.Writer, c.Request)
@@ -281,6 +334,7 @@ func (s *Server) routes() {
 	s.platformRoutes(platform)
 	admin := platform.Group("/admin", s.requireAdmin)
 	s.adminRoutes(admin)
+	admin.GET("/service-status", s.serviceStatus)
 	s.marketRoutes(platform, admin)
 	s.workshopRoutes(admin)
 	s.engine.NoRoute(func(c *gin.Context) {

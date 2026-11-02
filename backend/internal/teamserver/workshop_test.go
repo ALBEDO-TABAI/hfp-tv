@@ -37,7 +37,7 @@ func newWorkshopHarness(t *testing.T) *harness {
 		_ = pool.CloseAll(ctx)
 		_ = users.Close()
 	})
-	server, err := New(Options{Accounts: users, Pool: pool, DataRoot: root, CookieSecure: true, Workshop: shop})
+	server, err := New(Options{Accounts: users, Pool: pool, DataRoot: root, CookieSecure: CookieSecureAlways, Workshop: shop})
 	if err != nil {
 		t.Fatal(err)
 	}

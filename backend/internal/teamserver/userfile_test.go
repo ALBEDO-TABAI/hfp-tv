@@ -31,8 +31,12 @@ func TestAccountFilesDriveLoginKeysAndDisable(t *testing.T) {
 	aliceCookie := h.login("alice", "alice-password")
 	adminCookie := h.login("admin", "admin-password")
 	config := h.do(call{method: http.MethodGet, path: "/api/workspace/model-config", cookie: aliceCookie}).Body.String()
-	if !strings.Contains(config, "sk-alice-file-1111") {
-		t.Fatalf("file key not provisioned into alice's workspace: %s", config)
+	if strings.Contains(config, "sk-alice-file") || !strings.Contains(config, `"hasApiKey":true`) {
+		t.Fatalf("file key must be bound but stay on the server: %s", config)
+	}
+	alice := mustFindUser(t, h, "alice")
+	if key := storedRelayKey(t, h, alice); key != "sk-alice-file-1111" {
+		t.Fatalf("file key not provisioned into alice's workspace: %q", key)
 	}
 
 	// A key change reaches the open kernel without a restart.
@@ -42,9 +46,8 @@ func TestAccountFilesDriveLoginKeysAndDisable(t *testing.T) {
 	if _, err := h.server.SyncAccountFiles(ctx, files); err != nil {
 		t.Fatal(err)
 	}
-	config = h.do(call{method: http.MethodGet, path: "/api/workspace/model-config", cookie: aliceCookie}).Body.String()
-	if !strings.Contains(config, "sk-alice-file-2222") || strings.Contains(config, "sk-alice-file-1111") {
-		t.Fatalf("changed file key not applied: %s", config)
+	if key := storedRelayKey(t, h, alice); key != "sk-alice-file-2222" {
+		t.Fatalf("changed file key not applied: %q", key)
 	}
 
 	// The console shows file accounts but cannot change what the file owns.
@@ -52,7 +55,6 @@ func TestAccountFilesDriveLoginKeysAndDisable(t *testing.T) {
 	if !strings.Contains(list, `"source":"file"`) || strings.Contains(list, "sk-alice-file") {
 		t.Fatalf("admin user list = %s", list)
 	}
-	alice := mustFindUser(t, h, "alice")
 	reset := h.do(call{method: http.MethodPost, path: "/api/platform/admin/users/" + alice + "/password", cookie: adminCookie, body: `{"password":"console-password"}`})
 	if reset.Code != http.StatusConflict || reason(t, reset) != "account_managed_by_file" {
 		t.Fatalf("console reset = %d %s", reset.Code, reset.Body.String())

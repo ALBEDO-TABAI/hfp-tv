@@ -1,0 +1,10 @@
+# 有域名时叠加本文件，Caddy 自动申请证书并开放 443。在 .env 写：
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.https.yml
+#   TEAMSERVER_DOMAIN=studio.example.com
+# 证书签发需要 80 和 443 都能从公网访问，此时 TEAMSERVER_HTTP_PORT 保持 80。
+services:
+  caddy:
+    environment:
+      TEAMSERVER_SITE: ${TEAMSERVER_DOMAIN:?请在 .env 设置 TEAMSERVER_DOMAIN，例如 studio.example.com}
+    ports:
+      - "${TEAMSERVER_HTTPS_PORT:-443}:443"

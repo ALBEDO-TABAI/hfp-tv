@@ -89,6 +89,7 @@ type Service struct {
 	depthCapture             *depthcapture.Service
 	depthCaptureOnce         sync.Once
 	beefAPI                  *beefapi.Service
+	platformChannels         []string
 	generationDeliveryMedia  taskdelivery.Media
 	generationDelivery       *taskdelivery.Deliverer
 	deliveryMu               sync.Mutex
@@ -219,6 +220,8 @@ func (s *Service) StopWorker(ctx context.Context) error {
 func (s *Service) IsDraining() bool { return s.backgroundWorkers().IsDraining() }
 
 func (s *Service) ActiveWorkerTasks() int64 { return s.backgroundWorkers().ActiveTaskCount() }
+
+func (s *Service) UnfinishedTaskCount() (int64, error) { return s.repo.UnfinishedTaskCount() }
 
 func (s *Service) backgroundWorkers() *platform.Worker {
 	s.workerRuntimeMu.Lock()

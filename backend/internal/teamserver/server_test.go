@@ -12,6 +12,7 @@ import (
 
 	"infinite-canvas/backend/internal/accounts"
 	"infinite-canvas/backend/internal/kernelpool"
+	workspacecfg "infinite-canvas/backend/internal/workspace"
 )
 
 type harness struct {
@@ -20,7 +21,7 @@ type harness struct {
 	users  *accounts.Service
 }
 
-func newHarness(t *testing.T) *harness {
+func newHarness(t *testing.T, configure ...func(*Options)) *harness {
 	t.Helper()
 	t.Setenv("CANVAS_ALLOW_PRIVATE_UPSTREAMS", "false")
 	root := t.TempDir()
@@ -28,8 +29,10 @@ func newHarness(t *testing.T) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
+	relayTemplate := map[string]any{"name": "公司中转站", "baseUrl": "https://relay.example.com/v1", "apiFormat": "openai", "models": []any{"relay-model"},
+		"modelProfiles": []any{map[string]any{"model": "relay-model", "capability": "image"}}}
 	pool := kernelpool.New(kernelpool.Options{
-		RelayTemplate:   map[string]any{"name": "公司中转站", "baseUrl": "https://relay.example.com/v1", "apiFormat": "openai", "models": []any{"relay-model"}},
+		RelayTemplate:   relayTemplate,
 		ShutdownTimeout: 5 * time.Second,
 	})
 	t.Cleanup(func() {
@@ -38,7 +41,12 @@ func newHarness(t *testing.T) *harness {
 		_ = pool.CloseAll(ctx)
 		_ = users.Close()
 	})
-	server, err := New(Options{Accounts: users, Pool: pool, DataRoot: root, CookieSecure: true})
+	opts := Options{Accounts: users, Pool: pool, DataRoot: root, CookieSecure: CookieSecureAlways,
+		Status: DeploymentStatus{RelayFile: "/config/relay-channel.json", RelayTemplate: relayTemplate, RelayHost: "relay.example.com", IdleTimeout: 30 * time.Minute}}
+	for _, change := range configure {
+		change(&opts)
+	}
+	server, err := New(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,6 +182,12 @@ func TestTeamServerIsolatesWorkspacesBehindSessions(t *testing.T) {
 	if config.Code != http.StatusOK || !strings.Contains(config.Body.String(), `"id":"company-relay"`) || !strings.Contains(config.Body.String(), "https://relay.example.com/v1") {
 		t.Fatalf("relay channel not provisioned: %d %s", config.Code, config.Body.String())
 	}
+	if strings.Contains(config.Body.String(), "sk-alice-relay") || !strings.Contains(config.Body.String(), `"hasApiKey":true`) {
+		t.Fatalf("relay key must stay on the server: %s", config.Body.String())
+	}
+	if key := storedRelayKey(t, h, alice.ID); key != "sk-alice-relay-9876" {
+		t.Fatalf("stored relay key = %q", key)
+	}
 	// A member save that drops or rewrites the managed channel is restored.
 	tamper := h.do(call{method: http.MethodPut, path: "/api/workspace/model-config", cookie: aliceCookie,
 		body: `{"config":{"channels":[{"id":"company-relay","name":"x","baseUrl":"http://127.0.0.1:9","apiKey":"stolen","apiFormat":"openai","models":[]},{"id":"mine","name":"mine","baseUrl":"https://api.example.com","apiKey":"sk-mine","apiFormat":"openai","models":["m"]}]}}`})
@@ -223,3 +237,146 @@ func TestTeamServerServesSPAFallback(t *testing.T) {
 }
 
 func writeFile(path, body string) error { return os.WriteFile(path, []byte(body), 0o600) }
+
+// storedRelayKey reads the company relay key from the user's workspace config
+// on disk, where kernels resolve it.
+func storedRelayKey(t *testing.T, h *harness, userID string) string {
+	t.Helper()
+	workspace, err := h.users.WorkspaceForUser(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, err := h.server.WorkspaceSpec(*workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := workspacecfg.NewProviderConfig(spec.DataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective, _, err := store.LoadEffectiveModelConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	channels, _ := effective.Config["channels"].([]any)
+	for _, raw := range channels {
+		if channel, ok := raw.(map[string]any); ok && channel["id"] == kernelpool.RelayChannelID {
+			key, _ := channel["apiKey"].(string)
+			return key
+		}
+	}
+	return ""
+}
+
+func TestCookieSecureFollowsTheBrowserSchemeInAutoMode(t *testing.T) {
+	h := newHarness(t, func(opts *Options) {
+		opts.CookieSecure = CookieSecureAuto
+		opts.TrustedProxies = []string{"10.0.0.0/8"}
+	})
+	if _, err := h.users.CreateUser(context.Background(), "", accounts.CreateUserInput{Username: "alice", Password: "alice-pass"}); err != nil {
+		t.Fatal(err)
+	}
+	login := func(target, remote, proto string) *http.Cookie {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, target+"/api/platform/login", strings.NewReader(`{"username":"alice","password":"alice-pass"}`))
+		req.RemoteAddr = remote
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", target)
+		if proto != "" {
+			req.Header.Set("X-Forwarded-Proto", proto)
+		}
+		recorder := httptest.NewRecorder()
+		h.server.Handler().ServeHTTP(recorder, req)
+		for _, cookie := range recorder.Result().Cookies() {
+			if cookie.Name == SessionCookie {
+				return cookie
+			}
+		}
+		t.Fatalf("login via %s from %s: %d %s", target, remote, recorder.Code, recorder.Body.String())
+		return nil
+	}
+	for _, check := range []struct {
+		target, remote, proto string
+		secure                bool
+	}{
+		{"https://team.example.com", "203.0.113.5:40000", "", true}, // direct TLS
+		{"http://10.10.10.20", "10.0.0.2:40000", "https", true},     // Caddy terminated HTTPS
+		{"http://10.10.10.20", "10.0.0.2:40000", "http", false},     // intranet HTTP through Caddy
+		{"http://10.10.10.20", "203.0.113.5:40000", "https", false}, // untrusted peer cannot claim HTTPS
+	} {
+		if cookie := login(check.target, check.remote, check.proto); cookie.Secure != check.secure {
+			t.Errorf("%s from %s proto=%q: Secure=%v", check.target, check.remote, check.proto, cookie.Secure)
+		}
+	}
+}
+
+func TestServiceStatusShowsDeploymentToAdminsOnly(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	admin, err := h.users.CreateUser(ctx, "", accounts.CreateUserInput{Username: "admin", Password: "admin-pass", Role: accounts.RoleAdmin})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.users.CreateUser(ctx, admin.ID, accounts.CreateUserInput{Username: "alice", Password: "alice-pass", RelayKey: "sk-alice-status-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.users.CreateUser(ctx, admin.ID, accounts.CreateUserInput{Username: "bob", Password: "bob-pass1"}); err != nil {
+		t.Fatal(err)
+	}
+	member := h.do(call{method: http.MethodGet, path: "/api/platform/admin/service-status", cookie: h.login("alice", "alice-pass")})
+	if member.Code != http.StatusForbidden {
+		t.Fatalf("member service status = %d", member.Code)
+	}
+	response := h.do(call{method: http.MethodGet, path: "/api/platform/admin/service-status", cookie: h.login("admin", "admin-pass")})
+	if response.Code != http.StatusOK || strings.Contains(response.Body.String(), "sk-alice") {
+		t.Fatalf("service status = %d %s", response.Code, response.Body.String())
+	}
+	var envelope struct {
+		Data struct {
+			Relay struct {
+				Configured bool   `json:"configured"`
+				BaseURL    string `json:"baseUrl"`
+				Models     []struct {
+					Model      string `json:"model"`
+					Capability string `json:"capability"`
+				} `json:"models"`
+				AutoAllowedHost string `json:"autoAllowedHost"`
+			} `json:"relay"`
+			CookieSecure       string `json:"cookieSecure"`
+			IdleTimeoutSeconds int64  `json:"idleTimeoutSeconds"`
+			Members            struct {
+				Active       int `json:"active"`
+				WithRelayKey int `json:"withRelayKey"`
+			} `json:"members"`
+			Workspaces struct {
+				Total int `json:"total"`
+			} `json:"workspaces"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	status := envelope.Data
+	if !status.Relay.Configured || status.Relay.BaseURL != "https://relay.example.com/v1" || len(status.Relay.Models) != 1 || status.Relay.Models[0].Capability != "image" || status.Relay.AutoAllowedHost != "relay.example.com" {
+		t.Fatalf("relay status = %+v", status.Relay)
+	}
+	if status.CookieSecure != "always" || status.IdleTimeoutSeconds != 1800 || status.Members.Active != 3 || status.Members.WithRelayKey != 1 || status.Workspaces.Total != 3 {
+		t.Fatalf("status = %+v", status)
+	}
+}
+
+// Members create generation tasks through the gateway; the kernel's desktop
+// trust (which never matches without a desktop shell) must not block them.
+func TestMembersCanCreateTasksThroughTheGateway(t *testing.T) {
+	h := newHarness(t)
+	if _, err := h.users.CreateUser(context.Background(), "", accounts.CreateUserInput{Username: "alice", Password: "alice-pass"}); err != nil {
+		t.Fatal(err)
+	}
+	cookie := h.login("alice", "alice-pass")
+	for _, path := range []string{"/api/tasks", "/api/canvas-workflows"} {
+		response := h.do(call{method: http.MethodPost, path: path, cookie: cookie, body: `{"type":"canvas_text","prompt":"写一句话","input":{"config":{}}}`})
+		if response.Code == http.StatusForbidden {
+			t.Fatalf("%s rejected the workspace owner: %s", path, response.Body.String())
+		}
+	}
+}

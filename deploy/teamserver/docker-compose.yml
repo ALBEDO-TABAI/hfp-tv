@@ -1,5 +1,6 @@
 # 团队服务器：一个进程服务多名成员，每人一个独立工作区内核。
-# 用法见 docs/deployment.md。
+# 默认按内网 HTTP 部署，对外只占一个端口（TEAMSERVER_HTTP_PORT，默认 80）。
+# 有域名、要 HTTPS 时见 docker-compose.https.yml。用法见 docs/deployment.md。
 services:
   teamserver:
     image: hfp-teamserver:local
@@ -8,19 +9,18 @@ services:
       dockerfile: deploy/teamserver/Dockerfile
       args:
         GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+    # .env 里的设置原样传进容器（TEAMSERVER_*、CANVAS_* 等）；下面 environment 写死的几项优先。
+    env_file:
+      - path: .env
+        required: false
     environment:
-      TEAMSERVER_COOKIE_SECURE: ${TEAMSERVER_COOKIE_SECURE:-true}
-      # 只信任 Compose 网络里的 Caddy 传来的 X-Forwarded-For。
+      # 容器内监听地址和数据目录固定，Caddy 和数据卷依赖它们；对外端口改 TEAMSERVER_HTTP_PORT。
+      TEAMSERVER_ADDR: ":8080"
+      TEAMSERVER_DATA_DIR: /data
+      # 只信任 Compose 网络里的 Caddy 传来的 X-Forwarded-For / X-Forwarded-Proto。
       TEAMSERVER_TRUSTED_PROXIES: ${TEAMSERVER_TRUSTED_PROXIES:-172.16.0.0/12}
-      TEAMSERVER_RELAY_CHANNEL_FILE: ${TEAMSERVER_RELAY_CHANNEL_FILE:-}
-      TEAMSERVER_REFERENCE_STORAGE_FILE: ${TEAMSERVER_REFERENCE_STORAGE_FILE:-}
-      # 账号文件：每行“用户名:密码”；密钥文件：每行“用户名:中转站密钥”。改动 5 秒内生效。
-      TEAMSERVER_USERS_FILE: ${TEAMSERVER_USERS_FILE:-}
-      TEAMSERVER_USER_KEYS_FILE: ${TEAMSERVER_USER_KEYS_FILE:-}
-      # 团队服务器强制关闭私网出站；内网中转站只按主机名精确放行。
+      # 团队服务器强制关闭私网出站；公司中转站地址自动放行，其他内网地址写进 CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS。
       CANVAS_ALLOW_PRIVATE_UPSTREAMS: "false"
-      CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS: ${CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS:-}
-      CANVAS_SHUTDOWN_TIMEOUT: ${CANVAS_SHUTDOWN_TIMEOUT:-2m}
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
       - teamserver-data:/data
@@ -32,12 +32,8 @@ services:
     image: caddy:2.10-alpine
     depends_on:
       - teamserver
-    environment:
-      # 有域名时写域名（自动 HTTPS）；只在内网用 IP 访问时写 :80，并把 TEAMSERVER_COOKIE_SECURE 设为 false。
-      TEAMSERVER_DOMAIN: ${TEAMSERVER_DOMAIN:?请设置 TEAMSERVER_DOMAIN，例如 studio.example.com；内网 HTTP 访问写 :80}
     ports:
       - "${TEAMSERVER_HTTP_PORT:-80}:80"
-      - "${TEAMSERVER_HTTPS_PORT:-443}:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

@@ -168,6 +168,7 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 		return nil, beefAPIErr
 	}
 	svc.SetBeefAPI(beefAPIConnection)
+	svc.SetPlatformChannels(hostedManagedChannels(cfg))
 	localKernel := app.NewLocalKernel(svc)
 	assetService := svc.ResourceService()
 	projectService := svc.ProjectService()
@@ -457,6 +458,34 @@ func (r *Runtime) Errors() <-chan error {
 		return closed
 	}
 	return r.serveErr
+}
+
+// Idle reports that closing the runtime interrupts nothing: no worker task, no
+// queued or running task, no playback transcode recovery and no assistant
+// turn. Any doubt (a failed query) counts as busy.
+func (r *Runtime) Idle(ctx context.Context) bool {
+	if r == nil || r.closed.Load() || !r.started.Load() {
+		return false
+	}
+	if r.service.ActiveWorkerTasks() > 0 {
+		return false
+	}
+	if count, err := r.service.UnfinishedTaskCount(); err != nil || count > 0 {
+		return false
+	}
+	if r.backgroundDone != nil {
+		select {
+		case <-r.backgroundDone:
+		default:
+			return false
+		}
+	}
+	if r.assistantHost != nil && r.assistantHost.Running() {
+		if health := r.assistantHost.Probe(ctx); health.OK && health.Busy {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *Runtime) DepthComponents() *depthcapture.Service { return r.service.DepthComponents() }

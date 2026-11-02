@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"infinite-canvas/backend/internal/desktopnet"
@@ -502,19 +503,63 @@ func allowPrivateUpstreams() bool {
 	}
 }
 
-// allowedPrivateUpstreamHost lets operators pin only explicitly trusted upstream
+// AllowedPrivateUpstreamHost lets operators pin only explicitly trusted upstream
 // hostnames to an internal route without disabling SSRF protection for every URL.
 func AllowedPrivateUpstreamHost(host string) bool {
 	host = normalizeOutboundHost(host)
 	if host == "" {
 		return false
 	}
-	for _, configured := range strings.Split(os.Getenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS"), ",") {
-		if normalizeOutboundHost(configured) == host {
+	for _, configured := range AllowedPrivateUpstreamHosts() {
+		if configured == host {
 			return true
 		}
 	}
 	return false
+}
+
+var trustedPrivateHosts struct {
+	sync.RWMutex
+	hosts []string
+}
+
+// TrustPrivateUpstreamHost adds an operator-configured host, such as the team
+// server's company relay, to the private-upstream allowlist for this process.
+func TrustPrivateUpstreamHost(host string) {
+	host = normalizeOutboundHost(host)
+	if host == "" {
+		return
+	}
+	trustedPrivateHosts.Lock()
+	defer trustedPrivateHosts.Unlock()
+	for _, existing := range trustedPrivateHosts.hosts {
+		if existing == host {
+			return
+		}
+	}
+	trustedPrivateHosts.hosts = append(trustedPrivateHosts.hosts, host)
+}
+
+// AllowedPrivateUpstreamHosts lists CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS plus
+// the hosts trusted by TrustPrivateUpstreamHost, normalized and deduplicated.
+func AllowedPrivateUpstreamHosts() []string {
+	var hosts []string
+	seen := map[string]bool{}
+	add := func(host string) {
+		if host = normalizeOutboundHost(host); host != "" && !seen[host] {
+			seen[host] = true
+			hosts = append(hosts, host)
+		}
+	}
+	for _, configured := range strings.Split(os.Getenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS"), ",") {
+		add(configured)
+	}
+	trustedPrivateHosts.RLock()
+	for _, host := range trustedPrivateHosts.hosts {
+		add(host)
+	}
+	trustedPrivateHosts.RUnlock()
+	return hosts
 }
 
 func normalizeOutboundHost(host string) string {

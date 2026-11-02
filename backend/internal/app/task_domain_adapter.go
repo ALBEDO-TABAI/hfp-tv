@@ -165,6 +165,10 @@ func (taskCatalogAdapter) HasExecutableVideoConfig(input map[string]any) bool {
 type taskSecretsAdapter struct{ s *Service }
 
 func (a taskSecretsAdapter) ResolveManaged(input map[string]any) (map[string]any, error) {
+	input, err := a.s.resolvePlatformChannelSecrets(input)
+	if err != nil {
+		return nil, err
+	}
 	return a.s.resolveManagedBeefAPISecrets(input)
 }
 

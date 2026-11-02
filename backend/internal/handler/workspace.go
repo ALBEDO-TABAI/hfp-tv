@@ -3,8 +3,11 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"slices"
+	"strings"
 
 	"infinite-canvas/backend/internal/app"
 	"infinite-canvas/backend/internal/beefapi"
@@ -140,12 +143,48 @@ func redactModelConfig(c *gin.Context, svc *app.Service, config map[string]any) 
 	if _, external := externalBusiness(c); external {
 		config = redactExternalConfig(config)
 	}
+	if dependencies, ok := runtimeDependencies(c); ok {
+		config = redactPlatformChannels(config, dependencies.ManagedChannelIDs)
+	}
 	managed := false
 	if connection, err := requestBeefAPI(c, svc); err == nil && connection != nil {
 		managed = connection.HasManagedCredential()
 		return connection.RedactConfig(config)
 	}
 	return beefapi.RedactConfig(config, managed)
+}
+
+// redactPlatformChannels keeps team-server channel keys on the server: the
+// browser learns only whether a key is bound (hasApiKey). Saves restore the
+// stored channel, and requests naming it are completed server-side.
+func redactPlatformChannels(config map[string]any, ids []string) map[string]any {
+	channels, _ := config["channels"].([]any)
+	if len(ids) == 0 || len(channels) == 0 {
+		return config
+	}
+	next := make([]any, 0, len(channels))
+	for _, raw := range channels {
+		channel, ok := raw.(map[string]any)
+		if !ok || !slices.Contains(ids, fmt.Sprint(channel["id"])) {
+			next = append(next, raw)
+			continue
+		}
+		redacted := make(map[string]any, len(channel)+2)
+		for key, value := range channel {
+			redacted[key] = value
+		}
+		key, _ := channel["apiKey"].(string)
+		redacted["hasApiKey"] = strings.TrimSpace(key) != ""
+		redacted["apiKey"] = ""
+		redacted["secretKey"] = ""
+		next = append(next, redacted)
+	}
+	out := make(map[string]any, len(config))
+	for key, value := range config {
+		out[key] = value
+	}
+	out["channels"] = next
+	return out
 }
 
 func preserveManagedModelConfig(c *gin.Context, svc *app.Service, raw json.RawMessage) json.RawMessage {

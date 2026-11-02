@@ -131,6 +131,15 @@ func (s *Service) resolveChannelModelsRequest(input *ChannelModelsRequest) error
 	if input == nil {
 		return nil
 	}
+	if s.IsPlatformChannel(input.ChannelID) {
+		credential, found := s.platformChannelCredential(strings.TrimSpace(input.ChannelID))
+		if !found || credential.apiKey == "" {
+			return BadAuthRequest("管理员还没有为你绑定公司模型服务的密钥")
+		}
+		input.APIKey = credential.apiKey
+		input.BaseURL = credential.baseURL
+		return nil
+	}
 	if !beefapi.IsManagedChannel(input.ChannelID, input.CredentialRef, input.BaseURL) && input.ChannelID != beefapi.ChannelID {
 		return nil
 	}
@@ -153,6 +162,13 @@ func (s *Service) ResolveCustomRelayAPIKey(targetURL, incoming string) (string, 
 }
 
 func (s *Service) resolveCustomRelayKey(targetURL, incoming string) (string, error) {
+	// Team-server channels reach the browser without their key; a keyless
+	// request to that exact origin is completed with the stored one.
+	if strings.TrimSpace(incoming) == "" {
+		if key := s.platformRelayKey(targetURL); key != "" {
+			return key, nil
+		}
+	}
 	// An unrelated custom channel must remain usable even if the managed
 	// connection is revoked. Resolve its secret only for the bound origin.
 	if s.beefAPI != nil && s.beefAPI.HasManagedCredential() && !sameCredentialOrigin(targetURL, s.beefAPI.Origin()) {

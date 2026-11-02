@@ -43,7 +43,7 @@ func newMarketHarness(t *testing.T) *harness {
 		marketServer.Close()
 		_ = users.Close()
 	})
-	server, err := New(Options{Accounts: users, Pool: pool, DataRoot: root, CookieSecure: true, Market: market})
+	server, err := New(Options{Accounts: users, Pool: pool, DataRoot: root, CookieSecure: CookieSecureAlways, Market: market})
 	if err != nil {
 		t.Fatal(err)
 	}

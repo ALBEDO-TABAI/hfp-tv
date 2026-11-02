@@ -199,7 +199,8 @@ func trustedDesktopUI(c *gin.Context) bool {
 // requireTrustedDesktopWritePrincipal is the creation.write principal check.
 // Registered client tokens only skip the launch token on /api/ops; they cannot
 // take these writes even when a launch token is also present.
-// Hosted runtimes leave DesktopTrust unset and still allow the workspace owner.
+// Hosted kernels accept the workspace owner authenticated by the team-server
+// gateway; their DesktopTrust never matches because there is no desktop shell.
 func requireTrustedDesktopWritePrincipal(c *gin.Context, message string) bool {
 	if principal, valid := externalBusiness(c); valid {
 		if !principal.ReadOnly {
@@ -211,6 +212,9 @@ func requireTrustedDesktopWritePrincipal(c *gin.Context, message string) bool {
 	if strings.TrimSpace(c.GetHeader("X-Beeftv-Client")) != "" {
 		fail(c, http.StatusForbidden, app.Forbidden(message))
 		return false
+	}
+	if httptransport.HostedOwner(c.Request) {
+		return true
 	}
 	dependencies, ok := runtimeDependencies(c)
 	if !ok || dependencies.DesktopTrust == nil {

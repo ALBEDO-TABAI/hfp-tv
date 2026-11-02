@@ -13,6 +13,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	"infinite-canvas/backend/internal/accounts"
 	"infinite-canvas/backend/internal/bootstrap"
 	"infinite-canvas/backend/internal/kernelpool"
+	"infinite-canvas/backend/internal/outbound"
 	"infinite-canvas/backend/internal/referencestorage"
 	"infinite-canvas/backend/internal/skillmarket"
 	"infinite-canvas/backend/internal/teamserver"
@@ -132,7 +134,20 @@ func run(ctx context.Context) error {
 		return err
 	}
 	defer users.Close()
-	relayTemplate, err := kernelpool.LoadRelayTemplate(os.Getenv("TEAMSERVER_RELAY_CHANNEL_FILE"))
+	relayFile := strings.TrimSpace(os.Getenv("TEAMSERVER_RELAY_CHANNEL_FILE"))
+	relayTemplate, err := kernelpool.LoadRelayTemplate(relayFile)
+	if err != nil {
+		return err
+	}
+	relayHost, err := trustRelayHost(relayTemplate)
+	if err != nil {
+		return err
+	}
+	cookieSecure, err := teamserver.ParseCookieSecurity(os.Getenv("TEAMSERVER_COOKIE_SECURE"))
+	if err != nil {
+		return err
+	}
+	idleTimeout, err := idleTimeoutSetting()
 	if err != nil {
 		return err
 	}
@@ -174,18 +189,25 @@ func run(ctx context.Context) error {
 		RelayTemplate:    relayTemplate,
 		ReferenceStorage: referenceStorage,
 		ShutdownTimeout:  shutdownTimeout,
+		IdleTimeout:      idleTimeout,
 	})
 	server, err := teamserver.New(teamserver.Options{
 		Accounts: users, Pool: pool, DataRoot: root, WebDir: os.Getenv("TEAMSERVER_WEB_DIR"),
-		CookieSecure:   env("TEAMSERVER_COOKIE_SECURE", "true") != "false",
+		CookieSecure:   cookieSecure,
 		TrustedProxies: envListOrDefault("TEAMSERVER_TRUSTED_PROXIES", []string{"127.0.0.1", "::1"}),
 		AllowedOrigins: envList("TEAMSERVER_ALLOWED_ORIGINS"),
 		Market:         market,
 		Workshop:       shop,
+		Status: teamserver.DeploymentStatus{
+			RelayFile: relayFile, RelayTemplate: relayTemplate, RelayHost: relayHost,
+			UsersFile: strings.TrimSpace(os.Getenv("TEAMSERVER_USERS_FILE")), KeysFile: strings.TrimSpace(os.Getenv("TEAMSERVER_USER_KEYS_FILE")),
+			IdleTimeout: idleTimeout,
+		},
 	})
 	if err != nil {
 		return err
 	}
+	logDeployment(relayFile, relayTemplate, cookieSecure, idleTimeout)
 	accountFiles := teamserver.AccountFiles{UsersPath: strings.TrimSpace(os.Getenv("TEAMSERVER_USERS_FILE")), KeysPath: strings.TrimSpace(os.Getenv("TEAMSERVER_USER_KEYS_FILE"))}
 	if accountFiles.UsersPath == "" && accountFiles.KeysPath != "" {
 		return errors.New("设置了 TEAMSERVER_USER_KEYS_FILE 就必须同时设置 TEAMSERVER_USERS_FILE")
@@ -212,8 +234,10 @@ func run(ctx context.Context) error {
 	}
 
 	// Open every active workspace in the background so queued generation tasks
-	// resume after a restart without waiting for their owner to log in.
+	// resume after a restart without waiting for their owner to log in; the
+	// reaper closes the ones with nothing to do.
 	go openActiveWorkspaces(ctx, users, server, pool)
+	go pool.RunReaper(ctx)
 	go purgeSessions(ctx, users)
 
 	marketServer := &http.Server{Handler: teamserver.MarketHandler(market), ReadHeaderTimeout: 10 * time.Second}
@@ -319,7 +343,7 @@ func openActiveWorkspaces(ctx context.Context, users *accounts.Service, server *
 		go func() {
 			defer wg.Done()
 			defer func() { <-slots }()
-			if _, err := pool.Get(ctx, spec); err != nil {
+			if err := pool.Warm(ctx, spec); err != nil {
 				log.Printf("预先打开工作区 %s 失败：%v", spec.ID, err)
 			}
 		}()
@@ -418,4 +442,61 @@ func readPassword() (string, error) {
 		return "", errors.New("请通过 TEAMSERVER_ADMIN_PASSWORD 或标准输入提供密码")
 	}
 	return strings.TrimRight(line, "\r\n"), nil
+}
+
+// trustRelayHost lets kernels reach the company relay even when it sits on the
+// intranet, without a separate CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS entry: the
+// relay file is written by the operator, not by members.
+func trustRelayHost(template map[string]any) (string, error) {
+	if template == nil {
+		return "", nil
+	}
+	raw, _ := template["baseUrl"].(string)
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", errors.New("公司中转站渠道定义的 baseUrl 必须是 http:// 或 https:// 开头的完整地址")
+	}
+	host := parsed.Hostname()
+	outbound.TrustPrivateUpstreamHost(host)
+	return host, nil
+}
+
+// idleTimeoutSetting reads TEAMSERVER_IDLE_TIMEOUT: a duration (default 30m),
+// or 0/off to keep every workspace open until shutdown.
+func idleTimeoutSetting() (time.Duration, error) {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv("TEAMSERVER_IDLE_TIMEOUT")))
+	switch raw {
+	case "":
+		return 30 * time.Minute, nil
+	case "0", "off", "false":
+		return 0, nil
+	}
+	parsed, err := time.ParseDuration(raw)
+	if err != nil || parsed < time.Minute {
+		return 0, errors.New("TEAMSERVER_IDLE_TIMEOUT 必须是至少 1 分钟的时长（例如 30m），或 off")
+	}
+	return parsed, nil
+}
+
+// logDeployment prints what this start actually loaded, so a setting that did
+// not reach the container is visible in `docker compose logs`.
+func logDeployment(relayFile string, relay map[string]any, cookie teamserver.CookieSecurity, idle time.Duration) {
+	if relay == nil {
+		log.Printf("公司模型服务：未配置（TEAMSERVER_RELAY_CHANNEL_FILE 为空），成员只能使用自己添加的模型服务")
+	} else {
+		base, _ := relay["baseUrl"].(string)
+		models, _ := relay["models"].([]any)
+		log.Printf("公司模型服务：%s，%d 个模型（%s）", base, len(models), relayFile)
+	}
+	if hosts := outbound.AllowedPrivateUpstreamHosts(); len(hosts) > 0 {
+		log.Printf("允许访问的内网地址：%s", strings.Join(hosts, ", "))
+	}
+	log.Printf("登录 Cookie：%s；工作区：%s", cookie, idleText(idle))
+}
+
+func idleText(idle time.Duration) string {
+	if idle <= 0 {
+		return "不自动关闭"
+	}
+	return fmt.Sprintf("空闲 %d 分钟后关闭", int(idle.Minutes()))
 }

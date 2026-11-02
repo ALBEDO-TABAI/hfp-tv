@@ -1,4 +1,5 @@
-{$TEAMSERVER_DOMAIN} {
+# 默认站点 :80（内网 HTTP）；叠加 docker-compose.https.yml 后换成 TEAMSERVER_DOMAIN 并自动 HTTPS。
+{$TEAMSERVER_SITE::80} {
 	encode gzip
 	request_body {
 		max_size 1GB
@@ -14,6 +15,5 @@
 	header {
 		Referrer-Policy no-referrer
 		X-Content-Type-Options nosniff
-		Strict-Transport-Security "max-age=31536000"
 	}
 }

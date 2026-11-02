@@ -246,6 +246,14 @@ func (r *Repository) ActiveTaskCountForUser(userID string) (int64, error) {
 	return count, err
 }
 
+// UnfinishedTaskCount counts queued and running tasks of every user in this
+// workspace database.
+func (r *Repository) UnfinishedTaskCount() (int64, error) {
+	var count int64
+	err := r.db.Model(&model.Task{}).Where("status IN ?", []model.TaskStatus{model.TaskStatusQueued, model.TaskStatusRunning}).Count(&count).Error
+	return count, err
+}
+
 func (r *Repository) ActiveTaskCountForProjectIDs(userID string, projectIDs []string) (int64, error) {
 	if len(projectIDs) == 0 {
 		return 0, nil
