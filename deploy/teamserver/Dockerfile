@@ -18,7 +18,8 @@ COPY backend/internal/providerpreset/image_contracts.json backend/internal/provi
 COPY web ./
 RUN bun --bun ./node_modules/vite/bin/vite.js build
 
-FROM oven/bun:1.3.13 AS agent-host-deps
+# 助手锁文件是 Bun lockfile v2，Bun 1.3.x 无法解析，版本与本地开发要求的 1.4.4 对齐；前端锁文件仍是 v1，上面的阶段不受影响。
+FROM oven/bun:1.4.4 AS agent-host-deps
 WORKDIR /app/agent-host
 COPY agent-host/package.json agent-host/bun.lock ./
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --production --backend copyfile --cache-dir=/root/.bun/install/cache
