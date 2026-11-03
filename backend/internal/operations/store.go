@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"infinite-canvas/backend/internal/model"
 )
@@ -109,7 +110,11 @@ func (s *Store) Run(ctx context.Context, req RunRequest, fn func(tx *gorm.DB) ([
 	err := db.Transaction(func(tx *gorm.DB) error {
 		record := model.AgentOpRecord{OpID: req.OpID, UserID: req.UserID, Op: req.Op,
 			PayloadHash: req.PayloadHash, Status: "running", TurnID: strings.TrimSpace(req.TurnID)}
-		if err := tx.Create(&record).Error; err != nil {
+		// Insert first so SQLite takes the write lock before reading; a replay
+		// (task-binding recovery re-runs every bound task) then lands on the
+		// unique key. That is routine, so the insert does not log it.
+		quiet := tx.Session(&gorm.Session{Logger: tx.Logger.LogMode(logger.Silent)})
+		if err := quiet.Create(&record).Error; err != nil {
 			if !isDuplicateKey(err) {
 				return AsError(err)
 			}
