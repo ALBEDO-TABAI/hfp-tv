@@ -204,6 +204,19 @@ func (p appReceiptPort) NotifyPoll(ctx context.Context, event string, err error)
 	_ = p.service.log(call.UserID, call.TaskID, level, message, payload)
 }
 
+// NotePoll writes an upstream observation (status change, unreadable answer)
+// to the task log; see generation.PollNoter.
+func (p appReceiptPort) NotePoll(ctx context.Context, level, message string) {
+	if p.service == nil || p.service.repo == nil {
+		return
+	}
+	call := canonicalCallMeta(ctx)
+	if strings.TrimSpace(call.TaskID) == "" {
+		return
+	}
+	_ = p.service.log(call.UserID, call.TaskID, level, message, "")
+}
+
 func (p appReceiptPort) SyncProgress(taskID string, body []byte) {
 	if p.service == nil {
 		return

@@ -122,11 +122,13 @@ func RunVideoTaskWithPolicy(ctx context.Context, input Input, pollPolicy VideoPo
 	if id == "" {
 		return nil, errors.New("视频接口没有返回任务 ID")
 	}
+	observer := newPollObserver()
 	return RunVideoPollLoop(ctx, id, pollPolicy, func(ctx context.Context) (VideoPollOutcome, error) {
 		var state map[string]interface{}
 		if err := GetJSON(ctx, input.Config, "/videos/"+id, &state); err != nil {
 			return VideoPollOutcome{}, err
 		}
+		observer.observePayload(ctx, state)
 		var err error
 		state, err = ValidateVideoTaskState(id, state)
 		if err != nil {
@@ -256,11 +258,13 @@ func RunSeedanceVideosTask(ctx context.Context, input Input, pollPolicy VideoPol
 	if id == "" {
 		return nil, SubmissionUnknownError{Cause: errors.New("视频接口没有返回任务 ID")}
 	}
+	observer := newPollObserver()
 	return RunVideoPollLoop(ctx, id, pollPolicy, func(ctx context.Context) (VideoPollOutcome, error) {
 		var state map[string]interface{}
 		if err := GetJSON(ctx, input.Config, "/videos/"+id, &state); err != nil {
 			return VideoPollOutcome{}, err
 		}
+		observer.observePayload(ctx, state)
 		var err error
 		state, err = ValidateVideoTaskState(id, state)
 		if err != nil {

@@ -127,6 +127,7 @@ func RunProtocolAdapterTaskWithPolicy(ctx context.Context, input Input, adapter 
 		}
 	}
 
+	observer := newPollObserver()
 	return RunVideoPollLoop(ctx, taskID, policy, func(ctx context.Context) (VideoPollOutcome, error) {
 		spec, err := adapter.BuildPoll(ctx, protocol.PollContext{BaseURL: input.Config.BaseURL, Model: request.Model, Request: request, TaskID: taskID})
 		if err != nil {
@@ -140,11 +141,24 @@ func RunProtocolAdapterTaskWithPolicy(ctx context.Context, input Input, adapter 
 		if err != nil {
 			return VideoPollOutcome{}, err
 		}
+		observer.observe(ctx, body)
 		if state.TaskID != "" {
 			taskID = state.TaskID
 		}
 		switch state.Status {
 		case protocol.StatusSucceeded:
+			if input.Mode == "video" && !ProtocolResultHasOutput(input.Mode, state.Result) {
+				// Relays such as New API answer with their own task shapes; read
+				// the video address from those before declaring it missing.
+				if videos := relayVideoReferences(body); len(videos) > 0 {
+					if state.Result == nil {
+						state.Result = &protocol.Result{}
+					}
+					state.Result.Videos = videos
+				} else if capability, ok := adapter.(protocol.ResultCapability); !ok || !capability.ResultAvailable() {
+					observer.noteMissingVideo(ctx, body)
+				}
+			}
 			result, err := FinishProtocolAdapterResult(ctx, input, adapter, request, taskID, state.Result, policy)
 			return VideoPollOutcome{Done: err == nil, Result: result}, err
 		case protocol.StatusFailed, protocol.StatusCancelled:
@@ -1246,6 +1260,20 @@ func ProtocolResultError(message, taskID string, bodies ...[]byte) error {
 		}
 	}
 	message = strings.TrimSpace(message)
+	if len(bodies) > 0 {
+		// Relays keep their own task record: New API puts the status and the
+		// reason under data (fail_reason). Name both so the cause is visible.
+		status, reason := upstreamFailureDetail(bodies[0])
+		if message == "" {
+			message = reason
+		}
+		if message == "" {
+			message = "上游返回失败状态"
+		}
+		if status != "" && !strings.Contains(message, status) {
+			message += "（上游状态 " + status + "）"
+		}
+	}
 	if message == "" {
 		message = "上游返回失败状态"
 	}
@@ -1253,6 +1281,32 @@ func ProtocolResultError(message, taskID string, bodies ...[]byte) error {
 		return errors.New(message)
 	}
 	return fmt.Errorf("声明式协议任务失败（任务 %s）：%s", taskID, message)
+}
+
+// upstreamFailureDetail reads the raw status word and a failure reason from
+// the places relays and providers put them. A URL in fail_reason is a result
+// address on some relays, not a reason.
+func upstreamFailureDetail(body []byte) (status, reason string) {
+	var payload map[string]any
+	if json.Unmarshal(body, &payload) != nil {
+		return "", ""
+	}
+	status = pollStatusText(payload)
+	data := objectValue(payload["data"])
+	for _, candidate := range []string{
+		stringAt(data, "fail_reason"), stringAt(payload, "fail_reason"),
+		stringAt(objectValue(data["error"]), "message"), stringAt(objectValue(payload["error"]), "message"),
+		stringAt(data, "error"), stringAt(payload, "error"),
+		stringAt(data, "message"), stringAt(data, "reason"), stringAt(payload, "reason"),
+	} {
+		if candidate != "" && !isHTTPMediaURL(candidate) {
+			if runes := []rune(candidate); len(runes) > 300 {
+				candidate = string(runes[:300]) + "…"
+			}
+			return status, sanitizeProviderText(candidate)
+		}
+	}
+	return status, ""
 }
 
 func ValidateGenerationInterface(mode string, interfaceType string) error {

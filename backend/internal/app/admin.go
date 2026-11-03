@@ -294,6 +294,10 @@ func (s *Service) LogAPICall(log model.ApiCallLog) error {
 			// 重建，不能让一次状态写失败掩盖真实的上游调用。
 			stdlog.Printf("provider task state update failed: task_id=%s provider_request_id=%s error=%v", log.TaskID, log.ProviderRequestID, err)
 		}
+		if stage == "accepted" && log.Capability == "video" {
+			// The upstream task ID is what an administrator looks up on the relay.
+			_ = s.log(log.UserID, log.TaskID, "info", "上游已接单，任务号 "+log.ProviderRequestID, "")
+		}
 	}
 	if merged, err := s.mergeVideoAPICallLog(log); err != nil {
 		return err

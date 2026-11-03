@@ -952,6 +952,9 @@ func parseAudioResponse(payload map[string]any) (CreateResult, error) {
 	return CreateResult{Status: StatusSucceeded, Result: &Result{Audios: []MediaReference{{URL: value, Kind: "audio"}}}}, nil
 }
 
+// KnownStatus reports whether a provider status word maps to a task state.
+func KnownStatus(raw string) bool { return normalizeStatus(raw) != "" }
+
 func normalizeStatus(raw string) Status {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "queued", "pending", "created", "submitted", "in_queue", "task_status_queued":
