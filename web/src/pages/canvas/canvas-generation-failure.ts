@@ -95,8 +95,25 @@ export function imageSubmissionUnknown(metadata: CanvasNodeMetadata | undefined)
     return metadata?.generationSubmissionState === "unknown" || metadata?.taskStage === "submission_unknown" || metadata?.generationErrorCode === "submission_uncertain";
 }
 
+// The server bumps a running task's updatedAt on every lease heartbeat. Copying
+// only that into the node would mark the canvas edited, save it and reload it
+// every few seconds while a video renders, so such updates are dropped.
+const volatileTaskMetadata = new Set(["taskUpdatedAt"]);
+
+function sameTaskNodeMetadata(previous: CanvasNodeMetadata | undefined, next: CanvasNodeMetadata) {
+    const before = (previous || {}) as Record<string, unknown>;
+    const after = next as Record<string, unknown>;
+    for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+        if (volatileTaskMetadata.has(key) || before[key] === after[key]) continue;
+        if (before[key] === undefined || after[key] === undefined || typeof before[key] !== "object" || typeof after[key] !== "object") return false;
+        if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) return false;
+    }
+    return true;
+}
+
 export function canvasGenerationTaskNodes(nodes: CanvasNodeData[], targetNodeId: string, task: GenerationTask): CanvasNodeData[] {
-    return nodes.map((node) => {
+    let changed = false;
+    const next = nodes.map((node) => {
         const failed = task.status === "failed" || task.status === "cancelled";
         if (node.id !== targetNodeId && !(failed && node.metadata?.taskId === task.id)) return node;
         const outputIndex = node.metadata?.taskOutputIndex ?? 0;
@@ -111,16 +128,17 @@ export function canvasGenerationTaskNodes(nodes: CanvasNodeData[], targetNodeId:
         const retainRecovery = task.status === "succeeded" && !hasCompletedContent && Boolean(node.metadata?.resourceReloadAvailable || isKeptGenerationResultCode(node.metadata?.generationErrorCode));
         const targetUnavailable = node.metadata?.generationErrorCode === "result_target_unavailable";
         const failure = paused ? { resourceReloadAvailable: true, generationErrorCode: "download_failed", errorDetails: task.stage === "delivery_timed_out" ? "取回结果已超时，可以继续取回" : "已停止取回，可以继续取回" } : failed ? canvasTaskFailureMetadata(task, node.metadata) : undefined;
-        return {
-            ...node,
-            metadata: {
-                ...node.metadata,
-                ...generationTaskMetadata(task),
-                status: failed || paused || retainRecovery ? "error" : hasCompletedContent ? "success" : "loading",
-                ...(failure || (retainRecovery
-                    ? { resourceReloadAvailable: !targetUnavailable, generationErrorCode: node.metadata?.generationErrorCode, errorDetails: node.metadata?.errorDetails || (targetUnavailable ? explainGenerationError({ code: "result_target_unavailable" }).message : "生成结果已保留，请点击「继续取回」") }
-                    : { errorDetails: undefined, generationErrorCode: undefined, resourceReloadAvailable: undefined, failedPromptFingerprint: undefined, failedInputFingerprint: undefined })),
-            },
+        const metadata: CanvasNodeMetadata = {
+            ...node.metadata,
+            ...generationTaskMetadata(task),
+            status: failed || paused || retainRecovery ? "error" : hasCompletedContent ? "success" : "loading",
+            ...(failure || (retainRecovery
+                ? { resourceReloadAvailable: !targetUnavailable, generationErrorCode: node.metadata?.generationErrorCode, errorDetails: node.metadata?.errorDetails || (targetUnavailable ? explainGenerationError({ code: "result_target_unavailable" }).message : "生成结果已保留，请点击「继续取回」") }
+                : { errorDetails: undefined, generationErrorCode: undefined, resourceReloadAvailable: undefined, failedPromptFingerprint: undefined, failedInputFingerprint: undefined })),
         };
+        if (sameTaskNodeMetadata(node.metadata, metadata)) return node;
+        changed = true;
+        return { ...node, metadata };
     });
+    return changed ? next : nodes;
 }

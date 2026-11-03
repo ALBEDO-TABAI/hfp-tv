@@ -241,6 +241,9 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
                 ? nodesRef.current
                 : useCanvasStore.getState().openProject(projectId)?.nodes ?? nodesRef.current;
             const next = canvasGenerationTaskNodes(current, targetNodeId, task);
+            // Nothing the canvas shows changed (only a heartbeat timestamp): saving
+            // would rewrite and reload the whole canvas for no visible effect.
+            if (next === current) return;
             // 成功终态可能在同一轮到达；消费结果前就要让保存器看见 taskId。
             useCanvasStore.getState().updateProject(projectId, { nodes: next });
             nodesRef.current = next;
