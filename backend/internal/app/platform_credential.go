@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"slices"
 	"strings"
+
+	"infinite-canvas/backend/internal/model"
 )
 
 // SetPlatformChannels names the model channels a team server writes into this
@@ -29,6 +31,8 @@ type platformChannelCredential struct {
 	modelBaseURLs map[string]string
 	// modelReferenceServices register a model's reference images as assets.
 	modelReferenceServices map[string]string
+	// referenceServices lists those services in profile order.
+	referenceServices []string
 }
 
 func platformModelKey(model string) string {
@@ -37,6 +41,15 @@ func platformModelKey(model string) string {
 
 func (c platformChannelCredential) referenceServiceFor(model string) string {
 	return c.modelReferenceServices[platformModelKey(model)]
+}
+
+// anyReferenceService is the first configured service; one relay normally has
+// a single reference-image service shared by its models.
+func (c platformChannelCredential) anyReferenceService() string {
+	if len(c.referenceServices) == 0 {
+		return ""
+	}
+	return c.referenceServices[0]
 }
 
 // baseURLFor returns the model's own endpoint when it shares the channel's
@@ -95,6 +108,9 @@ func (s *Service) platformChannelCredentialsMatching(match func(id string) bool)
 				}
 				if service := strings.TrimSpace(profile.ReferenceAssetService); model != "" && service != "" {
 					credential.modelReferenceServices[model] = service
+					if !slices.Contains(credential.referenceServices, service) {
+						credential.referenceServices = append(credential.referenceServices, service)
+					}
 				}
 			}
 			out = append(out, credential)
@@ -116,8 +132,13 @@ func (s *Service) resolvePlatformChannelSecrets(input map[string]any) (map[strin
 	}
 	channelID := strings.TrimSpace(stringValue(config["channelId"]))
 	if !s.IsPlatformChannel(channelID) {
-		// Members' own channels never reach the reference-image service.
-		delete(config, "referenceAssetService")
+		// A member's own channel never names the reference-image service. Only
+		// a Seedance task sent to the company relay itself gets the company's.
+		if service := s.relayReferenceServiceFor(config); service != "" {
+			config["referenceAssetService"] = service
+		} else {
+			delete(config, "referenceAssetService")
+		}
 		return input, nil
 	}
 	credential, found := s.platformChannelCredential(channelID)
@@ -152,6 +173,27 @@ func (s *Service) platformRelayKey(targetURL string) string {
 		if credential.apiKey != "" && sameCredentialOrigin(targetURL, credential.baseURL) {
 			return credential.apiKey
 		}
+	}
+	return ""
+}
+
+// relayReferenceServiceFor gives a member's own Ark video task the company
+// reference-image service when it targets the company relay's origin, so
+// Seedance references are registered the same way as on the company channel.
+func (s *Service) relayReferenceServiceFor(config map[string]any) string {
+	interfaceType := strings.TrimSpace(stringValue(config["interfaceType"]))
+	if interfaceType != string(model.ChannelInterfaceVolcengineArkVideo) {
+		return ""
+	}
+	baseURL := strings.TrimSpace(stringValue(config["baseUrl"]))
+	for _, credential := range s.platformChannelCredentials() {
+		if baseURL == "" || !sameCredentialOrigin(baseURL, credential.baseURL) {
+			continue
+		}
+		if service := credential.referenceServiceFor(stringValue(config["model"])); service != "" {
+			return service
+		}
+		return credential.anyReferenceService()
 	}
 	return ""
 }

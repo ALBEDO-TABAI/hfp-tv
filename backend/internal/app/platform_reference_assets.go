@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
+	"infinite-canvas/backend/internal/generation"
 	"infinite-canvas/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -19,14 +21,20 @@ import (
 
 // The company reference-image service (the old project's
 // services/reference-upload-relay) stores an image in the company object
-// storage, registers it in the preset Deyun asset group and answers with an
-// asset:// ID. It authenticates the member's own relay key and keeps a content
-// ledger, so re-sending the same image never creates a second asset.
+// storage and answers, depending on the requested mode, with a temporary
+// public HTTPS link (public-url) or, after registering it in the preset Deyun
+// asset group, an asset:// ID (seedance-asset). It authenticates the member's
+// own relay key and keeps a content ledger, so re-sending the same image never
+// creates a second asset.
 const (
-	referenceServiceMode        = "seedance-asset"
+	referenceServiceAssetMode   = "seedance-asset"
+	referenceServicePublicMode  = "public-url"
 	referenceServiceMaxBytes    = 30 << 20
 	referenceServiceTimeout     = 4 * time.Minute
 	referenceServiceBindingKind = "reference-service:"
+	// A cached public link is reused only while the provider still has this
+	// long to fetch it.
+	referenceLinkReuseMargin = 30 * time.Minute
 )
 
 var referenceAssetIDPattern = regexp.MustCompile(`^asset://[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$`)
@@ -76,31 +84,17 @@ func (s *Service) ensureReferenceServiceAsset(ctx context.Context, userID, resou
 	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return "", err
 	}
-	if strings.TrimSpace(apiKey) == "" {
-		return "", errors.New("没有可用的中转站密钥，无法登记参考图")
-	}
-	resource, body, err := s.OpenResource(userID, resourceID)
-	if err != nil {
-		return "", fmt.Errorf("读取参考图失败：%w", err)
-	}
-	defer body.Close()
-	if resource.Status != model.ResourceStatusReady {
-		return "", errors.New("参考图尚未上传完成")
-	}
-	contentType := strings.ToLower(strings.TrimSpace(strings.Split(resource.MimeType, ";")[0]))
-	if !referenceServiceImageTypes[contentType] {
-		return "", errors.New("Seedance 参考图只支持 PNG、JPEG 或 WebP")
-	}
-	data, err := io.ReadAll(io.LimitReader(body, referenceServiceMaxBytes))
-	if err != nil {
-		return "", fmt.Errorf("读取参考图失败：%w", err)
-	}
-	if len(data) >= referenceServiceMaxBytes {
-		return "", errors.New("Seedance 参考图必须小于 30MB")
-	}
-	assetURL, err := callReferenceService(ctx, service, apiKey, contentType, data)
+	contentType, data, err := s.readReferenceServiceImage(userID, resourceID)
 	if err != nil {
 		return "", err
+	}
+	reply, err := callReferenceService(ctx, service, apiKey, referenceServiceAssetMode, contentType, data)
+	if err != nil {
+		return "", err
+	}
+	assetURL := strings.TrimSpace(reply.URL)
+	if !referenceAssetIDPattern.MatchString(assetURL) {
+		return "", relayReplyError("参考图服务没有返回可用的素材编号")
 	}
 	// Caching is an optimization: a concurrent task may have cached it first,
 	// and the service returns the same asset for the same image anyway.
@@ -109,55 +103,130 @@ func (s *Service) ensureReferenceServiceAsset(ctx context.Context, userID, resou
 	return assetURL, nil
 }
 
-func callReferenceService(ctx context.Context, service, apiKey, contentType string, data []byte) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, referenceServiceTimeout)
-	defer cancel()
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, service, bytes.NewReader(data))
+type publicReferenceLink struct {
+	url       string
+	expiresAt time.Time
+}
+
+// referenceServicePublicURL is the company image relay: it gives an owned
+// image a temporary public HTTPS link for model protocols that only accept
+// URLs. Links are reused while they stay valid long enough.
+func (s *Service) referenceServicePublicURL(ctx context.Context, userID, resourceID, service, apiKey string) (string, error) {
+	cacheKey := service + "\x00" + userID + "\x00" + resourceID
+	if cached, ok := s.publicReferenceLinks.Load(cacheKey); ok {
+		if link := cached.(publicReferenceLink); time.Until(link.expiresAt) > referenceLinkReuseMargin {
+			return link.url, nil
+		}
+		s.publicReferenceLinks.Delete(cacheKey)
+	}
+	contentType, data, err := s.readReferenceServiceImage(userID, resourceID)
 	if err != nil {
-		return "", fmt.Errorf("参考图服务地址无效：%w", err)
+		return "", err
+	}
+	reply, err := callReferenceService(ctx, service, apiKey, referenceServicePublicMode, contentType, data)
+	if err != nil {
+		return "", err
+	}
+	link := strings.TrimSpace(reply.URL)
+	if parsed, err := url.Parse(link); err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil {
+		return "", relayReplyError("参考图服务没有返回可用的 HTTPS 链接")
+	}
+	if expiresAt, err := time.Parse(time.RFC3339, strings.TrimSpace(reply.ExpiresAt)); err == nil {
+		s.publicReferenceLinks.Store(cacheKey, publicReferenceLink{url: link, expiresAt: expiresAt})
+	}
+	return link, nil
+}
+
+// readReferenceServiceImage reads an owned, ready image the service accepts.
+func (s *Service) readReferenceServiceImage(userID, resourceID string) (string, []byte, error) {
+	resource, body, err := s.OpenResource(userID, resourceID)
+	if err != nil {
+		return "", nil, fmt.Errorf("读取参考图失败：%w", err)
+	}
+	defer body.Close()
+	if resource.Status != model.ResourceStatusReady {
+		return "", nil, errors.New("参考图尚未上传完成")
+	}
+	contentType := strings.ToLower(strings.TrimSpace(strings.Split(resource.MimeType, ";")[0]))
+	if !referenceServiceImageTypes[contentType] {
+		return "", nil, errors.New("参考图服务只接受 PNG、JPEG 或 WebP 图片")
+	}
+	data, err := io.ReadAll(io.LimitReader(body, referenceServiceMaxBytes))
+	if err != nil {
+		return "", nil, fmt.Errorf("读取参考图失败：%w", err)
+	}
+	if len(data) >= referenceServiceMaxBytes {
+		return "", nil, errors.New("参考图必须小于 30MB")
+	}
+	return contentType, data, nil
+}
+
+type referenceServiceReply struct {
+	URL       string `json:"url"`
+	ExpiresAt string `json:"expiresAt"`
+	Error     string `json:"error"`
+	Code      string `json:"code"`
+}
+
+// callReferenceService posts one image. Failures of the service itself are
+// generation.ReferenceRelayError: the model was not called, and the request ID
+// lets an administrator find the call in the service's log.
+func callReferenceService(ctx context.Context, service, apiKey, mode, contentType string, data []byte) (referenceServiceReply, error) {
+	requestID := newID()
+	fail := func(unauthorized bool, message string, args ...any) (referenceServiceReply, error) {
+		return referenceServiceReply{}, generation.ReferenceRelayError{RequestID: requestID, Unauthorized: unauthorized, Cause: fmt.Errorf(message, args...)}
+	}
+	if strings.TrimSpace(apiKey) == "" {
+		return fail(true, "没有可用的中转站密钥，无法上传参考图")
+	}
+	callCtx, cancel := context.WithTimeout(ctx, referenceServiceTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(callCtx, http.MethodPost, service, bytes.NewReader(data))
+	if err != nil {
+		return fail(false, "参考图服务地址无效：%w", err)
 	}
 	request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(apiKey))
 	request.Header.Set("Content-Type", contentType)
-	request.Header.Set("X-HFP-Reference-Mode", referenceServiceMode)
-	request.Header.Set("X-HFP-Request-ID", newID())
+	request.Header.Set("X-HFP-Reference-Mode", mode)
+	request.Header.Set("X-HFP-Request-ID", requestID)
 	response, err := OutboundHTTPClient(referenceServiceTimeout).Do(request)
 	if err != nil {
 		if ctx.Err() != nil {
-			return "", errors.New("参考图素材登记超时；素材可能仍在处理，稍后重试会复用同一素材")
+			return referenceServiceReply{}, ctx.Err() // the task was cancelled
 		}
-		return "", fmt.Errorf("无法连接参考图服务：%w", err)
+		if callCtx.Err() != nil {
+			return fail(false, "参考图服务处理超时；稍后重试会复用同一张图")
+		}
+		return fail(false, "无法连接参考图服务：%w", err)
 	}
 	defer response.Body.Close()
-	var payload struct {
-		URL   string `json:"url"`
-		Error string `json:"error"`
-		Code  string `json:"code"`
-	}
+	var reply referenceServiceReply
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 64<<10))
-	_ = json.Unmarshal(raw, &payload)
-	if response.StatusCode == http.StatusOK && referenceAssetIDPattern.MatchString(strings.TrimSpace(payload.URL)) {
-		return strings.TrimSpace(payload.URL), nil
-	}
+	_ = json.Unmarshal(raw, &reply)
 	switch {
-	case response.StatusCode == http.StatusUnauthorized:
-		return "", errors.New("参考图服务不接受你的中转站密钥，请联系管理员核对")
 	case response.StatusCode == http.StatusOK:
-		return "", errors.New("参考图服务没有返回可用的素材编号")
-	case strings.TrimSpace(payload.Error) != "":
-		return "", fmt.Errorf("参考图素材登记失败：%s", strings.TrimSpace(payload.Error))
+		return reply, nil
+	case response.StatusCode == http.StatusUnauthorized:
+		return fail(true, "参考图服务不接受你的中转站密钥，请联系管理员核对")
+	case strings.TrimSpace(reply.Error) != "":
+		return fail(false, "参考图服务处理失败：%s", strings.TrimSpace(reply.Error))
 	default:
-		return "", fmt.Errorf("参考图素材登记失败（HTTP %d）", response.StatusCode)
+		return fail(false, "参考图服务处理失败（HTTP %d）", response.StatusCode)
 	}
 }
 
+// relayReplyError reports a successful call whose answer cannot be used.
+func relayReplyError(message string) error {
+	return generation.ReferenceRelayError{Cause: errors.New(message)}
+}
+
 // platformReferenceService is the reference-image service of any company relay
-// model, used for registering a library image ahead of generation.
+// model with the member's company key, used for registering a library image
+// ahead of generation and as the workspace's image relay.
 func (s *Service) platformReferenceService() (service, apiKey string, ok bool) {
 	for _, credential := range s.platformChannelCredentials() {
-		for _, candidate := range credential.modelReferenceServices {
-			if candidate != "" && credential.apiKey != "" {
-				return candidate, credential.apiKey, true
-			}
+		if service := credential.anyReferenceService(); service != "" && credential.apiKey != "" {
+			return service, credential.apiKey, true
 		}
 	}
 	return "", "", false

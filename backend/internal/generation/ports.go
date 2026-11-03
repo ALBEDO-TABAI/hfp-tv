@@ -48,8 +48,11 @@ type ResourcePort interface {
 	LocalMode() bool
 }
 
+// ReferenceStoragePort turns an owned resource into a temporary public URL.
+// Enabled reports whether it can do so for a media kind (image, video or
+// audio): a company image relay, for example, only handles images.
 type ReferenceStoragePort interface {
-	Enabled() (bool, error)
+	Enabled(kind string) (bool, error)
 	Upload(ctx context.Context, userID, resourceID string) (string, error)
 }
 

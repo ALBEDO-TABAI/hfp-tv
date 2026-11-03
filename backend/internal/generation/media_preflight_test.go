@@ -173,7 +173,7 @@ type referenceStorageFixture struct {
 	failure error
 }
 
-func (p *referenceStorageFixture) Enabled() (bool, error) { return true, nil }
+func (p *referenceStorageFixture) Enabled(string) (bool, error) { return true, nil }
 func (p *referenceStorageFixture) Upload(ctx context.Context, userID, resourceID string) (string, error) {
 	p.uploads++
 	if err := ctx.Err(); err != nil {
@@ -244,5 +244,30 @@ func TestWanInlineImageNeverUploadsEvenWhenStorageIsEnabled(t *testing.T) {
 	}
 	if storage.uploads != 0 || !strings.HasPrefix(input.ReferenceImages[0].DataURL, "data:image/png;base64,") {
 		t.Fatal("inline image was uploaded instead")
+	}
+}
+
+// imageRelayFixture is storage that handles only images, like the team
+// server's company image relay.
+type imageRelayFixture struct{ referenceStorageFixture }
+
+func (p *imageRelayFixture) Enabled(kind string) (bool, error) { return kind == "image", nil }
+
+func TestImageOnlyReferenceStorageStillAsksForVideoLinks(t *testing.T) {
+	var events []string
+	storage := &imageRelayFixture{}
+	ctx := WithProtocolRegistry(WithRuntime(context.Background(), Runtime{Resources: stageResources{events: &events}, ReferenceStorage: storage}), LoadOfficialFallbackRegistry())
+	input := Input{Mode: "video", Config: Config{InterfaceType: "newapi-channel-2", Model: "seedance_v2.5", BaseURL: "https://custom.example"}, ReferenceImages: []Media{{StorageKey: "resource:one"}}}
+	if err := ValidateMediaTransport(ctx, input); err != nil {
+		t.Fatalf("an image the relay can upload was refused: %v", err)
+	}
+	if err := HydrateMedia(ctx, "owner", &input, MediaHydrationPolicyFor(ctx, input)); err != nil || storage.uploads != 1 || input.ReferenceImages[0].URL != "https://cdn.example/uploaded.png" {
+		t.Fatalf("image was not relayed: %v %+v", err, input.ReferenceImages[0])
+	}
+	input.ReferenceImages = []Media{{StorageKey: "resource:one"}}
+	input.ReferenceVideos = []Media{{StorageKey: "resource:clip"}}
+	var appErr *kernel.AppError
+	if err := ValidateMediaTransport(ctx, input); !errors.As(err, &appErr) || appErr.Reason != "reference_media_requires_url" || !strings.Contains(err.Error(), "参考视频 1") || strings.Contains(err.Error(), "参考图片 1") {
+		t.Fatalf("video reference = %v", err)
 	}
 }

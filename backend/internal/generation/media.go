@@ -62,7 +62,7 @@ func HydrateOne(ctx context.Context, userID string, media *Media, policy MediaHy
 		return nil
 	}
 	if runtime.Resources.LocalMode() && policy.RequireURL && !policy.ManualURL && runtime.ReferenceStorage != nil {
-		enabled, err := runtime.ReferenceStorage.Enabled()
+		enabled, err := runtime.ReferenceStorage.Enabled(resourceMediaKind(resource))
 		if err != nil {
 			return RequestPreparationError{Cause: ReferenceStoragePreparationError{Cause: err}}
 		}
@@ -229,3 +229,15 @@ func OpenAIVideoInputURL(media Media) (string, error) {
 
 func openAIImageInputURL(media Media) (string, error) { return OpenAIImageInputURL(media) }
 func openAIVideoInputURL(media Media) (string, error) { return OpenAIVideoInputURL(media) }
+
+// resourceMediaKind is image, video or audio, from the stored kind or else
+// the MIME type.
+func resourceMediaKind(resource ResourceInfo) string {
+	for _, value := range []string{resource.Kind, strings.Split(resource.MimeType, "/")[0]} {
+		switch kind := strings.ToLower(strings.TrimSpace(value)); kind {
+		case "image", "video", "audio":
+			return kind
+		}
+	}
+	return ""
+}

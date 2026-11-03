@@ -3,6 +3,7 @@ package teamserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -411,13 +412,35 @@ func TestProvisionedWorkspaceIsReadyAndNeverEchoesTheRelayKey(t *testing.T) {
 	}
 	effective.Config["apiKey"] = "sk-alice-relay-5555"
 	effective.Config["legacy"] = map[string]any{"nested": []any{"sk-alice-relay-5555"}}
+	// Alice also added the relay as her own model service with the same key.
+	channels, _ := effective.Config["channels"].([]any)
+	effective.Config["channels"] = append(channels, map[string]any{"id": "mine", "name": "mine", "baseUrl": "http://relay.internal:3000/v1", "apiKey": "sk-alice-relay-5555", "apiFormat": "openai", "models": []any{"m"}})
 	raw, _ := json.Marshal(effective.Config)
 	if err := store.SaveLocalModelConfig(raw); err != nil {
 		t.Fatal(err)
 	}
 	body = h.do(call{method: http.MethodGet, path: "/api/workspace/model-config", cookie: aliceCookie}).Body.String()
-	if strings.Contains(body, "sk-alice-relay") {
+	var returned struct {
+		Data struct {
+			Config struct {
+				APIKey   string           `json:"apiKey"`
+				Legacy   map[string]any   `json:"legacy"`
+				Channels []map[string]any `json:"channels"`
+			} `json:"config"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &returned); err != nil {
+		t.Fatal(err)
+	}
+	keys := map[string]any{}
+	for _, channel := range returned.Data.Config.Channels {
+		keys[fmt.Sprint(channel["id"])] = channel["apiKey"]
+	}
+	if returned.Data.Config.APIKey != "" || strings.Contains(fmt.Sprint(returned.Data.Config.Legacy), "sk-alice-relay") || keys["company-relay"] != "" {
 		t.Fatalf("stale copy of the relay key reached the browser: %s", body)
+	}
+	if keys["mine"] != "sk-alice-relay-5555" {
+		t.Fatalf("the member's own channel lost its key: %s", body)
 	}
 
 	// Another member's canvas event stream is a plain 404, not a server error.

@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"infinite-canvas/backend/internal/generation"
 )
@@ -106,5 +109,113 @@ func TestReferenceServiceComesOnlyFromTheCompanyChannel(t *testing.T) {
 	}
 	if service, key, ok := s.platformReferenceService(); !ok || service != "http://10.10.10.45:8787/v1/reference-images" || key != "sk-member-relay" {
 		t.Fatalf("library pre-registration service = %q %q %v", service, key, ok)
+	}
+}
+
+// The company image relay gives a library image a temporary public link for
+// protocols that accept only URLs, using the member's company key.
+func TestCompanyImageRelayActsAsReferenceStorage(t *testing.T) {
+	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
+	var calls atomic.Int32
+	link := "https://cdn.example.com/hfp-reference/20261103/a.png?sig=1"
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.Header.Get("Authorization") != "Bearer sk-member-relay" || r.Header.Get("X-HFP-Reference-Mode") != "public-url" {
+			http.Error(w, `{"error":"bad request"}`, http.StatusBadRequest)
+			return
+		}
+		_, _ = w.Write([]byte(`{"url":"` + link + `","expiresAt":"` + time.Now().Add(6*time.Hour).UTC().Format(time.RFC3339) + `"}`))
+	}))
+	defer service.Close()
+	s, _, _, _ := creationTestService(t)
+	resource, err := s.UploadLocalResourceFile("user", "ref.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	if err != nil {
+		t.Fatal(err)
+	}
+	storage := appReferenceStoragePort{service: s}
+	if enabled, err := storage.Enabled("image"); err != nil || enabled {
+		t.Fatalf("relay enabled without a company service = %v %v", enabled, err)
+	}
+	if err := s.SaveLocalModelConfig([]byte(`{"channels":[{"id":"company-relay","baseUrl":"http://10.10.10.45:3000/v1","apiKey":"sk-member-relay","pinned":true,
+		"modelProfiles":[{"model":"doubao-seedance-2-0-260128","protocol":"volcengine-ark-video","referenceAssetService":"` + service.URL + `/v1/reference-images"}]}]}`)); err != nil {
+		t.Fatal(err)
+	}
+	s.SetPlatformChannels([]string{"company-relay"})
+	for kind, want := range map[string]bool{"image": true, "video": false, "audio": false} {
+		if enabled, err := storage.Enabled(kind); err != nil || enabled != want {
+			t.Fatalf("Enabled(%s) = %v %v", kind, enabled, err)
+		}
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		got, err := storage.Upload(context.Background(), "user", resource.ID)
+		if err != nil || got != link {
+			t.Fatalf("upload %d = %q %v", attempt, got, err)
+		}
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("a still-valid link was uploaded again: %d calls", calls.Load())
+	}
+}
+
+func TestReferenceServiceFailuresAreNotSentFailures(t *testing.T) {
+	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
+	status, body := http.StatusUnauthorized, `{"error":"无效或已失效的应用凭据"}`
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer service.Close()
+	s, _, _, _ := creationTestService(t)
+	resource, err := s.UploadLocalResourceFile("user", "ref.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.ensureReferenceServiceAsset(context.Background(), "user", resource.ID, service.URL, "sk-member-relay")
+	failure := generation.ClassifyError(fmt.Errorf("参考图 1：%w", err))
+	if failure.ProviderCode != "reference_relay_unauthorized" || failure.RequestID == "" || failure.BlocksManualRetry() || !failure.BlocksAutomaticRetry() {
+		t.Fatalf("401 failure = %+v", failure)
+	}
+	// The persisted message is recognized again as a not-sent failure.
+	if again := generation.ClassifyText(failure.UserMessage()); again.ProviderCode != "reference_relay_unauthorized" || again.BlocksManualRetry() {
+		t.Fatalf("persisted 401 failure = %+v (%s)", again, failure.UserMessage())
+	}
+	service.Close()
+	_, err = s.referenceServicePublicURL(context.Background(), "user", resource.ID, service.URL, "sk-member-relay")
+	if failure := generation.ClassifyError(err); failure.ProviderCode != "reference_relay_failed" || failure.BlocksManualRetry() {
+		t.Fatalf("unreachable service failure = %+v", failure)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := s.referenceServicePublicURL(ctx, "user", resource.ID, service.URL, "sk-member-relay"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled task = %v", err)
+	}
+}
+
+// A member's own Ark video channel on the company relay origin registers its
+// references through the company service too; other origins never do.
+func TestMemberSeedanceOnTheCompanyRelayUsesTheCompanyService(t *testing.T) {
+	s, _, _, _ := creationTestService(t)
+	if err := s.SaveLocalModelConfig([]byte(`{"channels":[{"id":"company-relay","baseUrl":"http://10.10.10.45:3000/v1","apiKey":"sk-member-relay","pinned":true,
+		"modelProfiles":[{"model":"doubao-seedance-2-0-260128","protocol":"volcengine-ark-video","referenceAssetService":"http://10.10.10.45:8787/v1/reference-images"}]}]}`)); err != nil {
+		t.Fatal(err)
+	}
+	s.SetPlatformChannels([]string{"company-relay"})
+	resolve := func(config map[string]any) any {
+		resolved, err := s.resolvePlatformChannelSecrets(map[string]any{"config": config})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resolved["config"].(map[string]any)["referenceAssetService"]
+	}
+	if got := resolve(map[string]any{"model": "doubao-seedance-2-0-fast-260128", "interfaceType": "volcengine-ark-video", "baseUrl": "http://10.10.10.45:3000/doubao/api/v3", "referenceAssetService": "http://attacker.example/upload"}); got != "http://10.10.10.45:8787/v1/reference-images" {
+		t.Fatalf("own channel on the relay = %v", got)
+	}
+	for _, config := range []map[string]any{
+		{"model": "doubao-seedance-2-0-260128", "interfaceType": "volcengine-ark-video", "baseUrl": "https://ark.cn-beijing.volces.com/api/v3", "referenceAssetService": "http://attacker.example/upload"},
+		{"model": "doubao-seedance-2-0-260128", "interfaceType": "newapi-video", "baseUrl": "http://10.10.10.45:3000/v1"},
+	} {
+		if got := resolve(config); got != nil {
+			t.Fatalf("%v got a reference service: %v", config, got)
+		}
 	}
 }

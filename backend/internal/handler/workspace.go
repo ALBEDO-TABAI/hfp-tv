@@ -186,14 +186,18 @@ func redactPlatformChannels(config map[string]any, ids []string) map[string]any 
 		redacted["secretKey"] = ""
 		next = append(next, redacted)
 	}
+	// Older builds copied the selected channel's key into top-level fields;
+	// a platform key must not leak through any such copy. A member's own
+	// channel is left alone: a member who adds the relay with the same key
+	// typed it themselves, and blanking it would erase it on the next save.
 	out := make(map[string]any, len(config))
 	for key, value := range config {
-		out[key] = value
+		if key != "channels" {
+			out[key] = scrubSecretValues(value, secrets)
+		}
 	}
 	out["channels"] = next
-	// Older builds copied the selected channel's key into top-level fields;
-	// a platform key must not leak through any such copy.
-	return scrubSecretValues(out, secrets).(map[string]any)
+	return out
 }
 
 func scrubSecretValues(value any, secrets map[string]bool) any {

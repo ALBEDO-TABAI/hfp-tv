@@ -23,7 +23,7 @@ func ValidateMediaTransport(ctx context.Context, input Input) error {
 	}
 	policy := MediaHydrationPolicyFor(ctx, input)
 	runtime, _ := RuntimeFromContext(ctx)
-	var storageChecked, storageEnabled bool
+	storageEnabled := map[string]bool{} // checked once per media kind
 	var blocked []string
 	var required []map[string]any
 	groups := []struct {
@@ -58,15 +58,16 @@ func ValidateMediaTransport(ctx context.Context, input Input) error {
 					continue // Hosted resources are resolved by the owned resource port.
 				}
 				if !groupPolicy.ManualURL && runtime.ReferenceStorage != nil {
-					if !storageChecked {
+					enabled, checked := storageEnabled[group.kind]
+					if !checked {
 						var err error
-						storageEnabled, err = runtime.ReferenceStorage.Enabled()
+						enabled, err = runtime.ReferenceStorage.Enabled(group.kind)
 						if err != nil {
 							return kernel.WrapAppError(500, "参考素材对象存储配置无法读取，请检查存储设置", err)
 						}
-						storageChecked = true
+						storageEnabled[group.kind] = enabled
 					}
-					if storageEnabled {
+					if enabled {
 						continue
 					}
 				}
@@ -105,7 +106,7 @@ func validateBytePlusVideoTransport(ctx context.Context, input Input) error {
 	var required []map[string]any
 	for index, media := range input.ReferenceVideos {
 		if strings.HasPrefix(media.StorageKey, "resource:") && !mediaPolicyForKind(ctx, input, "video", MediaHydrationPolicyFor(ctx, input)).ManualURL && runtime.ReferenceStorage != nil {
-			enabled, err := runtime.ReferenceStorage.Enabled()
+			enabled, err := runtime.ReferenceStorage.Enabled("video")
 			if err != nil {
 				return kernel.WrapAppError(500, "参考素材对象存储配置无法读取，请检查存储设置", err)
 			}

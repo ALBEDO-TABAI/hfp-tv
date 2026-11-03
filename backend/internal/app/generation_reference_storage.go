@@ -13,12 +13,19 @@ import (
 
 type appReferenceStoragePort struct{ service *Service }
 
-func (p appReferenceStoragePort) Enabled() (bool, error) {
+// Enabled prefers the workspace's own object storage. On a team server whose
+// company relay has a reference-image service, images can also be relayed
+// through that service (the member's company key authenticates the upload).
+func (p appReferenceStoragePort) Enabled(kind string) (bool, error) {
 	if p.service == nil || !p.service.IsLocalMode() {
 		return false, nil
 	}
 	config, err := referencestorage.Load(p.service.dataDir)
-	return config.Enabled, err
+	if err != nil || config.Enabled {
+		return config.Enabled, err
+	}
+	_, _, relay := p.service.platformReferenceService()
+	return relay && kind == "image", nil
 }
 
 func (p appReferenceStoragePort) Upload(ctx context.Context, userID, resourceID string) (string, error) {
@@ -31,6 +38,11 @@ func (p appReferenceStoragePort) Upload(ctx context.Context, userID, resourceID 
 	config, err := referencestorage.Load(p.service.dataDir)
 	if err != nil {
 		return "", errors.New("参考素材对象存储配置无法读取")
+	}
+	if !config.Enabled {
+		if service, apiKey, ok := p.service.platformReferenceService(); ok {
+			return p.service.referenceServicePublicURL(ctx, userID, resourceID, service, apiKey)
+		}
 	}
 	// OpenResource enforces ownership; callers cannot pass filesystem paths.
 	_, body, err := p.service.OpenResource(userID, resourceID)

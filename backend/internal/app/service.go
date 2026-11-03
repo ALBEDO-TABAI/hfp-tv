@@ -90,6 +90,7 @@ type Service struct {
 	depthCaptureOnce         sync.Once
 	beefAPI                  *beefapi.Service
 	platformChannels         []string
+	publicReferenceLinks     sync.Map // company image relay links, see platform_reference_assets.go
 	generationDeliveryMedia  taskdelivery.Media
 	generationDelivery       *taskdelivery.Deliverer
 	deliveryMu               sync.Mutex
