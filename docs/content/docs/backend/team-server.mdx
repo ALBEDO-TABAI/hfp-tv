@@ -105,12 +105,18 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 - 成员保存模型配置时，这个渠道总会恢复成平台写入的样子，成员不能修改或删除它，也不能伪造同 ID 的渠道。
 - 中转站密钥在平台库里加密保存，管理界面只显示末四位。
 - `modelProfiles[].baseUrl` 可以给单个模型指定中转站上的其他入口（例如 Seedance 走 `/doubao/api/v3`，其余走 `/v1`），但必须与渠道 `baseUrl` 同协议、同主机和端口，加载渠道文件时校验。服务端为该模型补密钥时改用这个地址；模型目录仍读渠道 `baseUrl`。Seedance 用 `protocol: "volcengine-ark-video"`。
-- `modelProfiles[].referenceAssetService` 指向公司参考图服务（`POST` 图片原始字节，`Authorization: Bearer <成员中转站密钥>`、`X-HFP-Reference-Mode: seedance-asset`，返回 `{"url":"asset://…"}`）。只有平台渠道的模型会带上它，成员任务里自带的同名字段在创建任务时被丢弃。视频任务执行前，`app/platform_reference_assets.go` 把素材库里的参考图逐张登记并改写为 `asset://`，成功的编号按资源缓存在 `ark_private_asset_bindings`（`project_name` 为 `reference-service:<地址>`）；不是素材库资源的参考图会被拒绝。`POST /api/resources/:id/ark-private-asset`（预先登记）在团队服务器上也走这条路径。服务地址启动时校验并自动加入内网放行名单。
-- **密钥只在服务端**：`GET /api/workspace/model-config` 返回的平台渠道 `apiKey`、`secretKey` 为空，另带 `hasApiKey` 表示是否已绑定。服务端在三处补上密钥，并始终改用渠道保存的 `baseUrl`，密钥只会发往管理员配置的地址：创建任务时 `config.channelId` 为 `company-relay`；`POST /api/ai/models` 带 `channelId: "company-relay"`；`/api/ai/custom` 中转请求没带密钥、且目标与该渠道同协议同主机端口。成员自己添加的渠道仍由浏览器携带本人填写的密钥。实现见 `internal/app/platform_credential.go` 与 `internal/handler/workspace.go` 的 `redactPlatformChannels`。
+- `modelProfiles[].referenceAssetService` 指向公司参考图服务（`POST` 图片原始字节，`Authorization: Bearer <成员中转站密钥>`、`X-HFP-Reference-Mode: seedance-asset`，返回 `{"url":"asset://…"}`）。只有平台渠道的模型会带上它，成员任务里自带的同名字段在创建任务时被丢弃。视频任务执行前，`app/platform_reference_assets.go` 把素材库里的参考图逐张登记并改写为 `asset://`，成功的编号按资源缓存在 `ark_private_asset_bindings`（`project_name` 为 `reference-service:<地址>`）；不是素材库资源的参考图会被拒绝。`POST /api/resources/:id/ark-private-asset`（预先登记）在团队服务器上也走这条路径。服务地址启动时校验并自动加入内网放行名单。成员自己添加的渠道若协议为 `volcengine-ark-video` 且地址与公司中转站同协议同主机端口，创建任务时也补上公司的参考图服务（用该渠道自己的密钥鉴权），其他地址一律不带。
+- 参考图服务调用失败（不可达、超时、非 200、返回值不可用）是 `generation.ReferenceRelayError`，归类为 `reference_relay_failed`，401 为 `reference_relay_unauthorized`；两者都表示模型尚未调用，不自动重发、允许手动重试，错误里的排查编号就是发给服务的 `X-HFP-Request-ID`。
+- **密钥只在服务端**：`GET /api/workspace/model-config` 返回的平台渠道 `apiKey`、`secretKey` 为空，另带 `hasApiKey` 表示是否已绑定。服务端在三处补上密钥，并始终改用渠道保存的 `baseUrl`，密钥只会发往管理员配置的地址：创建任务时 `config.channelId` 为 `company-relay`；`POST /api/ai/models` 带 `channelId: "company-relay"`；`/api/ai/custom` 中转请求没带密钥、且目标与该渠道同协议同主机端口。成员自己添加的渠道仍由浏览器携带本人填写的密钥；即使成员填的正好是自己的中转站密钥，也原样返回给本人，只清空配置顶层等旧版本留下的副本。实现见 `internal/app/platform_credential.go` 与 `internal/handler/workspace.go` 的 `redactPlatformChannels`。
 
 ### 参考素材
 
-托管内核不注册匿名资源下载路由。需要公网地址的模型协议，通过 `TEAMSERVER_REFERENCE_STORAGE_FILE` 配置的 S3 兼容对象存储上传参考素材，其余协议沿用内嵌素材。
+托管内核不注册匿名资源下载路由。需要公网地址的模型协议按以下顺序取得链接，其余协议沿用内嵌素材：
+
+1. `TEAMSERVER_REFERENCE_STORAGE_FILE` 配置的 S3 兼容对象存储（图片、视频、音频）。
+2. 没有配置对象存储、而公司渠道有 `referenceAssetService` 且成员已绑定密钥时，图片经该服务的 `public-url` 模式换成临时 HTTPS 链接（`X-HFP-Reference-Mode: public-url`，返回 `{"url":"https://…","expiresAt":"…"}`），按资源在内存里缓存到失效前 30 分钟。参考视频和音频不走这条路，仍提示成员提供在线链接。
+
+`generation.ReferenceStoragePort.Enabled(kind)` 按素材类型回答能否中转，接单前的素材检查只放行能中转的类型。实现见 `internal/app/generation_reference_storage.go`。
 
 ## 创意工坊
 

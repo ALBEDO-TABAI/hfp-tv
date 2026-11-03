@@ -46,6 +46,8 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
    模型自己的 `baseUrl` 必须与渠道 `baseUrl` 同协议、同主机和端口，否则启动时报错；成员密钥只会发往这个中转站。模型名以中转站 `/v1/models` 实际返回的为准。
 
    **Seedance 参考图自动登记**：Seedance 只接受已登记的德云素材编号（`asset://…`），不接受图片地址。配置了 `referenceAssetService` 后，成员用画布或素材库里的图片做参考时，团队服务器在提交视频前把图片发给公司参考图服务（旧项目的 `services/reference-upload-relay`，8787 端口）：它用成员自己的中转站密钥鉴权，把图片存进公司对象存储，登记进预设的德云素材组，等素材可用后返回素材编号；团队服务器按图片缓存这个编号，同一张图下次直接复用。参考图服务的地址会自动加入内网放行名单。服务自身的对象存储、德云密钥和素材组编号仍在它的 `.env` 里配置，见旧项目该目录的 README。纯文生视频不需要它。中转站没有取消接口，取消 Seedance 任务时会提示结果不明确。
+
+   **参考图中转**：同一个参考图服务也提供“临时公网链接”模式。配置了 `referenceAssetService` 后，凡是只接受图片网址的模型协议（例如 NewAPI 视频），团队服务器会自动把成员的参考图经它换成临时 HTTPS 链接，不再弹出“需要在线素材链接”；成员自己添加、指向公司中转站的模型服务也一样，用的是该成员绑定的中转站密钥。成员自己添加的服务若用 `volcengine-ark-video` 协议直连中转站的豆包入口，参考图同样会先登记为德云素材。参考视频和参考音频不经这个服务；需要在线链接时仍要成员提供，或另配下面的对象存储。
 2. **改部署设置** `.env`（不要提交）：示例文件里已经写好内网部署需要的几项，通常只需要改端口：
 
    ```bash
@@ -55,7 +57,7 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
    TEAMSERVER_USER_KEYS_FILE=/config/user-keys.txt
    # 除公司中转站外还要访问的内网地址（主机名或 IP，逗号分隔，不写端口）
    # CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS=10.10.10.46
-   # 需要公网素材地址的模型（部分视频模型）要配置 S3 兼容存储，可选
+   # 需要公网素材地址的模型：图片已由参考图服务中转；视频、音频也要中转时才配置 S3 兼容存储，可选
    # TEAMSERVER_REFERENCE_STORAGE_FILE=/config/reference-storage.json
    ```
 
