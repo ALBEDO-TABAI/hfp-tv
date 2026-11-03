@@ -24,6 +24,8 @@ type taskTerminalCoordinator struct {
 	outputs           taskOutputLifecycle
 	userFacingMessage func(error) string
 	logFailedAttempt  func(model.Task, error)
+	// reportFailure receives a task once its failed state is stored.
+	reportFailure func(model.Task)
 }
 
 type taskTerminalRepository interface {
@@ -84,6 +86,7 @@ func newTaskTerminalCoordinator(s *Service) *taskTerminalCoordinator {
 		outputs:           adapter,
 		userFacingMessage: s.UserFacingErrorMessage,
 		logFailedAttempt:  s.ensureFailedProviderAttemptLogged,
+		reportFailure:     s.reportTaskFailure,
 	}
 }
 
@@ -244,6 +247,9 @@ func (c *taskTerminalCoordinator) markTerminalState(task *model.Task) error {
 	}
 	if !updated {
 		return repository.ErrTaskStateConflict
+	}
+	if task.Status == model.TaskStatusFailed && c.reportFailure != nil {
+		c.reportFailure(*task)
 	}
 	return nil
 }

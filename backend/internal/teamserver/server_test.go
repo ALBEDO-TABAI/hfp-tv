@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"infinite-canvas/backend/internal/accounts"
+	"infinite-canvas/backend/internal/errorlog"
+	"infinite-canvas/backend/internal/kernel"
 	"infinite-canvas/backend/internal/kernelpool"
 	workspacecfg "infinite-canvas/backend/internal/workspace"
 )
@@ -451,5 +453,61 @@ func TestProvisionedWorkspaceIsReadyAndNeverEchoesTheRelayKey(t *testing.T) {
 	}
 	if response := h.do(call{method: http.MethodGet, path: "/api/canvas-projects/alice-canvas/events", cookie: h.login("bob", "bob-pass1")}); response.Code != http.StatusNotFound {
 		t.Fatalf("foreign canvas events = %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestErrorLogIsShownToAdminsWithTheMember(t *testing.T) {
+	var store *errorlog.Store
+	h := newHarness(t, func(opts *Options) {
+		var err error
+		if store, err = errorlog.Open(opts.Accounts.DB()); err != nil {
+			t.Fatal(err)
+		}
+		opts.ErrorLog = store
+	})
+	ctx := context.Background()
+	admin, err := h.users.CreateUser(ctx, "", accounts.CreateUserInput{Username: "admin", Password: "admin-pass", Role: accounts.RoleAdmin})
+	if err != nil {
+		t.Fatal(err)
+	}
+	alice, err := h.users.CreateUser(ctx, admin.ID, accounts.CreateUserInput{Username: "alice", Password: "alice-pass"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := h.users.CreateUser(ctx, admin.ID, accounts.CreateUserInput{Username: "bob", Password: "bob-pass1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace, _ := h.users.WorkspaceForUser(ctx, alice.ID)
+	if err := store.RecordTask(workspace.ID, kernel.FailureReport{TaskID: "task-1", TaskType: "canvas_video", Model: "doubao-seedance-2.0-fast",
+		Message: "声明式协议任务失败：上游返回失败状态", ProviderTaskID: "task_Cdcy", Log: []string{"18:05:04 ERROR 任务处理失败"}}); err != nil {
+		t.Fatal(err)
+	}
+	if member := h.do(call{method: http.MethodGet, path: "/api/platform/admin/errors", cookie: h.login("alice", "alice-pass")}); member.Code != http.StatusForbidden {
+		t.Fatalf("member error log = %d", member.Code)
+	}
+	adminCookie := h.login("admin", "admin-pass")
+	var envelope struct {
+		Data struct {
+			Events []struct {
+				TaskID         string   `json:"taskId"`
+				ProviderTaskID string   `json:"providerTaskId"`
+				Log            []string `json:"log"`
+				Member         *struct {
+					Username string `json:"username"`
+				} `json:"member"`
+			} `json:"events"`
+		} `json:"data"`
+	}
+	response := h.do(call{method: http.MethodGet, path: "/api/platform/admin/errors", cookie: adminCookie})
+	if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil || response.Code != http.StatusOK {
+		t.Fatalf("error log = %d %s", response.Code, response.Body.String())
+	}
+	if events := envelope.Data.Events; len(events) != 1 || events[0].Member == nil || events[0].Member.Username != "alice" || events[0].ProviderTaskID != "task_Cdcy" || len(events[0].Log) != 1 {
+		t.Fatalf("events = %s", response.Body.String())
+	}
+	filtered := h.do(call{method: http.MethodGet, path: "/api/platform/admin/errors?member=" + bob.ID, cookie: adminCookie})
+	if !strings.Contains(filtered.Body.String(), `"events":[]`) {
+		t.Fatalf("bob's error log = %s", filtered.Body.String())
 	}
 }

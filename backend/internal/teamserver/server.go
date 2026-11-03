@@ -18,6 +18,7 @@ import (
 
 	"infinite-canvas/backend/internal/accounts"
 	"infinite-canvas/backend/internal/bootstrap"
+	"infinite-canvas/backend/internal/errorlog"
 	"infinite-canvas/backend/internal/kernelpool"
 	"infinite-canvas/backend/internal/skillmarket"
 	"infinite-canvas/backend/internal/workshop"
@@ -82,6 +83,8 @@ type Options struct {
 	Workshop *workshop.Service
 	// Status describes the deployment for the admin service-status page.
 	Status DeploymentStatus
+	// ErrorLog backs the admin error log; nil leaves it empty.
+	ErrorLog *errorlog.Store
 }
 
 type Server struct {
@@ -317,6 +320,7 @@ func (s *Server) gateway(c *gin.Context) {
 	if err != nil {
 		if c.Request.Context().Err() == nil {
 			log.Printf("open workspace=%s: %v", spec.ID, err)
+			s.recordWorkspaceError(spec.ID, err)
 		}
 		failWith(c, http.StatusServiceUnavailable, "workspace_unavailable", "工作区暂时无法打开，请稍后重试")
 		return
@@ -335,6 +339,7 @@ func (s *Server) routes() {
 	admin := platform.Group("/admin", s.requireAdmin)
 	s.adminRoutes(admin)
 	admin.GET("/service-status", s.serviceStatus)
+	admin.GET("/errors", s.errorEvents)
 	s.marketRoutes(platform, admin)
 	s.workshopRoutes(admin)
 	s.engine.NoRoute(func(c *gin.Context) {

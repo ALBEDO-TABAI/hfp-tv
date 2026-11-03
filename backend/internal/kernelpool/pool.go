@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"infinite-canvas/backend/internal/bootstrap"
+	"infinite-canvas/backend/internal/kernel"
 	"infinite-canvas/backend/internal/projectsnapshot"
 	"infinite-canvas/backend/internal/referencestorage"
 )
@@ -46,6 +47,9 @@ type Options struct {
 	IdleTimeout time.Duration
 	// ReapInterval is how often idle kernels are looked for (default 1 minute).
 	ReapInterval time.Duration
+	// ReportFailure receives failed tasks from every kernel, tagged with the
+	// workspace they came from.
+	ReportFailure func(workspaceID string, report kernel.FailureReport)
 }
 
 type entry struct {
@@ -188,9 +192,14 @@ func (p *Pool) open(spec Spec) (Kernel, error) {
 	if err := p.provision(spec); err != nil {
 		return nil, fmt.Errorf("准备工作区配置失败：%w", err)
 	}
+	hosted := p.opts.Hosted
+	if report := p.opts.ReportFailure; report != nil {
+		workspaceID := spec.ID
+		hosted.ReportFailure = func(failure kernel.FailureReport) { report(workspaceID, failure) }
+	}
 	runtime, err := bootstrap.Open(context.Background(), bootstrap.Config{
 		Profile: bootstrap.ProfileHosted, DataDir: spec.DataDir, AutoMigrate: true,
-		ShutdownTimeout: p.opts.ShutdownTimeout, Hosted: p.opts.Hosted,
+		ShutdownTimeout: p.opts.ShutdownTimeout, Hosted: hosted,
 	})
 	if err != nil {
 		return nil, err

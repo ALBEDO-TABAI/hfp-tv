@@ -25,6 +25,8 @@ import (
 
 	"infinite-canvas/backend/internal/accounts"
 	"infinite-canvas/backend/internal/bootstrap"
+	"infinite-canvas/backend/internal/errorlog"
+	"infinite-canvas/backend/internal/kernel"
 	"infinite-canvas/backend/internal/kernelpool"
 	"infinite-canvas/backend/internal/outbound"
 	"infinite-canvas/backend/internal/referencestorage"
@@ -184,12 +186,21 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	errorLog, err := errorlog.Open(users.DB())
+	if err != nil {
+		return err
+	}
 	pool := kernelpool.New(kernelpool.Options{
 		Hosted:           bootstrap.HostedConfig{AssistantHostCommand: os.Getenv("TEAMSERVER_AGENT_HOST_COMMAND"), AssistantHostArgs: args},
 		RelayTemplate:    relayTemplate,
 		ReferenceStorage: referenceStorage,
 		ShutdownTimeout:  shutdownTimeout,
 		IdleTimeout:      idleTimeout,
+		ReportFailure: func(workspaceID string, report kernel.FailureReport) {
+			if err := errorLog.RecordTask(workspaceID, report); err != nil {
+				log.Printf("error log write failed: workspace=%s task=%s error=%v", workspaceID, report.TaskID, err)
+			}
+		},
 	})
 	server, err := teamserver.New(teamserver.Options{
 		Accounts: users, Pool: pool, DataRoot: root, WebDir: os.Getenv("TEAMSERVER_WEB_DIR"),
@@ -198,6 +209,7 @@ func run(ctx context.Context) error {
 		AllowedOrigins: envList("TEAMSERVER_ALLOWED_ORIGINS"),
 		Market:         market,
 		Workshop:       shop,
+		ErrorLog:       errorLog,
 		Status: teamserver.DeploymentStatus{
 			RelayFile: relayFile, RelayTemplate: relayTemplate, RelayHost: relayHost,
 			UsersFile: strings.TrimSpace(os.Getenv("TEAMSERVER_USERS_FILE")), KeysFile: strings.TrimSpace(os.Getenv("TEAMSERVER_USER_KEYS_FILE")),

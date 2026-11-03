@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"infinite-canvas/backend/internal/assistantruntime"
+	"infinite-canvas/backend/internal/kernel"
 	"infinite-canvas/backend/internal/projectsnapshot"
 	httptransport "infinite-canvas/backend/internal/transport/http"
 
@@ -26,6 +27,9 @@ type HostedConfig struct {
 	// ManagedChannelIDs are model channels written by the team server; saves
 	// from the browser cannot change or remove them.
 	ManagedChannelIDs []string
+	// ReportFailure receives every task that ends in failure, for the team
+	// server's error log. It is called off the worker goroutine.
+	ReportFailure func(kernel.FailureReport)
 }
 
 // hostedDeniedRoute matches gin route patterns (c.FullPath()).

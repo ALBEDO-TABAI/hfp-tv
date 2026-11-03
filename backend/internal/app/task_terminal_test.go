@@ -218,3 +218,29 @@ func TestTaskTerminalCoordinatorReturnsTaskReadErrorAfterSuccess(t *testing.T) {
 		t.Fatalf("handleSuccess() error = %v, want %v", err, taskError)
 	}
 }
+
+// A team server's error log hears about failures, after they are stored, and
+// never about a stale worker's attempt or a cancellation.
+func TestTaskTerminalReportsStoredFailuresOnly(t *testing.T) {
+	var reported []model.Task
+	report := func(task model.Task) { reported = append(reported, task) }
+
+	failed := &model.Task{ID: "failed", Status: model.TaskStatusRunning, ProviderRequestID: "task_upstream"}
+	coordinator := newTaskTerminalCoordinatorForTest(&taskTerminalRepositoryStub{task: failed}, &taskTerminalReplayStub{}, &taskTerminalLoggerStub{}, &taskTerminalOutputStub{})
+	coordinator.reportFailure = report
+	_ = coordinator.handleExecutionFailure(failed, errors.New("upstream failed"), false, false)
+
+	stale := &model.Task{ID: "stale", Status: model.TaskStatusRunning}
+	coordinator = newTaskTerminalCoordinatorForTest(&taskTerminalRepositoryStub{terminalConflict: true}, &taskTerminalReplayStub{}, &taskTerminalLoggerStub{}, &taskTerminalOutputStub{})
+	coordinator.reportFailure = report
+	_ = coordinator.handleExecutionFailure(stale, errors.New("upstream failed"), false, false)
+
+	cancelled := &model.Task{ID: "cancelled", Status: model.TaskStatusRunning}
+	coordinator = newTaskTerminalCoordinatorForTest(&taskTerminalRepositoryStub{task: cancelled}, &taskTerminalReplayStub{}, &taskTerminalLoggerStub{}, &taskTerminalOutputStub{})
+	coordinator.reportFailure = report
+	_ = coordinator.handleExecutionFailure(cancelled, context.Canceled, false, false)
+
+	if len(reported) != 1 || reported[0].ID != "failed" || reported[0].Error == "" || reported[0].ProviderRequestID != "task_upstream" {
+		t.Fatalf("reported = %+v", reported)
+	}
+}

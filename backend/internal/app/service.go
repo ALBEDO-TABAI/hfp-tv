@@ -91,6 +91,7 @@ type Service struct {
 	beefAPI                  *beefapi.Service
 	platformChannels         []string
 	publicReferenceLinks     sync.Map // company image relay links, see platform_reference_assets.go
+	failureReporter          func(kernel.FailureReport)
 	generationDeliveryMedia  taskdelivery.Media
 	generationDelivery       *taskdelivery.Deliverer
 	deliveryMu               sync.Mutex

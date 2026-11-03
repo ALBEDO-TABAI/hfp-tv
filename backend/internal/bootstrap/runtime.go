@@ -169,6 +169,9 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 	}
 	svc.SetBeefAPI(beefAPIConnection)
 	svc.SetPlatformChannels(hostedManagedChannels(cfg))
+	if cfg.Profile == ProfileHosted {
+		svc.SetFailureReporter(cfg.Hosted.ReportFailure)
+	}
 	localKernel := app.NewLocalKernel(svc)
 	assetService := svc.ResourceService()
 	projectService := svc.ProjectService()
