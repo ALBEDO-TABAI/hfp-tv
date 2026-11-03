@@ -24,6 +24,7 @@ import { readLocalCanvasProjectFromBackend, syncLocalCanvasProjectToBackend } fr
 import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
 import { deleteWorkspaceAsset } from "@/services/workspace-asset-repository";
 import { usesBrowserLocalResourceStore } from "@/services/workspace-resource-storage";
+import { sha256Hex } from "@/lib/sha256";
 import { flushCanvasStorePersistence, useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasDrawingExport, CanvasExportAsset } from "@/types/canvas-export";
@@ -69,9 +70,8 @@ export type CanvasArchiveRestoreResult = {
     storage: "browser" | "backend";
 };
 
-export async function archiveContentDigest(blob: Blob): Promise<string> {
-    const hash = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
-    return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+export function archiveContentDigest(blob: Blob): Promise<string> {
+    return sha256Hex(blob);
 }
 
 export async function archiveMediaIdempotencyKey(blob: Blob): Promise<string> {

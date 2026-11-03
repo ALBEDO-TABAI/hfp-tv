@@ -25,6 +25,7 @@ import { CanvasGenerationDurableAckError, CanvasGenerationMaterializationError }
 import type { persistCanvasGenerationTarget } from "@/services/canvas-generation-target";
 import { GenerationSubmissionUnknownError } from "@/services/api/generation-submission";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
+import { sha256Hex } from "@/lib/sha256";
 
 export async function runBackendCanvasGenerationTask(
     {
@@ -219,9 +220,7 @@ export type GenerationRetryContext = {
 };
 
 export async function createGenerationRetryContext(retryOf: string, attemptGroupId = retryOf): Promise<GenerationRetryContext> {
-    const bytes = new TextEncoder().encode(`generation-retry\0${attemptGroupId}\0${retryOf}`);
-    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-    const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const hex = await sha256Hex(`generation-retry\0${attemptGroupId}\0${retryOf}`);
     return { retryOf, attemptGroupId, clientOperationId: `retry:${hex}` };
 }
 

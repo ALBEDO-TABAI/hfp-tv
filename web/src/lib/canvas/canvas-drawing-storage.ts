@@ -12,6 +12,7 @@ import { ApiError, http } from "@/services/api/request";
 import { resourceFileUrl, resourceStorageKey, uploadResourceFile } from "@/services/api/resources";
 import { imageToDataUrl } from "@/services/image-storage";
 import { usesBrowserLocalResourceStore } from "@/services/workspace-resource-storage";
+import { sha256Hex } from "@/lib/sha256";
 
 export type CanvasDrawingSnapshot = {
     version: 2;
@@ -1007,9 +1008,8 @@ function snapshotFromRecord(record: CanvasDrawingRecord, snapshot: unknown = rec
     })!);
 }
 
-async function contentDigest(blob: Blob) {
-    const hash = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
-    return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+function contentDigest(blob: Blob) {
+    return sha256Hex(blob);
 }
 
 async function createInitialDrawingRender(dataUrl: string, width: number, height: number, pageId: string): Promise<CanvasDrawingRenderDraft> {

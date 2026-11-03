@@ -7,6 +7,7 @@ import { ApiError } from "@/services/api/request";
 import { resourceFileUrl, uploadResourceFile } from "@/services/api/resources";
 import { deleteCanvasLibraryFolder as deleteCanvasLibraryFolderRemote, listCanvasLibraryFolders as listCanvasLibraryFoldersRemote, putCanvasLibraryFolder } from "@/services/api/workspace-data";
 import { usesBrowserLocalResourceStore } from "@/services/workspace-resource-storage";
+import { sha256Hex } from "@/lib/sha256";
 import { useCanvasStore, type CanvasFolder } from "@/stores/canvas/use-canvas-store";
 
 export const CANVAS_FOLDER_PENDING_KEY = "infinite-canvas:canvas_folder_pending";
@@ -282,8 +283,7 @@ function canonicalFromProjection(pending: FolderPendingMap): CanvasFolder[] {
 
 async function contentDigest(blob: Blob) {
     if (digestDelayForTests) await digestDelayForTests();
-    const hash = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
-    return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return sha256Hex(blob);
 }
 
 async function folderCoverResourceId(folder: CanvasFolder, expected: CapturedUserScope) {

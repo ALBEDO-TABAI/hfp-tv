@@ -3,13 +3,15 @@ import { Alert, Button, Input, Space } from "antd";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { appHref } from "@/lib/app-routing";
+import { createClientId } from "@/lib/client-id";
 import { platformErrorMessage } from "@/lib/platform-account";
 import { ApiError } from "@/services/api/request";
 import { copyWorkshopPublication, getWorkshopCopy, workshopQueryKey, type Publication } from "@/services/api/workshop";
 
 // Mount once per dialog opening so retries keep the same request identity.
 export function WorkshopCopyDialog({ publication, onClose }: { publication: Publication; onClose: () => void }) {
-    const [requestId] = useState(() => crypto.randomUUID().replaceAll("-", ""));
+    // randomUUID needs a secure context; the intranet page is often plain HTTP.
+    const [requestId] = useState(() => createClientId());
     const [title, setTitle] = useState(`${publication.title}（副本）`);
     const attempted = useRef(false);
     const client = useQueryClient();
