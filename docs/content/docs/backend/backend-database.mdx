@@ -167,7 +167,7 @@ HTTPS 图片提交前读取同源 `/models` 元数据，仅成功响应明确声
 
 ## 团队服务器平台库
 
-团队服务器另有一个 `platform.db`（`backend/internal/accounts`），与各工作区数据库是不同文件，用 GORM `AutoMigrate` 单独迁移，绝不调用 `MigrateLocalSchema`。每个工作区仍是上面的本地结构，位于 `workspaces/<工作区ID>/`。
+团队服务器另有一个 `platform.db`（`backend/internal/accounts` 打开，`workshop`、`skillmarket`、`errorlog` 在同一文件里建各自的表），与各工作区数据库是不同文件，用 GORM `AutoMigrate` 单独迁移，绝不调用 `MigrateLocalSchema`。每个工作区仍是上面的本地结构，位于 `workspaces/<工作区ID>/`。
 
 | 表 | 用途 | 关键边界 |
 | --- | --- | --- |
@@ -186,6 +186,7 @@ HTTPS 图片提交前读取同源 `/models` 元数据，仅成功响应明确声
 | `workshop_versions` | 每次投稿：版本号、快照 SHA-256、文件数与大小、画布与节点数、拟公开的信息、改编来源、审核状态（pending、approved、rejected、withdrawn）、审核人与意见 | 审批按快照摘要条件更新；新投稿把同一作品仍待审的旧稿标为 withdrawn |
 | `workshop_version_files` | 版本包含的文件 | 主键 `(version_id, sha256)`；文件读取必须经由当前用户可见的版本 |
 | `workshop_copies` | 复制记录：用户、请求 ID、作品与版本、目标工作区与项目、状态 | `(user_id, request_id)` 唯一；用于复制幂等和识别改编来源 |
+| `error_events` | 错误记录：工作区内核推送的失败任务（任务 ID、类型、模型、阶段、错误类别、成员看到的消息、上游任务号、HTTP 状态、上游详情、最近的任务日志）与无法打开的工作区（`internal/errorlog`） | 只存成员在任务详情里本来就能看到的内容，不存密钥、请求正文或结果地址；同一工作区同一打开错误一分钟只记一次；保留最新 5000 条 |
 
 ## 画布版本与快照
 

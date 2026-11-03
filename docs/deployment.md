@@ -150,6 +150,7 @@ docker compose start teamserver
 | 审核作品与技能 | 侧栏“管理”分组里的“作品审核”“技能审核” |
 | 查谁做了什么 | “用户管理 → 操作记录” |
 | 确认服务器读到的配置 | 侧栏“管理 → 服务状态”，或 `docker compose logs teamserver` 开头几行 |
+| 成员报生成失败 | 侧栏“管理 → 错误记录”：按成员筛选，详情里有成员看到的消息、上游任务号（可到中转站后台对照）和任务日志里的上游状态变化 |
 | 换端口 | 改 `.env` 的 `TEAMSERVER_HTTP_PORT`，再 `docker compose up -d` |
 | 调整空闲回收 | `.env` 设置 `TEAMSERVER_IDLE_TIMEOUT`（默认 `30m`，`off` 表示不回收）；有任务在跑或助手在回复时不会回收 |
 

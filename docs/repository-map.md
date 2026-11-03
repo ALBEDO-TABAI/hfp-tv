@@ -52,7 +52,7 @@
 
 ```text
 浏览器 → Caddy → teamserver 网关（会话 Cookie + Origin 校验）
-       ├─ /api/platform/*   accounts（账号、会话、邀请、操作记录，platform.db）
+       ├─ /api/platform/*   accounts（账号、会话、邀请、操作记录，platform.db）、errorlog（错误记录）
        ├─ /api/community/*  workshop（作品、版本、审核、复制）
        │                    → kernelpool → 内核 ProjectSnapshots（projectsnapshot：导出/导入）
        └─ 其余 /api/*        kernelpool → 本人的托管内核 GatewayHandler（与单机同一套路由）
@@ -96,7 +96,8 @@
 | `backend/cmd/teamserver/` | 团队服务器入口：环境检查、内置技能市场、管理员命令 | 工作区业务逻辑 |
 | `backend/internal/teamserver/` | 网关、平台与管理员 HTTP 接口、SkillHub v1 接口、前端静态文件 | 工作区数据读写（经内核接口完成） |
 | `backend/internal/accounts/` | 账号、会话、邀请、工作区登记、中转站密钥、操作记录（`platform.db`） | 工作区数据库 |
-| `backend/internal/kernelpool/` | 按用户打开托管内核，下发公司渠道与对象存储配置 | 账号与权限判断 |
+| `backend/internal/kernelpool/` | 按用户打开托管内核，下发公司渠道与对象存储配置，转交内核上报的失败任务 | 账号与权限判断 |
+| `backend/internal/errorlog/` | 错误记录：内核上报的失败任务与无法打开的工作区（`platform.db` 的 `error_events`） | 读取工作区数据库 |
 | `backend/internal/workshop/` | 创意工坊作品、版本、审核、文件授权与复制记录 | 画布文档的直接读写（经 `projectsnapshot`） |
 | `backend/internal/skillmarket/` | 站内技能市场：稿件、审核、签名发布 | 内核的技能安装逻辑（在 `internal/skills`） |
 | `backend/internal/projectsnapshot/` | 内核侧项目快照的预检、导出与导入 | 平台账号或审核状态 |
