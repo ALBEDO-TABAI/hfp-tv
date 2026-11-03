@@ -1,4 +1,4 @@
-import { Activity, BadgeCheck, ClipboardCheck, Users, ChevronLeft, ChevronRight, Home, Plug, Plus, Settings2, HardDrive, Sun, Moon, GalleryHorizontalEnd } from "lucide-react";
+import { Activity, AlertTriangle, BadgeCheck, ClipboardCheck, Users, ChevronLeft, ChevronRight, Home, Plug, Plus, Settings2, HardDrive, Sun, Moon, GalleryHorizontalEnd } from "lucide-react";
 import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
@@ -70,6 +70,7 @@ function buildNav(features: FeatureAvailability, workshop: boolean, admin: Platf
             ...(admin.capabilities.skillReview ? [{ id: "admin:skill-reviews", title: "技能审核", icon: BadgeCheck, to: "/admin/skill-reviews" }] : []),
             ...(admin.capabilities.workshopReview ? [{ id: "admin:workshop-reviews", title: "作品审核", icon: ClipboardCheck, to: "/admin/workshop-reviews" }] : []),
             ...(admin.capabilities.userAdmin ? [{ id: "admin:service", title: "服务状态", icon: Activity, to: "/admin/service" }] : []),
+            ...(admin.capabilities.userAdmin ? [{ id: "admin:errors", title: "错误记录", icon: AlertTriangle, to: "/admin/errors" }] : []),
         ];
         if (items.length) groups.push({ heading: "管理", items });
     }

@@ -29,6 +29,25 @@ export type AdminUser = {
 };
 export type PlatformAuditItem = { id: string; actorUsername: string; action: string; targetUsername: string; detail: string; createdAt: string };
 export type PlatformSession = { mode: "local" } | { mode: "hosted"; me: PlatformMe | null };
+export type PlatformErrorEvent = {
+    id: string;
+    createdAt: string;
+    workspaceId: string;
+    source: "task" | "workspace";
+    taskId?: string;
+    taskType?: string;
+    model?: string;
+    stage?: string;
+    category?: string;
+    message: string;
+    providerTaskId?: string;
+    httpStatus?: number;
+    upstreamDetail?: string;
+    startedAt?: string;
+    log?: string[];
+    member: { id: string; username: string; displayName: string } | null;
+};
+export type PlatformErrorLog = { events: PlatformErrorEvent[]; nextBefore: string };
 export type PlatformServiceStatus = {
     relay: {
         configured: boolean;
@@ -95,6 +114,7 @@ export const getPlatformInvitation = (token: string) => http.get<{ role: Platfor
 export const acceptPlatformInvitation = (token: string, input: { username: string; displayName: string; password: string }) => http.post<PlatformMe>(`/platform/invitations/${encodeURIComponent(token)}/accept`, input);
 export const listPlatformUsers = () => http.get<{ items: AdminUser[] }>("/platform/admin/users");
 export const getPlatformServiceStatus = (signal?: AbortSignal) => http.get<PlatformServiceStatus>("/platform/admin/service-status", { signal });
+export const listPlatformErrors = (params: { member?: string; source?: "task" | "workspace"; before?: string; limit?: number }, signal?: AbortSignal) => http.get<PlatformErrorLog>("/platform/admin/errors", { params: compactApiParams(params), signal });
 export const createPlatformUser = (input: { username: string; displayName: string; password: string; role: PlatformRole; relayKey?: string }) => http.post<{ user: AdminUser }>("/platform/admin/users", input);
 export const updatePlatformUser = (id: string, input: { displayName?: string; role?: PlatformRole; status?: AdminUser["status"] }) => http.patch<{ user: AdminUser }>(`/platform/admin/users/${encodeURIComponent(id)}`, input);
 export const resetPlatformUserPassword = (id: string, password: string) => http.post<{ changed: true }>(`/platform/admin/users/${encodeURIComponent(id)}/password`, { password });
