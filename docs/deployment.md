@@ -85,6 +85,8 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
    docker compose logs -f teamserver
    ```
 
+   第一次构建要下载 Go 和前端依赖，耗时较长；之后的构建复用缓存，只编译改动的代码。Go 依赖默认先走国内镜像 goproxy.cn，公司有自己的 Go 代理时在 `.env` 里设置 `GOPROXY`（示例见 `.env.example`）。
+
    日志里应该看到：“公司模型服务：<地址>，N 个模型”、“允许访问的内网地址：…”、“账号文件已同步”、“内置技能市场”和 “team server listening”。看到“公司模型服务：未配置”说明 `.env` 里的 `TEAMSERVER_RELAY_CHANNEL_FILE` 没有生效。
 
 5. **创建管理员**（审核创意工坊作品和技能、查看操作记录需要；密码从标准输入读，不进 shell 历史）：

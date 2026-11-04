@@ -27,6 +27,7 @@
 | --- | --- | --- |
 | 登录或任何写操作返回 403 `origin_forbidden` / `origin_required` | 反向代理是否保留了 `Host`，`X-Forwarded-Host` 是否来自 `TEAMSERVER_TRUSTED_PROXIES` 里的地址 | Caddy 默认保留 `Host`；nginx 需 `proxy_set_header Host $host`；Compose 外的代理把它的地址加进 `TEAMSERVER_TRUSTED_PROXIES`。不要关掉来源校验 |
 | 用 `http://` 访问时，登录后马上又回到登录页 | `.env` 里是否写了 `TEAMSERVER_COOKIE_SECURE=true` | 删掉这一行（默认 `auto` 会按访问方式处理）；Compose 外自建代理时要转发 `X-Forwarded-Proto` |
+| 构建停在 `go: downloading` 很久，最后报 `proxy.golang.org … unexpected EOF` | 构建输出里 `backend-build` 步骤下载的地址；`.env` 里的 `GOPROXY` | 拉取最新代码后重新 `docker compose up -d --build`：默认先走国内镜像，下载和编译共用模块缓存，断续时自动重试且保留已下完的模块。`.env` 里写过 `GOPROXY=https://proxy.golang.org…` 的删掉或改成公司可用的镜像 |
 | 端口冲突，或改了端口仍占用 80 | `.env` 里的 `TEAMSERVER_HTTP_PORT` | 对外端口只认 `TEAMSERVER_HTTP_PORT`（例如 `180`），改完 `docker compose up -d`；不要用 `TEAMSERVER_ADDR` 或 `TEAMSERVER_DOMAIN=:180` 改端口。默认部署不再占用 443 |
 | 成员的“模型配置”里没有公司中转站 | 启动日志开头的“公司模型服务”一行，或管理员“管理 → 服务状态” | 显示“未配置”说明 `TEAMSERVER_RELAY_CHANNEL_FILE` 没设或没写进 `deploy/teamserver/.env`；路径要写容器内的 `/config/relay-channel.json`。管理员在自己“模型配置”里添加的服务不会分发给其他人 |
 | 改了账号文件没生效 | `docker compose logs teamserver` 里的“账号文件有误”行 | 按提示的行号改正（常见：缺冒号、密码不足 8 位、用户名重复、密钥文件里的用户不在账号文件中）；整份改对之前沿用原有账号 |
