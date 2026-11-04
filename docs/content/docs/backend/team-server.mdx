@@ -99,6 +99,8 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 
 ### 公司中转站渠道
 
+管理员可以在网页上维护公司中转站：“模型配置”里公司中转站卡片的“编辑（所有成员）”（还没有公司中转站时是页头的“配置公司中转站”）。编辑器与“添加模型服务”相同，但没有密钥栏，多两个共用设置：火山方舟（豆包）接口地址和参考图服务地址，保存时套用到所有火山方舟协议（参考图服务只套用到 Seedance）的模型。读取模型目录用管理员本人绑定的中转站密钥。保存后定义存进 `platform.db` 的 `relay_channel_settings`（`internal/relaychannel`），立即改写所有在用成员工作区里的公司中转站渠道，已打开的内核不必重启，成员刷新页面即可看到；保存与恢复都记入操作记录。网页保存的定义存在时优先于下面的渠道文件，“服务状态”页显示当前来源；`DELETE /api/platform/admin/relay-channel` 恢复为文件里的定义。
+
 `TEAMSERVER_RELAY_CHANNEL_FILE` 指向一个模型渠道 JSON 对象，格式与模型配置里的渠道相同，但不能包含 `apiKey`、`secretKey` 或 `credentialRef`。示例见 `deploy/teamserver/config/relay-channel.example.json`；Compose 把 `deploy/teamserver/config` 挂载到容器的 `/config`，因此可设为 `/config/relay-channel.json`。
 
 服务端会把它写进每个工作区的模型配置，渠道 ID 固定为 `company-relay`，密钥用管理员为该成员绑定的中转站密钥。所有成员的请求都发往同一个 `baseUrl`，各自带自己的密钥。管理员在自己的“模型配置”里添加的服务只属于自己的工作区，不会分发给其他成员。规则如下：
@@ -106,8 +108,8 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 - 未绑定密钥时渠道处于停用状态；绑定、换绑或清除后立即改写配置。助手子进程在下次状态检查时用新密钥重启。
 - 成员保存模型配置时，这个渠道总会恢复成平台写入的样子，成员不能修改或删除它，也不能伪造同 ID 的渠道。
 - 中转站密钥在平台库里加密保存，管理界面只显示末四位。
-- `modelProfiles[].baseUrl` 可以给单个模型指定中转站上的其他入口（例如 Seedance 走 `/doubao/api/v3`，其余走 `/v1`），但必须与渠道 `baseUrl` 同协议、同主机和端口，加载渠道文件时校验。服务端为该模型补密钥时改用这个地址；模型目录仍读渠道 `baseUrl`。Seedance 用 `protocol: "volcengine-ark-video"`。
-- `modelProfiles[].referenceAssetService` 指向公司参考图服务（`POST` 图片原始字节，`Authorization: Bearer <成员中转站密钥>`、`X-HFP-Reference-Mode: seedance-asset`，返回 `{"url":"asset://…"}`）。只有平台渠道的模型会带上它，成员任务里自带的同名字段在创建任务时被丢弃。视频任务执行前，`app/platform_reference_assets.go` 把素材库里的参考图逐张登记并改写为 `asset://`，成功的编号按资源缓存在 `ark_private_asset_bindings`（`project_name` 为 `reference-service:<地址>`）；不是素材库资源的参考图会被拒绝。`POST /api/resources/:id/ark-private-asset`（预先登记）在团队服务器上也走这条路径。服务地址启动时校验并自动加入内网放行名单。成员自己添加的渠道若协议为 `volcengine-ark-video` 且地址与公司中转站同协议同主机端口，创建任务时也补上公司的参考图服务（用该渠道自己的密钥鉴权），其他地址一律不带。
+- `modelProfiles[].baseUrl` 可以给单个模型指定中转站上的其他入口（例如 Seedance 走 `/doubao/api/v3`，其余走 `/v1`），但必须与渠道 `baseUrl` 同协议、同主机和端口，加载渠道文件和网页保存时都会校验。服务端为该模型补密钥时改用这个地址；模型目录仍读渠道 `baseUrl`。Seedance 用 `protocol: "volcengine-ark-video"`。
+- `modelProfiles[].referenceAssetService` 指向公司参考图服务（`POST` 图片原始字节，`Authorization: Bearer <成员中转站密钥>`、`X-HFP-Reference-Mode: seedance-asset`，返回 `{"url":"asset://…"}`）。只有平台渠道的模型会带上它，成员任务里自带的同名字段在创建任务时被丢弃。视频任务执行前，`app/platform_reference_assets.go` 把素材库里的参考图逐张登记并改写为 `asset://`，成功的编号按资源缓存在 `ark_private_asset_bindings`（`project_name` 为 `reference-service:<地址>`）；不是素材库资源的参考图会被拒绝。`POST /api/resources/:id/ark-private-asset`（预先登记）在团队服务器上也走这条路径。服务地址在启动和网页保存时校验并自动加入内网放行名单（只增不减：换掉的旧地址到下次重启前仍在名单里）。成员自己添加的渠道若协议为 `volcengine-ark-video` 且地址与公司中转站同协议同主机端口，创建任务时也补上公司的参考图服务（用该渠道自己的密钥鉴权），其他地址一律不带。
 - 参考图服务调用失败（不可达、超时、非 200、返回值不可用）是 `generation.ReferenceRelayError`，归类为 `reference_relay_failed`，401 为 `reference_relay_unauthorized`；两者都表示模型尚未调用，不自动重发、允许手动重试，错误里的排查编号就是发给服务的 `X-HFP-Request-ID`。
 - **密钥只在服务端**：`GET /api/workspace/model-config` 返回的平台渠道 `apiKey`、`secretKey` 为空，另带 `hasApiKey` 表示是否已绑定。服务端在三处补上密钥，并始终改用渠道保存的 `baseUrl`，密钥只会发往管理员配置的地址：创建任务时 `config.channelId` 为 `company-relay`；`POST /api/ai/models` 带 `channelId: "company-relay"`；`/api/ai/custom` 中转请求没带密钥、且目标与该渠道同协议同主机端口。成员自己添加的渠道仍由浏览器携带本人填写的密钥；即使成员填的正好是自己的中转站密钥，也原样返回给本人，只清空配置顶层等旧版本留下的副本。实现见 `internal/app/platform_credential.go` 与 `internal/handler/workspace.go` 的 `redactPlatformChannels`。
 
@@ -178,7 +180,10 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 | `PUT/DELETE /api/platform/admin/users/:id/relay-key` | 绑定或清除中转站密钥 |
 | `POST /api/platform/admin/invitations` | `{role, expiresInHours}`，返回一次性邀请链接 |
 | `GET /api/platform/admin/audit` | 管理员操作记录，只增不改 |
-| `GET /api/platform/admin/service-status` | 本次启动实际读到的部署设置：公司模型服务（名称、地址、模型与能力、文件路径、自动放行的主机）、账号文件路径、内网放行名单、Cookie 模式、空闲回收时长、已打开/总工作区数、启用成员数与已绑定密钥的成员数。不含任何密钥 |
+| `GET /api/platform/admin/relay-channel` | 公司中转站的当前定义（不含密钥）、来源（`web` 网页保存 / `file` 渠道文件 / `none`）、文件路径、能否恢复为文件、最后保存人和时间 |
+| `PUT /api/platform/admin/relay-channel` | 保存定义：只保留 `name`、`baseUrl`、`apiFormat`、`models` 和所列模型的 `modelProfiles`；带密钥、模型地址不在中转站主机上或没有模型时返回 400 `relay_channel_invalid`。随后改写所有在用成员的工作区，返回改写成功与失败的数量（失败的在成员下次打开时补上） |
+| `DELETE /api/platform/admin/relay-channel` | 删除网页保存的定义，恢复渠道文件；没有渠道文件时返回 409 `relay_channel_no_file` |
+| `GET /api/platform/admin/service-status` | 当前生效的部署设置：公司模型服务（名称、地址、模型与能力、来源与网页保存时间、文件路径、自动放行的主机）、账号文件路径、内网放行名单、Cookie 模式、空闲回收时长、已打开/总工作区数、启用成员数与已绑定密钥的成员数。不含任何密钥 |
 | `GET /api/platform/admin/errors` | 错误记录，新的在前。参数：`member`（用户 ID）、`source`（`task` 失败任务 / `workspace` 工作区无法打开）、`before`（RFC 3339 时间，翻页）、`limit`（默认 50，最多 200）；返回 `{events, nextBefore}`，每条带所属成员。不含密钥与结果地址 |
 | `GET /api/health/live` | 进程存活，不需要登录 |
 
