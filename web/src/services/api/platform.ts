@@ -1,5 +1,28 @@
 import { ApiError, apiBaseURL, compactApiParams, http, type BackendEnvelope } from "./request";
 import type { SkillMetadata } from "./skill-market";
+import type { ModelChannel } from "@/stores/use-config-store";
+
+export type RelayChannelProfile = NonNullable<ModelChannel["modelProfiles"]>[number] & {
+    baseUrl?: string;
+    referenceAssetService?: string;
+};
+export type RelayChannelTemplate = {
+    name: string;
+    baseUrl: string;
+    apiFormat: "openai" | "gemini";
+    models: string[];
+    modelProfiles: RelayChannelProfile[];
+};
+export type PlatformRelayChannel = {
+    channel: RelayChannelTemplate | null;
+    source: "web" | "file" | "none";
+    file: string;
+    fileAvailable: boolean;
+    updatedAt?: string;
+    updatedBy?: { id: string; username: string; displayName: string } | null;
+    applied?: number;
+    failed?: number;
+};
 
 export type PlatformRole = "admin" | "member";
 export type PlatformMe = {
@@ -51,6 +74,8 @@ export type PlatformErrorLog = { events: PlatformErrorEvent[]; nextBefore: strin
 export type PlatformServiceStatus = {
     relay: {
         configured: boolean;
+        source: "web" | "file" | "none";
+        updatedAt?: string;
         name: string;
         baseUrl: string;
         apiFormat: string;
@@ -114,6 +139,9 @@ export const getPlatformInvitation = (token: string) => http.get<{ role: Platfor
 export const acceptPlatformInvitation = (token: string, input: { username: string; displayName: string; password: string }) => http.post<PlatformMe>(`/platform/invitations/${encodeURIComponent(token)}/accept`, input);
 export const listPlatformUsers = () => http.get<{ items: AdminUser[] }>("/platform/admin/users");
 export const getPlatformServiceStatus = (signal?: AbortSignal) => http.get<PlatformServiceStatus>("/platform/admin/service-status", { signal });
+export const getPlatformRelayChannel = (signal?: AbortSignal) => http.get<PlatformRelayChannel>("/platform/admin/relay-channel", { signal });
+export const savePlatformRelayChannel = (channel: RelayChannelTemplate) => http.put<PlatformRelayChannel>("/platform/admin/relay-channel", { channel });
+export const resetPlatformRelayChannel = () => http.delete<PlatformRelayChannel>("/platform/admin/relay-channel");
 export const listPlatformErrors = (params: { member?: string; source?: "task" | "workspace"; before?: string; limit?: number }, signal?: AbortSignal) => http.get<PlatformErrorLog>("/platform/admin/errors", { params: compactApiParams(params), signal });
 export const createPlatformUser = (input: { username: string; displayName: string; password: string; role: PlatformRole; relayKey?: string }) => http.post<{ user: AdminUser }>("/platform/admin/users", input);
 export const updatePlatformUser = (id: string, input: { displayName?: string; role?: PlatformRole; status?: AdminUser["status"] }) => http.patch<{ user: AdminUser }>(`/platform/admin/users/${encodeURIComponent(id)}`, input);

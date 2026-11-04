@@ -14,11 +14,13 @@ import { createModelChannel, type ModelCapability, type ModelChannel } from "@/s
 import { ChannelModelSettings } from "./channel-model-settings";
 import { currentModelConnectionReceipt, useModelConnectionTests } from "@/stores/use-model-connection-tests";
 import "./model-service-editor.css";
-import { getTransportFailureKind } from "@/services/api/request";
+import { ApiError, getTransportFailureKind } from "@/services/api/request";
 import { isHostedMode } from "@/stores/use-platform-session";
+import { companyRelayChannelFromTemplate, companyRelaySharedEndpoints, type CompanyRelaySharedEndpoints } from "@/lib/company-relay-template";
 
-export function ModelServiceEditor({ initial, onClose, onSave }: { initial?: ModelChannel; onClose: () => void; onSave: (channel: ModelChannel) => Promise<void> }) {
-    const [draft, setDraft] = useState<ModelChannel>(() => initial ? structuredClone(initial) : { ...createModelChannel(), name: "", baseUrl: "" });
+export function ModelServiceEditor({ initial, company = false, onClose, onSave }: { initial?: ModelChannel; company?: boolean; onClose: () => void; onSave: (channel: ModelChannel, shared?: CompanyRelaySharedEndpoints) => Promise<void> }) {
+    const [draft, setDraft] = useState<ModelChannel>(() => initial ? structuredClone(initial) : company ? companyRelayChannelFromTemplate(null) : { ...createModelChannel(), name: "", baseUrl: "" });
+    const [shared, setShared] = useState(() => companyRelaySharedEndpoints(initial ?? draft));
     const [presetId, setPresetId] = useState<ModelServicePresetId>(() => initial ? servicePresetFor(initial) : "compatible");
     const [step, setStep] = useState(initial ? 1 : 0);
     const [advanced, setAdvanced] = useState(false);
@@ -68,7 +70,7 @@ export function ModelServiceEditor({ initial, onClose, onSave }: { initial?: Mod
         setNotice("");
     };
     const validateConnection = (requireCredential = true) => {
-        const problem = serviceConnectionError(draft, { protocols, requireCredential }) || validateChannelHeaders(draft.headers);
+        const problem = serviceConnectionError(draft, { protocols, requireCredential: company ? false : requireCredential }) || (!company && validateChannelHeaders(draft.headers));
         if (problem) setError(problem);
         return !problem;
     };
@@ -100,11 +102,12 @@ export function ModelServiceEditor({ initial, onClose, onSave }: { initial?: Mod
         setError("");
         setNotice("");
         try {
-            const result = await fetchChannelModels(draft, true, request.signal);
+            const result = await fetchChannelModels(company ? { ...draft, apiKey: "" } : draft, true, request.signal);
             if (alive.current && !request.signal.aborted) applyCatalog(result);
         } catch (failure) {
             if (alive.current && !request.signal.aborted) {
-                setError(getTransportFailureKind(failure) === "timeout" ? "读取模型目录超时，请检查地址和网络后重试" : failure instanceof Error ? failure.message : "读取模型失败");
+                const authFailure = company && ((failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) || (failure instanceof Error && /key|密钥/i.test(failure.message)));
+                setError(authFailure ? "读取模型目录要用你自己绑定的中转站密钥：请先在「用户管理」为自己绑定密钥，或直接手动添加模型 ID。" : company && !initial ? "还没有保存过公司中转站，暂时读不了模型目录：请先手动添加模型 ID 并保存；为自己绑定中转站密钥后，再回来读取完整目录。" : getTransportFailureKind(failure) === "timeout" ? "读取模型目录超时，请检查地址和网络后重试" : failure instanceof Error ? failure.message : "读取模型失败");
                 setNotice("部分服务不提供模型目录，你仍可手动添加模型 ID。");
             }
         } finally { if (alive.current) setBusy(false); }
@@ -143,7 +146,8 @@ export function ModelServiceEditor({ initial, onClose, onSave }: { initial?: Mod
         setSaving(true);
         setError("");
         try {
-            await onSave({ ...draft, name: draft.name.trim() || "我的模型服务", baseUrl: draft.baseUrl.trim().replace(/\/+$/, ""), apiKey: draft.apiKey.trim(), modelProfiles: profiles });
+            if (company) await onSave({ ...draft, apiKey: "", modelProfiles: profiles }, shared);
+            else await onSave({ ...draft, name: draft.name.trim() || "我的模型服务", baseUrl: draft.baseUrl.trim().replace(/\/+$/, ""), apiKey: draft.apiKey.trim(), modelProfiles: profiles });
             onClose();
         } catch (failure) { setError(failure instanceof Error ? failure.message : "保存失败，请重试"); }
         finally { if (alive.current) { setBusy(false); setSaving(false); } }
@@ -167,15 +171,16 @@ export function ModelServiceEditor({ initial, onClose, onSave }: { initial?: Mod
 
     return <AppModal open centered width={1000} flush footer={null} title={null} closable={!saving} keyboard={!saving} mask={{ closable: false }} onCancel={() => { catalogRequest.current?.abort(); onClose(); }} rootClassName="model-service-modal">
         <div className="model-service-header">
-            <h2>{initial ? `管理 ${initial.name}` : "连接你的模型服务"}</h2>
+            <h2>{company ? initial ? "管理公司中转站" : "配置公司中转站" : initial ? `管理 ${initial.name}` : "连接你的模型服务"}</h2>
+            {company && <p className="mt-2 text-sm text-foreground/65">保存后，所有成员的「公司中转站」都会更新；每人用管理员为其绑定的密钥调用，用量记在各自名下。</p>}
             <ol className="model-service-steps" aria-label="接入步骤">
                 <li aria-current={step === 0 ? "step" : undefined}><span>{step > 0 ? <Check size={13} /> : "1"}</span>连接服务</li>
                 <li aria-current={step === 1 ? "step" : undefined}><span>2</span>选择模型</li>
             </ol>
         </div>
         <div className="model-service-body" aria-busy={busy} inert={busy}>
-            {step === 0 ? <div className="model-service-connection">
-                <aside className="model-service-providers" aria-label="选择服务商">
+            {step === 0 ? <div className="model-service-connection" style={company ? { gridTemplateColumns: "minmax(0, 1fr)" } : undefined}>
+                {!company && <aside className="model-service-providers" aria-label="选择服务商">
                     <p className="model-service-label">选择服务商</p>
                     {MODEL_SERVICE_PRESETS.map((preset) => <button key={preset.id} type="button" disabled={busy || Boolean(initial)} aria-pressed={presetId === preset.id} className="model-service-provider" onClick={() => choosePreset(preset.id)}>
                         <ModelLogo icon={preset.icon} size={24} />
@@ -183,19 +188,23 @@ export function ModelServiceEditor({ initial, onClose, onSave }: { initial?: Mod
                         {presetId === preset.id && <Check size={15} />}
                     </button>)}
                     <div className="model-service-note"><ShieldCheck size={16} /><p>{isHostedMode() ? "密钥保存在你的团队工作区，只有你本人可用。" : "密钥保存在这台设备上。"}<br />生成费用由服务商结算。</p></div>
-                </aside>
+                </aside>}
                 <Form layout="vertical" requiredMark={false} className="model-service-fields" disabled={busy} onFinish={() => void fetchModels()}>
-                    <div className="model-service-form-title"><ModelLogo icon={selectedPreset.icon} size={28} /><div><h3>{selectedPreset.name}</h3>{presetId === "compatible" && <p>用户可以自行添加第三方模型服务，但是 hfp - all in one 无法确保所有第三方模型服务的兼容性</p>}</div></div>
-                    <Form.Item label="连接名称"><Input aria-label="连接名称" placeholder="例如：我的创作账号" value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></Form.Item>
-                    <Form.Item label="API Key" help="选择无鉴权协议（例如 Ollama）后可以留空。读取模型目录仍需要密钥。"><Input.Password prefix={<KeyRound size={15} />} aria-label="API Key" autoComplete="new-password" placeholder="粘贴你的 API Key" value={draft.apiKey} onChange={(event) => patch({ apiKey: event.target.value })} /></Form.Item>
+                    {!company && <div className="model-service-form-title"><ModelLogo icon={selectedPreset.icon} size={28} /><div><h3>{selectedPreset.name}</h3>{presetId === "compatible" && <p>用户可以自行添加第三方模型服务，但是 hfp - all in one 无法确保所有第三方模型服务的兼容性</p>}</div></div>}
+                    <Form.Item label={company ? "名称" : "连接名称"}><Input aria-label={company ? "名称" : "连接名称"} placeholder={company ? "公司中转站" : "例如：我的创作账号"} value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></Form.Item>
+                    {!company && <Form.Item label="API Key" help="选择无鉴权协议（例如 Ollama）后可以留空。读取模型目录仍需要密钥。"><Input.Password prefix={<KeyRound size={15} />} aria-label="API Key" autoComplete="new-password" placeholder="粘贴你的 API Key" value={draft.apiKey} onChange={(event) => patch({ apiKey: event.target.value })} /></Form.Item>}
                     <Form.Item label="服务地址"><Input aria-label="服务地址" inputMode="url" placeholder="https://api.example.com/v1" value={draft.baseUrl} onChange={(event) => patch({ baseUrl: event.target.value })} /></Form.Item>
+                    {company && <>
+                        <Form.Item label="火山方舟（豆包）接口地址（可选）" help="Seedance 视频、Seedream 图片走中转站的豆包入口，例如 http://10.10.10.45:3000/doubao/api/v3。填写后套用到所有火山方舟协议的模型。"><Input aria-label="火山方舟（豆包）接口地址（可选）" inputMode="url" value={shared.arkBaseUrl} onChange={event => { setShared(current => ({ ...current, arkBaseUrl: event.target.value })); setError(""); }} /></Form.Item>
+                        <Form.Item label="参考图服务地址（可选）" help="Seedance 参考图先登记到这个服务，例如 http://10.10.10.45:8787/v1/reference-images。填写后套用到所有 Seedance 模型。"><Input aria-label="参考图服务地址（可选）" inputMode="url" value={shared.referenceAssetService} onChange={event => { setShared(current => ({ ...current, referenceAssetService: event.target.value })); setError(""); }} /></Form.Item>
+                    </>}
                     {modelCatalogRequestURL(draft) && <div className="model-service-url"><span>模型目录地址</span><code>{modelCatalogRequestURL(draft).split("/").map((part, index) => <Fragment key={index}>{index > 0 && <>/<wbr /></>}{part}</Fragment>)}</code></div>}
                     <button type="button" className="model-service-advanced" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}><Settings2 size={15} />高级设置<ChevronDown size={14} /></button>
                     {advanced && <div className="model-service-advanced-fields">
-                        <Form.Item label="素材服务地址（可选）" help="公网素材域名使用 HTTPS。本机、局域网或 CGNAT 可填写 HTTP，并可带端口。留空时只接受与 API 同主机的素材。"><Input aria-label="素材服务地址" inputMode="url" placeholder="https://assets.example.com" value={draft.referenceAssetOrigin || ""} onChange={(event) => patch({ referenceAssetOrigin: event.target.value })} /></Form.Item>
+                        {!company && <Form.Item label="素材服务地址（可选）" help="公网素材域名使用 HTTPS。本机、局域网或 CGNAT 可填写 HTTP，并可带端口。留空时只接受与 API 同主机的素材。"><Input aria-label="素材服务地址" inputMode="url" placeholder="https://assets.example.com" value={draft.referenceAssetOrigin || ""} onChange={(event) => patch({ referenceAssetOrigin: event.target.value })} /></Form.Item>}
                         <Form.Item label="目录接口格式"><Select aria-label="目录接口格式" value={draft.apiFormat} options={[{ value: "openai", label: "OpenAI 兼容" }, { value: "gemini", label: "Gemini 原生" }]} onChange={(apiFormat) => patch({ apiFormat })} /></Form.Item>
-                        <Form.Item label="Secret Key（按需填写）"><Input.Password aria-label="Secret Key" autoComplete="new-password" value={draft.secretKey} onChange={(event) => patch({ secretKey: event.target.value })} /></Form.Item>
-                        <ChannelHeadersEditor value={draft.headers} onChange={(headers) => patch({ headers })} />
+                        {!company && <><Form.Item label="Secret Key（按需填写）"><Input.Password aria-label="Secret Key" autoComplete="new-password" value={draft.secretKey} onChange={(event) => patch({ secretKey: event.target.value })} /></Form.Item>
+                        <ChannelHeadersEditor value={draft.headers} onChange={(headers) => patch({ headers })} /></>}
                     </div>}
                 </Form>
             </div> : <div className="model-service-models">
@@ -215,8 +224,8 @@ export function ModelServiceEditor({ initial, onClose, onSave }: { initial?: Mod
             </div>}
             {(error || notice) && <div className="model-service-feedback">{error && <Alert type="error" showIcon title={error} />}{notice && <Alert type="info" showIcon title={notice} />}</div>}
         </div>
-        <div className="model-service-footer">{step === 1 && <span>保存后，可在创作页选择这些模型</span>}<div>
-            {step === 0 ? <><Button disabled={busy} onClick={() => { if (validateConnection(false)) { setNotice(""); setStep(1); } }}>手动添加模型</Button><Button type="primary" loading={busy} disabled={protocolLoading} onClick={() => void fetchModels()}>读取模型</Button></> : <><Button disabled={busy} icon={<ArrowLeft size={15} />} onClick={() => { setStep(0); setError(""); }}>连接信息</Button><Button type="primary" loading={busy} disabled={!draft.models.length || protocolLoading} icon={<Check size={15} />} onClick={() => void save()}>保存并使用</Button></>}
+        <div className="model-service-footer">{step === 1 && <span>{company ? "保存后所有成员刷新页面即可使用这些模型" : "保存后，可在创作页选择这些模型"}</span>}<div>
+            {step === 0 ? <><Button disabled={busy} onClick={() => { if (validateConnection(false)) { setNotice(""); setStep(1); } }}>手动添加模型</Button><Button type="primary" loading={busy} disabled={protocolLoading} onClick={() => void fetchModels()}>读取模型</Button></> : <><Button disabled={busy} icon={<ArrowLeft size={15} />} onClick={() => { setStep(0); setError(""); }}>连接信息</Button><Button type="primary" loading={busy} disabled={!draft.models.length || protocolLoading} icon={<Check size={15} />} onClick={() => void save()}>{company ? "保存到公司中转站" : "保存并使用"}</Button></>}
         </div></div>
     </AppModal>;
 }

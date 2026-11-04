@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { chromium, type Browser } from "playwright";
 import postcss from "postcss";
 import tailwind from "@tailwindcss/postcss";
+import type { RelayChannelTemplate } from "../src/services/api/platform";
 
 let browser: Browser;
 let server: ReturnType<typeof Bun.serve>;
@@ -93,3 +94,72 @@ for (const [width, dark] of [[1280, false], [390, true]] as const) {
         } finally { await page.close(); }
     }, 60000);
 }
+
+test("company edit and setup entries require hosted userAdmin capability", async () => {
+    const page = await browser.newPage();
+    try {
+        for (const role of ["admin", "member", "local"]) {
+            await page.goto(`${server.url}?company=${role}`);
+            await page.getByRole("button", { name: "添加模型服务", exact: true }).first().waitFor();
+            expect(await page.getByRole("button", { name: "编辑（所有成员）", exact: true }).count()).toBe(role === "admin" ? 1 : 0);
+            await page.goto(`${server.url}?company=${role}&empty=1`);
+            await page.getByRole("button", { name: "添加模型服务", exact: true }).first().waitFor();
+            expect(await page.getByRole("button", { name: "配置公司中转站", exact: true }).count()).toBe(role === "admin" ? 1 : 0);
+        }
+        await page.goto(`${server.url}?company=admin&empty=1`);
+        await page.getByRole("button", { name: "配置公司中转站", exact: true }).click();
+        await page.getByRole("heading", { name: "配置公司中转站", exact: true }).waitFor();
+        expect(await page.getByRole("textbox", { name: "名称", exact: true }).inputValue()).toBe("公司中转站");
+        expect(await page.getByLabel("API Key", { exact: true }).count()).toBe(0);
+    } finally { await page.close(); }
+}, 60000);
+
+test("company editor keeps shared endpoints, saves without keys, displays errors and reloads the card", async () => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    const template: RelayChannelTemplate = {
+        name: "公司中转站", baseUrl: "http://10.10.10.45:3000/v1", apiFormat: "openai", models: ["seedance-2.5"],
+        modelProfiles: [{ model: "seedance-2.5", capability: "video", protocol: "volcengine-ark-video", baseUrl: "http://10.10.10.45:3000/doubao/api/v3", referenceAssetService: "http://10.10.10.45:8787/v1/reference-images" }],
+    };
+    const submitted: RelayChannelTemplate[] = [];
+    let rejectSave = true;
+    try {
+        await page.route("**/api/platform/admin/relay-channel", async route => {
+            if (route.request().method() === "PUT") {
+                submitted.push(route.request().postDataJSON().channel);
+                if (rejectSave) return route.fulfill({ status: 400, json: { code: 400, reason: "relay_channel_invalid", msg: "模型接口地址必须与中转站同主机" } });
+            }
+            await route.fulfill({ json: { code: 0, data: { channel: template, source: "web", file: "", fileAvailable: false, applied: 3, failed: 1 } } });
+        });
+        await page.route("**/api/workspace/model-config", route => route.fulfill({ json: { code: 0, data: { revision: 2, config: { channels: [{ ...submitted.at(-1), id: "company-relay", pinned: true, apiKey: "", hasApiKey: false }] } } } }));
+        await page.route("**/api/ai/models", async route => {
+            expect(route.request().postDataJSON()).toMatchObject({ channelId: "company-relay", apiKey: "" });
+            await route.fulfill({ status: 403, json: { code: 403, msg: "denied", reason: "relay_key_missing" } });
+        });
+        await page.goto(`${server.url}?company=admin`);
+        await page.getByRole("button", { name: "编辑（所有成员）", exact: true }).click();
+        await page.getByRole("heading", { name: "管理公司中转站", exact: true }).waitFor();
+        await page.getByRole("button", { name: "连接信息", exact: true }).click();
+        expect(await page.getByLabel("API Key", { exact: true }).count()).toBe(0);
+        expect(await page.getByLabel("选择服务商", { exact: true }).count()).toBe(0);
+        expect(await page.getByLabel("火山方舟（豆包）接口地址（可选）", { exact: true }).inputValue()).toBe(template.modelProfiles[0].baseUrl!);
+        expect(await page.getByLabel("参考图服务地址（可选）", { exact: true }).inputValue()).toBe(template.modelProfiles[0].referenceAssetService!);
+        await page.getByRole("button", { name: "高级设置", exact: true }).click();
+        expect(await page.getByLabel("Secret Key", { exact: true }).count()).toBe(0);
+        expect(await page.getByLabel("素材服务地址", { exact: true }).count()).toBe(0);
+        expect(await page.getByRole("combobox", { name: "目录接口格式", exact: true }).count()).toBe(1);
+        await page.getByRole("button", { name: "读取模型", exact: true }).click();
+        await page.getByText("读取模型目录要用你自己绑定的中转站密钥：请先在「用户管理」为自己绑定密钥，或直接手动添加模型 ID。", { exact: true }).waitFor();
+        await page.getByRole("textbox", { name: "名称", exact: true }).fill("公司新模型服务");
+        await page.getByRole("button", { name: "手动添加模型", exact: true }).click();
+        await page.getByRole("button", { name: "保存到公司中转站", exact: true }).click();
+        await page.getByText("模型接口地址必须与中转站同主机", { exact: true }).waitFor();
+        expect(submitted[0]).toMatchObject({ ...template, name: "公司新模型服务" });
+        expect(Object.keys(submitted[0]).sort()).toEqual(["apiFormat", "baseUrl", "modelProfiles", "models", "name"]);
+        rejectSave = false;
+        await page.getByRole("button", { name: "保存到公司中转站", exact: true }).click();
+        await page.getByRole("heading", { name: "公司新模型服务", exact: true }).waitFor();
+        await page.getByText("公司中转站已保存，已更新 3 位成员的工作区；其他成员刷新页面后可见", { exact: true }).waitFor({ state: "attached" });
+        await page.getByText("1 个工作区暂未更新，会在成员下次打开时更新", { exact: true }).waitFor({ state: "attached" });
+        await page.getByRole("dialog").waitFor({ state: "hidden" });
+    } finally { await page.close(); }
+}, 60000);

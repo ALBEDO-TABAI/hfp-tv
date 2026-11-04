@@ -26,6 +26,8 @@ import { getTransportFailureKind } from "@/services/api/request";
 import { beefAPIConnectionLabel, cancelBeefAPIConnection, disconnectBeefAPIConnection, getBeefAPIConnection, openBeefAPIWallet, startBeefAPIConnection, type BeefAPIConnectionSummary } from "@/services/api/beefapi-connection";
 import { recordChannelDelete, recordChannelDeleteConfirmOpen } from "./model-settings-diagnostics";
 import { usePlatformSession } from "@/stores/use-platform-session";
+import { getPlatformRelayChannel, savePlatformRelayChannel } from "@/services/api/platform";
+import { companyRelayChannelFromTemplate, companyRelayTemplateFromChannel, type CompanyRelaySharedEndpoints } from "@/lib/company-relay-template";
 
 type UserChannelConnection = "openai" | "gemini";
 type ChannelSettingsPaneProps = {
@@ -40,11 +42,14 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
     const replaceConfig = useConfigStore((state) => state.replaceConfig);
     const localMode = workspaceCapabilities().local;
     const hosted = usePlatformSession((state) => state.mode === "hosted");
+    const userAdmin = usePlatformSession((state) => state.me?.capabilities.userAdmin === true);
     const persistence = useSyncExternalStore(subscribeModelConfigPersistence, getModelConfigPersistenceState, getModelConfigPersistenceState);
     const [loadingChannelIds, setLoadingChannelIds] = useState<string[]>([]);
     const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
     const [newChannelId, setNewChannelId] = useState<string | null>(null);
     const [serviceEditor, setServiceEditor] = useState<ModelChannel | null | undefined>(undefined);
+    const [companyEditor, setCompanyEditor] = useState<ModelChannel | null | undefined>(undefined);
+    const [companyLoading, setCompanyLoading] = useState(false);
     const [beefConnection, setBeefConnection] = useState<BeefAPIConnectionSummary | null>(null);
     const [beefBusy, setBeefBusy] = useState(false);
     const appliedConnectionState = useRef<string | undefined>(undefined);
@@ -180,6 +185,25 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
 
     const addChannel = () => {
         setServiceEditor(null);
+    };
+
+    const editCompanyRelay = async () => {
+        setCompanyLoading(true);
+        try {
+            const state = await getPlatformRelayChannel();
+            setCompanyEditor(companyRelayChannelFromTemplate(state.channel));
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "无法读取公司中转站配置，请重试");
+        } finally { setCompanyLoading(false); }
+    };
+
+    const saveCompanyRelay = async (channel: ModelChannel, shared?: CompanyRelaySharedEndpoints) => {
+        if (!shared) throw new Error("缺少公司中转站共享地址设置");
+        const result = await savePlatformRelayChannel(companyRelayTemplateFromChannel(channel, shared));
+        const server = await getLocalModelConfig();
+        replaceConfig(localWorkspaceConfig(normalizeConfigSnapshot({ config: server.config }).config));
+        message.success(`公司中转站已保存，已更新 ${result.applied ?? 0} 位成员的工作区；其他成员刷新页面后可见`);
+        if (result.failed && result.failed > 0) message.warning(`${result.failed} 个工作区暂未更新，会在成员下次打开时更新`);
     };
 
     const saveService = async (channel: ModelChannel) => {
@@ -359,6 +383,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                     <Button type="primary" className="h-10 flex-1 sm:h-8 sm:flex-none" icon={<Plus className="size-4" />} onClick={addChannel}>
                         添加模型服务
                     </Button>
+                    {hosted && userAdmin && !config.channels.some(isPlatformManagedChannel) && <Button className="h-10 flex-1 sm:h-8 sm:flex-none" icon={<Pencil className="size-4" />} onClick={() => setCompanyEditor(null)}>配置公司中转站</Button>}
                     </div>
                 )}
             />
@@ -412,6 +437,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                         {!builtinBeefAPI && !topazUpscale && !platformManaged && <p className="mt-1 break-all text-xs text-foreground/50">模型目录地址：{modelCatalogRequestURL(channel)}</p>}
                                     </div>
                                     <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto sm:shrink-0">
+                                        {platformManaged && hosted && userAdmin && <Button size="small" icon={<Pencil className="size-3.5" />} loading={companyLoading} onClick={() => void editCompanyRelay()}>编辑（所有成员）</Button>}
                                         {builtinBeefAPI && catalogSyncFailed ? <Button loading={beefBusy} onClick={() => void runBeefAction(getBeefAPIConnection, "无法更新模型列表")}>重试更新模型列表</Button> : null}
                                         {builtinBeefAPI ? (
                                             <BeefAPIConnectionActions
@@ -599,6 +625,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                 />
             )}
             {serviceEditor !== undefined && <ModelServiceEditor initial={serviceEditor || undefined} onClose={() => setServiceEditor(undefined)} onSave={saveService} />}
+            {companyEditor !== undefined && hosted && userAdmin && <ModelServiceEditor company initial={companyEditor || undefined} onClose={() => setCompanyEditor(undefined)} onSave={saveCompanyRelay} />}
         </Form>
     );
 }
