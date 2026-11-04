@@ -14,12 +14,14 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"infinite-canvas/backend/internal/accounts"
 	"infinite-canvas/backend/internal/bootstrap"
 	"infinite-canvas/backend/internal/errorlog"
 	"infinite-canvas/backend/internal/kernelpool"
+	"infinite-canvas/backend/internal/relaychannel"
 	"infinite-canvas/backend/internal/skillmarket"
 	"infinite-canvas/backend/internal/workshop"
 
@@ -85,12 +87,18 @@ type Options struct {
 	Status DeploymentStatus
 	// ErrorLog backs the admin error log; nil leaves it empty.
 	ErrorLog *errorlog.Store
+	// RelayChannels stores the company relay definition saved from the admin
+	// page and RelayTemplates applies it; either nil disables web editing.
+	RelayChannels  *relaychannel.Store
+	RelayTemplates RelayTemplates
 }
 
 type Server struct {
 	opts    Options
 	engine  *gin.Engine
 	origins map[string]bool
+	// relayMu serializes company relay saves and the rewrite that follows.
+	relayMu sync.Mutex
 }
 
 func New(opts Options) (*Server, error) {
@@ -340,6 +348,7 @@ func (s *Server) routes() {
 	s.adminRoutes(admin)
 	admin.GET("/service-status", s.serviceStatus)
 	admin.GET("/errors", s.errorEvents)
+	s.relayChannelRoutes(admin)
 	s.marketRoutes(platform, admin)
 	s.workshopRoutes(admin)
 	s.engine.NoRoute(func(c *gin.Context) {

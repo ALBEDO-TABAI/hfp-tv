@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"infinite-canvas/backend/internal/outbound"
 	"infinite-canvas/backend/internal/referencestorage"
 	"infinite-canvas/backend/internal/workspace"
 )
@@ -32,18 +33,134 @@ func LoadRelayTemplate(path string) (map[string]any, error) {
 	if err := json.Unmarshal(body, &template); err != nil {
 		return nil, fmt.Errorf("公司中转站渠道定义不是 JSON 对象：%w", err)
 	}
-	if baseURL, _ := template["baseUrl"].(string); strings.TrimSpace(baseURL) == "" {
-		return nil, errors.New("公司中转站渠道定义缺少 baseUrl")
-	}
-	for _, secret := range []string{"apiKey", "secretKey", "credentialRef"} {
-		if value, _ := template[secret].(string); strings.TrimSpace(value) != "" {
-			return nil, fmt.Errorf("公司中转站渠道定义不能包含 %s，密钥按成员单独绑定", secret)
-		}
-	}
-	if err := checkModelBaseURLs(template); err != nil {
+	if err := ValidateRelayTemplate(template); err != nil {
 		return nil, err
 	}
 	return template, nil
+}
+
+// ValidateRelayTemplate checks a company relay definition from the server
+// file or the admin page: an http(s) base URL, no credentials (each member's
+// key is bound separately), and model endpoints on the relay's own host.
+func ValidateRelayTemplate(template map[string]any) error {
+	if template == nil {
+		return errors.New("公司中转站渠道定义为空")
+	}
+	baseURL, _ := template["baseUrl"].(string)
+	if strings.TrimSpace(baseURL) == "" {
+		return errors.New("公司中转站渠道定义缺少 baseUrl")
+	}
+	if parsed, err := url.Parse(strings.TrimSpace(baseURL)); err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return errors.New("公司中转站渠道定义的 baseUrl 必须是 http:// 或 https:// 开头的完整地址")
+	}
+	for _, secret := range []string{"apiKey", "secretKey", "credentialRef"} {
+		if value, _ := template[secret].(string); strings.TrimSpace(value) != "" {
+			return fmt.Errorf("公司中转站渠道定义不能包含 %s，密钥按成员单独绑定", secret)
+		}
+	}
+	return checkModelBaseURLs(template)
+}
+
+// NormalizeRelayTemplate turns a channel sent by the admin page into a relay
+// definition: only the name, base URL, catalog format, model list and model
+// profiles are kept, so editor state and credentials never reach members.
+func NormalizeRelayTemplate(input map[string]any) (map[string]any, error) {
+	for _, secret := range []string{"apiKey", "secretKey", "credentialRef"} {
+		if value, _ := input[secret].(string); strings.TrimSpace(value) != "" {
+			return nil, errors.New("公司中转站不保存密钥，密钥由管理员按成员单独绑定")
+		}
+	}
+	name, _ := input["name"].(string)
+	baseURL, _ := input["baseUrl"].(string)
+	apiFormat, _ := input["apiFormat"].(string)
+	apiFormat = strings.TrimSpace(apiFormat)
+	if apiFormat == "" {
+		apiFormat = "openai"
+	}
+	if apiFormat != "openai" && apiFormat != "gemini" {
+		return nil, errors.New("公司中转站的目录接口格式只能是 openai 或 gemini")
+	}
+	listed, _ := input["models"].([]any)
+	models := make([]any, 0, len(listed))
+	seen := map[string]bool{}
+	for _, raw := range listed {
+		model, _ := raw.(string)
+		if model = strings.TrimSpace(model); model != "" && !seen[model] {
+			seen[model] = true
+			models = append(models, model)
+		}
+	}
+	if len(models) == 0 {
+		return nil, errors.New("公司中转站至少需要一个模型")
+	}
+	if len(models) > maxRelayModels {
+		return nil, fmt.Errorf("公司中转站最多 %d 个模型", maxRelayModels)
+	}
+	rawProfiles, _ := input["modelProfiles"].([]any)
+	profiles := make([]any, 0, len(rawProfiles))
+	profiled := map[string]bool{}
+	for _, raw := range rawProfiles {
+		profile, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		model, _ := profile["model"].(string)
+		if model = strings.TrimSpace(model); !seen[model] || profiled[model] {
+			continue
+		}
+		profiled[model] = true
+		clean := make(map[string]any, len(profile))
+		for key, value := range profile {
+			if key == "apiKey" || key == "secretKey" || key == "credentialRef" {
+				continue
+			}
+			clean[key] = value
+		}
+		clean["model"] = model
+		profiles = append(profiles, clean)
+	}
+	template := map[string]any{
+		"name":          strings.TrimSpace(name),
+		"baseUrl":       strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		"apiFormat":     apiFormat,
+		"models":        models,
+		"modelProfiles": profiles,
+	}
+	if template["name"] == "" {
+		template["name"] = "公司中转站"
+	}
+	if err := ValidateRelayTemplate(template); err != nil {
+		return nil, err
+	}
+	return template, nil
+}
+
+const maxRelayModels = 500
+
+// TrustRelayHosts lets kernels reach the company relay and its
+// reference-image service even when they sit on the intranet, without a
+// separate CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS entry: the definition comes
+// from the operator's file or an administrator, not from members. Hosts are
+// only ever added; a host the relay no longer uses stays allowed until the
+// next restart.
+func TrustRelayHosts(template map[string]any) (string, error) {
+	if template == nil {
+		return "", nil
+	}
+	raw, _ := template["baseUrl"].(string)
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", errors.New("公司中转站渠道定义的 baseUrl 必须是 http:// 或 https:// 开头的完整地址")
+	}
+	host := parsed.Hostname()
+	outbound.TrustPrivateUpstreamHost(host)
+	// The reference-image service usually runs next to the relay (e.g. :8787).
+	for _, service := range RelayReferenceServices(template) {
+		if parsed, err := url.Parse(service); err == nil {
+			outbound.TrustPrivateUpstreamHost(parsed.Hostname())
+		}
+	}
+	return host, nil
 }
 
 // checkModelBaseURLs allows a model its own endpoint on the relay (for example

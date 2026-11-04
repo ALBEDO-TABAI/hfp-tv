@@ -15,6 +15,7 @@ import (
 	"infinite-canvas/backend/internal/errorlog"
 	"infinite-canvas/backend/internal/kernel"
 	"infinite-canvas/backend/internal/kernelpool"
+	"infinite-canvas/backend/internal/relaychannel"
 	workspacecfg "infinite-canvas/backend/internal/workspace"
 )
 
@@ -44,8 +45,12 @@ func newHarness(t *testing.T, configure ...func(*Options)) *harness {
 		_ = pool.CloseAll(ctx)
 		_ = users.Close()
 	})
-	opts := Options{Accounts: users, Pool: pool, DataRoot: root, CookieSecure: CookieSecureAlways,
-		Status: DeploymentStatus{RelayFile: "/config/relay-channel.json", RelayTemplate: relayTemplate, RelayHost: "relay.example.com", IdleTimeout: 30 * time.Minute}}
+	relayChannels, err := relaychannel.Open(users.DB())
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := Options{Accounts: users, Pool: pool, DataRoot: root, CookieSecure: CookieSecureAlways, RelayChannels: relayChannels, RelayTemplates: pool,
+		Status: DeploymentStatus{RelayFile: "/config/relay-channel.json", RelayFileTemplate: relayTemplate, IdleTimeout: 30 * time.Minute}}
 	for _, change := range configure {
 		change(&opts)
 	}

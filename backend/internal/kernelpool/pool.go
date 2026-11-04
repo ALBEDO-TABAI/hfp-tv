@@ -73,6 +73,25 @@ type Pool struct {
 	now     func() time.Time
 	// openKernel is p.open; tests replace it.
 	openKernel func(Spec) (Kernel, error)
+	// relay is the company relay definition written into every workspace; an
+	// administrator can replace it while the server runs.
+	relayMu sync.RWMutex
+	relay   map[string]any
+}
+
+// RelayTemplate returns the company relay definition in effect, or nil.
+func (p *Pool) RelayTemplate() map[string]any {
+	p.relayMu.RLock()
+	defer p.relayMu.RUnlock()
+	return p.relay
+}
+
+// SetRelayTemplate replaces the definition used by later provisioning. Call
+// Reprovision for each workspace to apply it to kernels that are open.
+func (p *Pool) SetRelayTemplate(template map[string]any) {
+	p.relayMu.Lock()
+	defer p.relayMu.Unlock()
+	p.relay = template
 }
 
 func New(opts Options) *Pool {
@@ -82,10 +101,11 @@ func New(opts Options) *Pool {
 	if opts.ReapInterval <= 0 {
 		opts.ReapInterval = time.Minute
 	}
-	if opts.RelayTemplate != nil {
-		opts.Hosted.ManagedChannelIDs = append(opts.Hosted.ManagedChannelIDs, RelayChannelID)
-	}
-	pool := &Pool{opts: opts, kernels: make(map[string]*entry), closing: make(map[string]chan struct{}), now: time.Now}
+	// Managed even before a relay is defined: an administrator can define it
+	// from the browser while kernels are open, and a managed channel never
+	// has its key echoed to the browser.
+	opts.Hosted.ManagedChannelIDs = append(opts.Hosted.ManagedChannelIDs, RelayChannelID)
+	pool := &Pool{opts: opts, kernels: make(map[string]*entry), closing: make(map[string]chan struct{}), now: time.Now, relay: opts.RelayTemplate}
 	pool.openKernel = pool.open
 	return pool
 }
@@ -216,7 +236,8 @@ func (p *Pool) provision(spec Spec) error {
 	if err := applyReferenceStorage(spec.DataDir, p.opts.ReferenceStorage); err != nil {
 		return err
 	}
-	if p.opts.RelayTemplate == nil {
+	template := p.RelayTemplate()
+	if template == nil {
 		return nil
 	}
 	key := ""
@@ -226,7 +247,7 @@ func (p *Pool) provision(spec Spec) error {
 			return err
 		}
 	}
-	return applyRelayChannel(spec.DataDir, p.opts.RelayTemplate, key)
+	return applyRelayChannel(spec.DataDir, template, key)
 }
 
 // Reprovision rewrites deployment-managed settings, e.g. after an admin binds

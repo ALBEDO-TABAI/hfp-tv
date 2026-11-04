@@ -2,6 +2,7 @@ package teamserver
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -15,13 +16,13 @@ import (
 // service-status page shows it so a missed setting is visible in the browser,
 // not only in the container log.
 type DeploymentStatus struct {
-	RelayFile     string
-	RelayTemplate map[string]any
-	// RelayHost is the company relay's intranet host trusted automatically.
-	RelayHost   string
-	UsersFile   string
-	KeysFile    string
-	IdleTimeout time.Duration
+	RelayFile string
+	// RelayFileTemplate is the definition read from RelayFile, if any. A
+	// definition saved from the admin page takes its place while it exists.
+	RelayFileTemplate map[string]any
+	UsersFile         string
+	KeysFile          string
+	IdleTimeout       time.Duration
 }
 
 type relayModelView struct {
@@ -60,6 +61,16 @@ func relayModels(template map[string]any) []relayModelView {
 	return models
 }
 
+// relayHost is the relay's intranet host, allowed automatically for kernels.
+func relayHost(template map[string]any) string {
+	raw, _ := template["baseUrl"].(string)
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return ""
+	}
+	return parsed.Hostname()
+}
+
 func (s *Server) serviceStatus(c *gin.Context) {
 	ctx := c.Request.Context()
 	users, err := s.opts.Accounts.ListUsers(ctx)
@@ -82,13 +93,17 @@ func (s *Server) serviceStatus(c *gin.Context) {
 		}
 	}
 	status := s.opts.Status
-	template := status.RelayTemplate
+	template := s.currentRelayTemplate()
 	text := func(key string) string {
 		value, _ := template[key].(string)
 		return strings.TrimSpace(value)
 	}
+	source, updatedAt := s.relaySource()
 	relay := gin.H{"configured": template != nil, "name": text("name"), "baseUrl": text("baseUrl"), "apiFormat": text("apiFormat"),
-		"models": relayModels(template), "file": status.RelayFile, "autoAllowedHost": status.RelayHost}
+		"models": relayModels(template), "file": status.RelayFile, "autoAllowedHost": relayHost(template), "source": source}
+	if updatedAt != nil {
+		relay["updatedAt"] = updatedAt
+	}
 	if template != nil && text("name") == "" {
 		relay["name"] = "公司中转站"
 	}

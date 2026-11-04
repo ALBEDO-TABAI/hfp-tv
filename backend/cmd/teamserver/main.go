@@ -13,7 +13,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -30,6 +29,7 @@ import (
 	"infinite-canvas/backend/internal/kernelpool"
 	"infinite-canvas/backend/internal/outbound"
 	"infinite-canvas/backend/internal/referencestorage"
+	"infinite-canvas/backend/internal/relaychannel"
 	"infinite-canvas/backend/internal/skillmarket"
 	"infinite-canvas/backend/internal/teamserver"
 	"infinite-canvas/backend/internal/workshop"
@@ -137,12 +137,26 @@ func run(ctx context.Context) error {
 	}
 	defer users.Close()
 	relayFile := strings.TrimSpace(os.Getenv("TEAMSERVER_RELAY_CHANNEL_FILE"))
-	relayTemplate, err := kernelpool.LoadRelayTemplate(relayFile)
+	relayFileTemplate, err := kernelpool.LoadRelayTemplate(relayFile)
 	if err != nil {
 		return err
 	}
-	relayHost, err := trustRelayHost(relayTemplate)
+	relayChannels, err := relaychannel.Open(users.DB())
 	if err != nil {
+		return err
+	}
+	// A definition an administrator saved from the browser takes the place of
+	// the file until they revert it.
+	relayTemplate, relaySource := relayFileTemplate, "配置文件 "+relayFile
+	if saved, err := relayChannels.Load(); err != nil {
+		return err
+	} else if saved != nil {
+		if err := kernelpool.ValidateRelayTemplate(saved.Template); err != nil {
+			return fmt.Errorf("网页保存的公司中转站定义无效：%w", err)
+		}
+		relayTemplate, relaySource = saved.Template, "网页保存的定义"
+	}
+	if _, err := kernelpool.TrustRelayHosts(relayTemplate); err != nil {
 		return err
 	}
 	cookieSecure, err := teamserver.ParseCookieSecurity(os.Getenv("TEAMSERVER_COOKIE_SECURE"))
@@ -210,8 +224,10 @@ func run(ctx context.Context) error {
 		Market:         market,
 		Workshop:       shop,
 		ErrorLog:       errorLog,
+		RelayChannels:  relayChannels,
+		RelayTemplates: pool,
 		Status: teamserver.DeploymentStatus{
-			RelayFile: relayFile, RelayTemplate: relayTemplate, RelayHost: relayHost,
+			RelayFile: relayFile, RelayFileTemplate: relayFileTemplate,
 			UsersFile: strings.TrimSpace(os.Getenv("TEAMSERVER_USERS_FILE")), KeysFile: strings.TrimSpace(os.Getenv("TEAMSERVER_USER_KEYS_FILE")),
 			IdleTimeout: idleTimeout,
 		},
@@ -219,7 +235,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	logDeployment(relayFile, relayTemplate, cookieSecure, idleTimeout)
+	logDeployment(relaySource, relayTemplate, cookieSecure, idleTimeout)
 	accountFiles := teamserver.AccountFiles{UsersPath: strings.TrimSpace(os.Getenv("TEAMSERVER_USERS_FILE")), KeysPath: strings.TrimSpace(os.Getenv("TEAMSERVER_USER_KEYS_FILE"))}
 	if accountFiles.UsersPath == "" && accountFiles.KeysPath != "" {
 		return errors.New("设置了 TEAMSERVER_USER_KEYS_FILE 就必须同时设置 TEAMSERVER_USERS_FILE")
@@ -456,29 +472,6 @@ func readPassword() (string, error) {
 	return strings.TrimRight(line, "\r\n"), nil
 }
 
-// trustRelayHost lets kernels reach the company relay even when it sits on the
-// intranet, without a separate CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS entry: the
-// relay file is written by the operator, not by members.
-func trustRelayHost(template map[string]any) (string, error) {
-	if template == nil {
-		return "", nil
-	}
-	raw, _ := template["baseUrl"].(string)
-	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return "", errors.New("公司中转站渠道定义的 baseUrl 必须是 http:// 或 https:// 开头的完整地址")
-	}
-	host := parsed.Hostname()
-	outbound.TrustPrivateUpstreamHost(host)
-	// The reference-image service usually runs next to the relay (e.g. :8787).
-	for _, service := range kernelpool.RelayReferenceServices(template) {
-		if parsed, err := url.Parse(service); err == nil {
-			outbound.TrustPrivateUpstreamHost(parsed.Hostname())
-		}
-	}
-	return host, nil
-}
-
 // idleTimeoutSetting reads TEAMSERVER_IDLE_TIMEOUT: a duration (default 30m),
 // or 0/off to keep every workspace open until shutdown.
 func idleTimeoutSetting() (time.Duration, error) {
@@ -498,13 +491,13 @@ func idleTimeoutSetting() (time.Duration, error) {
 
 // logDeployment prints what this start actually loaded, so a setting that did
 // not reach the container is visible in `docker compose logs`.
-func logDeployment(relayFile string, relay map[string]any, cookie teamserver.CookieSecurity, idle time.Duration) {
+func logDeployment(relaySource string, relay map[string]any, cookie teamserver.CookieSecurity, idle time.Duration) {
 	if relay == nil {
-		log.Printf("公司模型服务：未配置（TEAMSERVER_RELAY_CHANNEL_FILE 为空），成员只能使用自己添加的模型服务")
+		log.Printf("公司模型服务：未配置（管理员可在“模型配置”里配置公司中转站，或设置 TEAMSERVER_RELAY_CHANNEL_FILE），成员只能使用自己添加的模型服务")
 	} else {
 		base, _ := relay["baseUrl"].(string)
 		models, _ := relay["models"].([]any)
-		log.Printf("公司模型服务：%s，%d 个模型（%s）", base, len(models), relayFile)
+		log.Printf("公司模型服务：%s，%d 个模型（%s）", base, len(models), strings.TrimSpace(relaySource))
 	}
 	if hosts := outbound.AllowedPrivateUpstreamHosts(); len(hosts) > 0 {
 		log.Printf("允许访问的内网地址：%s", strings.Join(hosts, ", "))
