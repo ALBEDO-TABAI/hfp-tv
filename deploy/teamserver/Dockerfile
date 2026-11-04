@@ -31,17 +31,25 @@ COPY plugin-packages ./plugin-packages
 RUN ./plugin-packages/build-packages.sh
 
 FROM golang:1.25-bookworm AS backend-build
-ARG GOPROXY=https://proxy.golang.org,direct
+# 先走国内镜像；它出任何错（含断流、超时）都换官方源再试一次，官方源没有的模块直接从源码仓库取。
+ARG GOPROXY=https://goproxy.cn|https://proxy.golang.org,direct
 ARG BUILD_VERSION
 ARG BUILD_COMMIT=unknown
 ARG BUILD_TIME=unknown
 ENV GOPROXY=$GOPROXY
 WORKDIR /src/backend
 COPY VERSION /src/VERSION
-COPY backend/go.mod backend/go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY backend ./
-RUN --mount=type=cache,target=/root/.cache/go-build set -eu; \
+# 依赖下载和编译必须挂载同一个模块缓存：以前只有下载步骤挂载，编译步骤看不到已下载的模块，每次构建都重新联网拉全部依赖。
+# 缓存在失败后也保留已下完的模块，网络断续时重试和下次构建都从断点继续；模块齐全时 go mod download 不联网。
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build set -eu; \
+    attempt=1; \
+    until go mod download; do \
+        if [ "$attempt" -ge 4 ]; then echo "Go 依赖连续 ${attempt} 次下载失败（GOPROXY=${GOPROXY}）。网络不稳时在 .env 设置 GOPROXY 后重新构建，见 .env.example。" >&2; exit 1; fi; \
+        echo "Go 依赖第 ${attempt} 次下载失败，$((attempt * 15)) 秒后继续" >&2; \
+        sleep $((attempt * 15)); \
+        attempt=$((attempt + 1)); \
+    done; \
     version="${BUILD_VERSION:-$(tr -d '\r\n' </src/VERSION)}"; \
     ldflags="-s -w -X infinite-canvas/backend/internal/buildinfo.Version=${version} -X infinite-canvas/backend/internal/buildinfo.Commit=${BUILD_COMMIT} -X infinite-canvas/backend/internal/buildinfo.BuildTime=${BUILD_TIME}"; \
     CGO_ENABLED=1 GOOS=linux go build -trimpath -ldflags="$ldflags" -o /out/teamserver ./cmd/teamserver

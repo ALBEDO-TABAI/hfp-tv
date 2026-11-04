@@ -8,7 +8,8 @@ services:
       context: ../..
       dockerfile: deploy/teamserver/Dockerfile
       args:
-        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        # Go 依赖源：默认先走国内镜像，出错再换官方源；公司有自己的 Go 代理时在 .env 里设置 GOPROXY。
+        GOPROXY: ${GOPROXY:-https://goproxy.cn|https://proxy.golang.org,direct}
     # .env 里的设置原样传进容器（TEAMSERVER_*、CANVAS_* 等）；下面 environment 写死的几项优先。
     env_file:
       - path: .env
