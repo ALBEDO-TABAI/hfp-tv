@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"infinite-canvas/backend/internal/database"
 	"infinite-canvas/backend/internal/localcrypto"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 const (
@@ -56,7 +56,7 @@ func Open(root string) (*Service, error) {
 		return nil, err
 	}
 	dsn := filepath.Join(root, "platform.db") + "?_busy_timeout=5000&_journal_mode=WAL&_foreign_keys=on&_synchronous=NORMAL"
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Warn)})
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: database.Logger()})
 	if err != nil {
 		return nil, err
 	}
