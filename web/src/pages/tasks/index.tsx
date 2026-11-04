@@ -374,7 +374,8 @@ export default function TasksPage() {
                 const logs = await listTaskLogs(task.id);
                 if (request === detailRequestRef.current) {
                     setTaskLogs(logs);
-                    message.info("原任务仍在处理中，请稍后再取回结果");
+                    if (result.message || ["failed", "failure", "cancelled", "expired"].includes(result.providerStatus.toLowerCase())) message.warning(`上游仍报告任务失败，没有可取回的视频${result.message ? `：${result.message}` : ""}`);
+                    else message.info("原任务仍在处理中，请稍后再取回结果");
                 }
                 return;
             }

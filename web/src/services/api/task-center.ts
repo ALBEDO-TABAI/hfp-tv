@@ -95,6 +95,8 @@ export type ProviderTaskQueryResult = {
     task: GenerationTask;
     providerStatus: string;
     recovered: boolean;
+    /** The upstream's failure text when it still reports the task as failed or cancelled. */
+    message?: string;
 };
 
 export type TaskTextDelta = {

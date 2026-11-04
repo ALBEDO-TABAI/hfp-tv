@@ -683,3 +683,60 @@ func TestVideoRequestReceiptPreservesOriginalIdentityExceptCreate(t *testing.T) 
 		})
 	}
 }
+
+// "取回结果" on a task the relay still reports as failed is an answer, not a
+// server fault: the member gets the relay's status and reason, and the task
+// stays failed.
+func TestFailedRelayVideoQueryReportsTheRelaysFailure(t *testing.T) {
+	allowLoopbackProviderTest(t)
+	relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/doubao/api/v3/contents/generations/tasks/task_Oy5P" {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "task_Oy5P", "object": "video", "status": "failed", "progress": 100, "error": map[string]any{"message": "Failed to query the upstream task status"}})
+	}))
+	defer relay.Close()
+	svc, db := openDBRuntimeMatrix(t, t.TempDir())
+	defer closeDBRuntimeMatrix(t, svc, db)
+	inputJSON, err := json.Marshal(canvasGenerationInput{Mode: "video", Config: providerConfig{BaseURL: relay.URL + "/doubao/api/v3", APIKey: "member-key", APIFormat: "openai", InterfaceType: "volcengine-ark-video", Model: "doubao-seedance-2.0-fast"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	task := model.Task{ID: "failed-relay-video", UserID: "local", Type: "canvas_video", Status: model.TaskStatusFailed, ProviderRequestID: "task_Oy5P", InputJSON: string(inputJSON), CreatedAt: now, UpdatedAt: now}
+	if err := db.Create(&task).Error; err != nil {
+		t.Fatal(err)
+	}
+	result, err := svc.QueryFailedVideoTask(context.Background(), task.UserID, task.ID)
+	if err != nil {
+		t.Fatalf("query = %v", err)
+	}
+	if result.Recovered || result.ProviderStatus != "failed" || !strings.Contains(result.Message, "Failed to query the upstream task status") || result.Task.Status != model.TaskStatusFailed {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
+func TestFailedVideoQueryThatCannotReachTheUpstreamSaysSo(t *testing.T) {
+	allowLoopbackProviderTest(t)
+	relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"error":{"message":"upstream unavailable"}}`))
+	}))
+	defer relay.Close()
+	svc, db := openDBRuntimeMatrix(t, t.TempDir())
+	defer closeDBRuntimeMatrix(t, svc, db)
+	inputJSON, err := json.Marshal(canvasGenerationInput{Mode: "video", Config: providerConfig{BaseURL: relay.URL + "/doubao/api/v3", APIKey: "member-key", APIFormat: "openai", InterfaceType: "volcengine-ark-video", Model: "doubao-seedance-2.0-fast"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	task := model.Task{ID: "failed-relay-video-down", UserID: "local", Type: "canvas_video", Status: model.TaskStatusFailed, ProviderRequestID: "task_Oy5P", InputJSON: string(inputJSON), CreatedAt: now, UpdatedAt: now}
+	if err := db.Create(&task).Error; err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.QueryFailedVideoTask(context.Background(), task.UserID, task.ID)
+	var appErr *AppError
+	if !errors.As(err, &appErr) || appErr.Status < 400 || appErr.Status == http.StatusInternalServerError || !strings.Contains(appErr.Message, "查询上游任务失败") {
+		t.Fatalf("query error = %#v", err)
+	}
+}

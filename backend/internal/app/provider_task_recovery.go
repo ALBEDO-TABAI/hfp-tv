@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"infinite-canvas/backend/internal/model"
+	"infinite-canvas/backend/internal/protocol"
 	"infinite-canvas/backend/internal/provider/workflow"
 	"infinite-canvas/backend/internal/repository"
 )
@@ -20,6 +21,9 @@ type ProviderTaskQueryResult struct {
 	Task           *model.Task `json:"task"`
 	ProviderStatus string      `json:"providerStatus"`
 	Recovered      bool        `json:"recovered"`
+	// Message is the upstream's own failure text when it still reports the
+	// task as failed or cancelled.
+	Message string `json:"message,omitempty"`
 }
 
 func (s *Service) QueryFailedVideoTask(ctx context.Context, userID string, taskID string) (*ProviderTaskQueryResult, error) {
@@ -143,8 +147,19 @@ func (s *Service) queryFailedVideoTask(ctx context.Context, task *model.Task, cl
 		result, providerStatus, err = queryProtocolAdapterVideoTask(queryCtx, input, adapter, providerRequestID)
 	}
 	if err != nil {
+		// The upstream answered and still calls the task failed: that is the
+		// answer to the query, not a server fault.
+		switch protocol.NormalizeStatus(providerStatus) {
+		case protocol.StatusFailed, protocol.StatusCancelled:
+			_ = s.log(task.UserID, task.ID, "info", "人工查询完成，上游仍报告任务失败", err.Error())
+			return &ProviderTaskQueryResult{Task: taskForOutput(*task), ProviderStatus: providerStatus, Recovered: false, Message: err.Error()}, nil
+		}
 		_ = s.log(task.UserID, task.ID, "error", "人工查询上游视频任务失败", err.Error())
-		return nil, err
+		var appErr *AppError
+		if errors.As(err, &appErr) {
+			return nil, err
+		}
+		return nil, WrapAppError(502, "查询上游任务失败："+err.Error(), err)
 	}
 	if result == nil {
 		_ = s.log(task.UserID, task.ID, "info", "人工查询完成，上游任务仍在处理", providerStatus)
