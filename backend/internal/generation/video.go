@@ -122,7 +122,8 @@ func RunVideoTaskWithPolicy(ctx context.Context, input Input, pollPolicy VideoPo
 	if id == "" {
 		return nil, errors.New("视频接口没有返回任务 ID")
 	}
-	observer := newPollObserver()
+	observer := newPollObserver(pollPolicy.Now)
+	observer.taskID = id
 	return RunVideoPollLoop(ctx, id, pollPolicy, func(ctx context.Context) (VideoPollOutcome, error) {
 		var state map[string]interface{}
 		if err := GetJSON(ctx, input.Config, "/videos/"+id, &state); err != nil {
@@ -151,6 +152,11 @@ func RunVideoTaskWithPolicy(ctx context.Context, input Input, pollPolicy VideoPo
 			return VideoPollOutcome{Done: true, Result: map[string]interface{}{"mode": "video", "video": map[string]interface{}{"dataUrl": DataURL(mimeType, data), "mimeType": mimeType}}}, nil
 		}
 		if status == "failed" || status == "cancelled" {
+			if _, reason := upstreamFailurePayloadDetail(state); status == "failed" {
+				if explained := observer.unexplainedFailure(reason); explained != "" {
+					return VideoPollOutcome{}, fmt.Errorf("视频生成失败（任务 %s）：%s", id, explained)
+				}
+			}
 			return VideoPollOutcome{}, errors.New("视频生成失败")
 		}
 		return VideoPollOutcome{}, nil
@@ -258,7 +264,8 @@ func RunSeedanceVideosTask(ctx context.Context, input Input, pollPolicy VideoPol
 	if id == "" {
 		return nil, SubmissionUnknownError{Cause: errors.New("视频接口没有返回任务 ID")}
 	}
-	observer := newPollObserver()
+	observer := newPollObserver(pollPolicy.Now)
+	observer.taskID = id
 	return RunVideoPollLoop(ctx, id, pollPolicy, func(ctx context.Context) (VideoPollOutcome, error) {
 		var state map[string]interface{}
 		if err := GetJSON(ctx, input.Config, "/videos/"+id, &state); err != nil {
@@ -290,7 +297,11 @@ func RunSeedanceVideosTask(ctx context.Context, input Input, pollPolicy VideoPol
 		if status == "failed" || status == "cancelled" || status == "expired" {
 			message := SeedanceErrorMessage(state)
 			if message == "" {
-				payload, _ := json.Marshal(map[string]interface{}{"error": map[string]string{"code": "task_failed", "message": "视频生成失败", "task_id": id}})
+				failure := "视频生成失败"
+				if explained := observer.unexplainedFailure(""); status == "failed" && explained != "" {
+					failure += "：" + explained
+				}
+				payload, _ := json.Marshal(map[string]interface{}{"error": map[string]string{"code": "task_failed", "message": failure, "task_id": id}})
 				message = string(payload)
 			}
 			return VideoPollOutcome{}, errors.New(message)

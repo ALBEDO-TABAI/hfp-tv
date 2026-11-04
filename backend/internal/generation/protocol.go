@@ -127,8 +127,9 @@ func RunProtocolAdapterTaskWithPolicy(ctx context.Context, input Input, adapter 
 		}
 	}
 
-	observer := newPollObserver()
+	observer := newPollObserver(policy.Now)
 	return RunVideoPollLoop(ctx, taskID, policy, func(ctx context.Context) (VideoPollOutcome, error) {
+		observer.taskID = taskID
 		spec, err := adapter.BuildPoll(ctx, protocol.PollContext{BaseURL: input.Config.BaseURL, Model: request.Model, Request: request, TaskID: taskID})
 		if err != nil {
 			return VideoPollOutcome{}, err
@@ -162,6 +163,12 @@ func RunProtocolAdapterTaskWithPolicy(ctx context.Context, input Input, adapter 
 			result, err := FinishProtocolAdapterResult(ctx, input, adapter, request, taskID, state.Result, policy)
 			return VideoPollOutcome{Done: err == nil, Result: result}, err
 		case protocol.StatusFailed, protocol.StatusCancelled:
+			if state.Status == protocol.StatusFailed && !upstreamFailureHasCode(body) {
+				_, reason := upstreamFailureDetail(body)
+				if explained := observer.unexplainedFailure(firstNonEmpty(strings.TrimSpace(state.Message), reason)); explained != "" {
+					return VideoPollOutcome{}, ProtocolResultError(explained, taskID, body)
+				}
+			}
 			return VideoPollOutcome{}, ProtocolResultError(state.Message, taskID, body)
 		}
 		return VideoPollOutcome{}, nil
@@ -1291,6 +1298,23 @@ func upstreamFailureDetail(body []byte) (status, reason string) {
 	if json.Unmarshal(body, &payload) != nil {
 		return "", ""
 	}
+	return upstreamFailurePayloadDetail(payload)
+}
+
+// upstreamFailureHasCode reports a structured error code, which
+// ProtocolResultError keeps as the failure itself.
+func upstreamFailureHasCode(body []byte) bool {
+	var payload map[string]any
+	if json.Unmarshal(body, &payload) != nil {
+		return false
+	}
+	if nested := objectValue(payload["data"]); nested != nil {
+		payload = nested
+	}
+	return stringAt(objectValue(payload["error"]), "code") != ""
+}
+
+func upstreamFailurePayloadDetail(payload map[string]any) (status, reason string) {
 	status = pollStatusText(payload)
 	data := objectValue(payload["data"])
 	for _, candidate := range []string{

@@ -955,9 +955,13 @@ func parseAudioResponse(payload map[string]any) (CreateResult, error) {
 // KnownStatus reports whether a provider status word maps to a task state.
 func KnownStatus(raw string) bool { return normalizeStatus(raw) != "" }
 
+// NormalizeStatus maps a provider or relay status word to a Status, or ""
+// when the word is not recognized.
+func NormalizeStatus(raw string) Status { return normalizeStatus(raw) }
+
 func normalizeStatus(raw string) Status {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "queued", "pending", "created", "submitted", "in_queue", "task_status_queued":
+	case "queued", "pending", "created", "submitted", "not_start", "in_queue", "task_status_queued":
 		return StatusPending
 	case "running", "processing", "in_progress", "executing", "task_status_running":
 		return StatusProcessing

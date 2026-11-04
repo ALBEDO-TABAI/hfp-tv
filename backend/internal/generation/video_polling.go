@@ -28,7 +28,10 @@ type VideoPollPolicy struct {
 	MaxDownloadTries      int
 	RetryTransient        bool
 	Sleep                 func(context.Context, time.Duration) error
-	Notify                func(context.Context, string, VideoPollEvent, error)
+	// Now is the clock the task log uses to tell how long the upstream has
+	// been stuck; tests pair it with Sleep. Nil means time.Now.
+	Now    func() time.Time
+	Notify func(context.Context, string, VideoPollEvent, error)
 }
 
 type VideoPollEvent string
