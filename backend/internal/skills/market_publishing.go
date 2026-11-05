@@ -456,11 +456,24 @@ func (s *Service) PublicationStatus(ctx context.Context, user, id string) (*Publ
 
 // publicationSkillMarkdown gives a SKILL.md without any front matter the
 // name/description header Agent Skills installers require. Skills written in
-// the app often store only the instruction body. An existing header is never
-// rewritten; the market reports what to fix instead.
+// the app often store only the instruction body. An existing header is only
+// repaired when a value merely needs quoting (e.g. a description containing
+// ": ", which this app's installer already accepted) and the repaired header
+// names the same skill; otherwise the market reports what to fix.
 func publicationSkillMarkdown(body []byte, name, description string) []byte {
 	if bytes.HasPrefix(bytes.ReplaceAll(body, []byte("\r\n"), []byte("\n")), []byte("---\n")) {
-		return body
+		if _, err := skillhub.SkillName(body); err == nil {
+			return body
+		}
+		repaired, changed := skillhub.RepairFrontMatter(body)
+		if !changed {
+			return body
+		}
+		before, after := parseSkillPackageMetadata(body), parseSkillPackageMetadata(repaired)
+		if _, err := skillhub.SkillName(repaired); err != nil || before.Name != after.Name || before.Description != after.Description {
+			return body
+		}
+		return repaired
 	}
 	slug := publicationSkillSlug(name)
 	description = strings.Join(strings.Fields(description), " ")

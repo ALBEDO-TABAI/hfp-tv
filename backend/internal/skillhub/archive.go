@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path"
@@ -75,8 +76,14 @@ func SkillName(markdown []byte) (string, error) {
 		Name        string `yaml:"name"`
 		Description string `yaml:"description"`
 	}
-	if !ok || yaml.Unmarshal([]byte(front), &metadata) != nil {
-		return "", fmt.Errorf("SKILL.md 元信息无效")
+	if !ok {
+		return "", fmt.Errorf("SKILL.md 元信息缺少结束的 ---")
+	}
+	if err := yaml.Unmarshal([]byte(front), &metadata); err != nil {
+		// The parser's first line carries the position, e.g. "[2:14] mapping
+		// value is not allowed in this context"; the source excerpt is dropped.
+		where, _, _ := strings.Cut(err.Error(), "\n")
+		return "", fmt.Errorf("SKILL.md 元信息不是有效的 YAML（%s）。值里含有“: ”“ #”等符号时，请用英文双引号把整个值括起来", strings.TrimSpace(where))
 	}
 	name := metadata.Name
 	if name == "" || utf8.RuneCountInString(name) > 64 || name != strings.ToLower(name) || strings.HasPrefix(name, "-") || strings.HasSuffix(name, "-") || strings.Contains(name, "--") || !SafeFilePath(name) || strings.TrimSpace(metadata.Description) == "" || utf8.RuneCountInString(metadata.Description) > 1024 {
@@ -88,6 +95,62 @@ func SkillName(markdown []byte) (string, error) {
 		}
 	}
 	return name, nil
+}
+
+// RepairFrontMatter quotes top-level "key: value" lines whose plain value is
+// not valid YAML as written, e.g. a description containing ": ". Agent
+// tools and this app's own installer read such headers line by line, so the
+// author's intent is clear; only quoting changes. Anything else (nested
+// keys, block scalars, already quoted values) is left untouched. It reports
+// whether a line changed.
+func RepairFrontMatter(markdown []byte) ([]byte, bool) {
+	text := strings.ReplaceAll(string(markdown), "\r\n", "\n")
+	if !strings.HasPrefix(text, "---\n") {
+		return markdown, false
+	}
+	front, rest, ok := strings.Cut(text[4:], "\n---")
+	if !ok {
+		return markdown, false
+	}
+	lines := strings.Split(front, "\n")
+	changed := false
+	for i, line := range lines {
+		if line == "" || line[0] == ' ' || line[0] == '\t' || line[0] == '#' {
+			continue
+		}
+		key, value, found := strings.Cut(line, ":")
+		if !found || strings.TrimSpace(key) != key || !plainYAMLKey(key) {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		if value == "" || strings.ContainsAny(value[:1], "\"'[{|>&*!%@`") || !needsYAMLQuotes(value) {
+			continue
+		}
+		quoted, err := json.Marshal(value)
+		if err != nil {
+			continue
+		}
+		lines[i] = key + ": " + string(quoted)
+		changed = true
+	}
+	if !changed {
+		return markdown, false
+	}
+	return []byte("---\n" + strings.Join(lines, "\n") + "\n---" + rest), true
+}
+
+func plainYAMLKey(key string) bool {
+	for _, char := range key {
+		if char != '-' && char != '_' && !unicode.IsLetter(char) && !unicode.IsDigit(char) {
+			return false
+		}
+	}
+	return key != ""
+}
+
+// needsYAMLQuotes reports plain values YAML would not read as one string.
+func needsYAMLQuotes(value string) bool {
+	return strings.Contains(value, ": ") || strings.HasSuffix(value, ":") || strings.Contains(value, " #") || strings.HasPrefix(value, "- ") || strings.HasPrefix(value, "? ")
 }
 
 func ContentDigest(files map[string][]byte) string {

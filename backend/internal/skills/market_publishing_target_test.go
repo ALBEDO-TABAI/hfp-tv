@@ -91,3 +91,22 @@ func TestPublicationSkillMarkdownAddsMissingFrontMatterOnly(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// A header this app's installer already read (a description with ": ") is
+// published with that value quoted, naming the same skill; nothing else moves.
+func TestPublicationQuotesAHeaderValueThatOnlyNeedsQuoting(t *testing.T) {
+	body := []byte("---\nname: xhs-seed-shot\ndescription: Prompts for seeding photos: natural iPhone realism.\ncategory: media\n---\n\n# xhs-seed-shot\n")
+	published := publicationSkillMarkdown(body, "小红书种草图", "ignored")
+	name, err := skillhub.SkillName(published)
+	if err != nil || name != "xhs-seed-shot" {
+		t.Fatalf("published header = %q %v\n%s", name, err, published)
+	}
+	if before, after := parseSkillPackageMetadata(body), parseSkillPackageMetadata(published); before.Description != after.Description || before.Name != after.Name {
+		t.Fatalf("repair changed the meaning: %+v -> %+v", before, after)
+	}
+	// A header that needs more than quoting is still reported, not rewritten.
+	broken := []byte("---\nname: [unclosed\ndescription: x\n---\nbody")
+	if !bytes.Equal(publicationSkillMarkdown(broken, "ok", "ok"), broken) {
+		t.Fatal("an unrepairable header was rewritten")
+	}
+}
