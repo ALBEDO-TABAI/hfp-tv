@@ -94,7 +94,8 @@ export async function getAccountFileStorageUsage() {
 }
 
 export async function syncResourceToArkPrivateAsset(id: string) {
-    const data = await http.post<{ sync: ArkPrivateAssetSync }>(`/resources/${encodeURIComponent(id)}/ark-private-asset`);
+    const expectedScope = captureUserScope();
+    const data = await http.post<{ sync: ArkPrivateAssetSync }>(`/resources/${encodeURIComponent(id)}/ark-private-asset`, undefined, { timeout: 250_000, expectedScope });
     return data.sync;
 }
 

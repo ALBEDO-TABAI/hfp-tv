@@ -2162,8 +2162,8 @@ function InfiniteCanvasPage() {
         (node: CanvasNodeData) => {
             modal.confirm({
                 title: "上传到方舟素材库",
-                content: "仅可上传你拥有肖像、版权或其他合法使用权的图片。方舟审核通过后，Seedance 会使用受控素材标识生成视频。",
-                okText: "确认拥有使用权并上传",
+                content: "请确认这是你拥有使用权的虚拟人像。真人素材需先完成人像本人的认证与授权。素材审核通过后，Seedance 才能使用。",
+                okText: "确认并上传",
                 cancelText: "取消",
                 onOk: () => uploadNodeImageToArkPrivateAsset(node),
             });

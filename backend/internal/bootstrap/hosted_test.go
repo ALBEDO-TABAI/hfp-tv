@@ -102,6 +102,14 @@ func TestHostedGatewayOwnerReachesTaskCreationAdmission(t *testing.T) {
 	}
 }
 
+func TestHostedGatewayOffersReferenceRegistrationOnlyWhenConfigured(t *testing.T) {
+	runtime := openHostedKernel(t, t.TempDir())
+	response := hostedCall(t, runtime, http.MethodPost, "/resources/example/ark-private-asset", `{}`, nil)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("unconfigured reference registration = %d %s", response.Code, response.Body.String())
+	}
+}
+
 func TestHostedKernelRefusesServerLocalCapabilities(t *testing.T) {
 	runtime := openHostedKernel(t, t.TempDir())
 	cases := []struct{ method, path string }{

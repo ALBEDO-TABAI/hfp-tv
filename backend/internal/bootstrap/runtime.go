@@ -268,6 +268,9 @@ func Open(_ context.Context, raw Config) (result *Runtime, openErr error) {
 		AssistantOpsEndpoint: assistantOpsEndpoint,
 		ManagedChannelIDs:    hostedManagedChannels(cfg),
 	})
+	if hosted {
+		canvasHandler.RegisterCompanyReferenceAssetRoutes(api, svc, svc)
+	}
 	businessCatalog := canvasHandler.NewBusinessCatalog(router.Routes())
 	canvasHandler.RegisterBusinessDiscovery(api, businessCatalog, svc)
 	router.NoRoute(func(c *gin.Context) {

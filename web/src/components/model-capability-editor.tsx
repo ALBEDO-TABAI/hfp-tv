@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/base/switch";
 import { SegmentedControl } from "@/components/ui/base/segmented-control";
 import type { ReactNode } from "react";
 
-import { defaultImageCapabilityConfig, defaultModelCapabilityConfig, imageResponseFormatSelectable, normalizeModelCapabilityConfig, type ImageCapabilityConfig, type ImageResponseFormatConfig, type ModelCapabilityConfig, type TextCapabilityConfig, type VideoCapabilityConfig } from "@/lib/model-capabilities";
+import { defaultImageCapabilityConfig, defaultModelCapabilityConfig, imageResponseFormatSelectable, isYSXXAISeedanceModel, normalizeModelCapabilityConfig, type ImageCapabilityConfig, type ImageResponseFormatConfig, type ModelCapabilityConfig, type TextCapabilityConfig, type VideoCapabilityConfig } from "@/lib/model-capabilities";
 import type { ModelProtocol } from "@/lib/model-protocols";
 import { VIDEO_RESOLUTION_CAPABILITY_OPTIONS } from "@/lib/video-generation-options";
 
@@ -157,7 +157,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                                     className="w-full"
                                     disabled={disabled}
                                     value={profile.ratios}
-                                    options={ratioOptions.map((item) => ({ label: item, value: item }))}
+                                    options={(isYSXXAISeedanceModel(protocol, model) ? [...ratioOptions, "adaptive"] : ratioOptions).map((item) => ({ label: item, value: item }))}
                                     onChange={(ratios) => update({ ratios, defaultRatio: ratios.includes(profile.defaultRatio) ? profile.defaultRatio : ratios[0] || "16:9" })}
                                 />
                             </Field>
@@ -269,7 +269,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                                 className="w-full"
                                 disabled={disabled}
                                 value={profile.ratios}
-                                options={ratioOptions.map((item) => ({ label: item, value: item }))}
+                                options={(isYSXXAISeedanceModel(protocol, model) ? [...ratioOptions, "adaptive"] : ratioOptions).map((item) => ({ label: item, value: item }))}
                                 onChange={(ratios) => update({ ratios, defaultRatio: ratios.includes(profile.defaultRatio) ? profile.defaultRatio : ratios[0] || "16:9" })}
                             />
                         </Field>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, App, Button, Popconfirm, Segmented, Tag } from "antd";
+import { Alert, App, Button, Input, Popconfirm, Segmented, Tag } from "antd";
 import { ReferenceMediaTransportFields } from "./reference-media-transport-fields";
 import { ChevronRight, FlaskConical, Settings2 } from "lucide-react";
 
@@ -9,7 +9,7 @@ import { testChannelModelConnection } from "@/lib/model-connection-test";
 import { seedancePortraitLabel } from "@/lib/seedance-portrait";
 import { ModelCapabilityEditor } from "@/components/model-capability-editor";
 import { type ModelCapabilityChoice } from "@/components/model-protocol-picker";
-import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
+import { defaultModelCapabilityConfig, isYSXXAISeedanceModel } from "@/lib/model-capabilities";
 import { defaultProtocolForCapability, defaultProtocolForModel, inferProtocolCapabilityFromModel, modelProtocolCapability, modelProtocolDefinition, type ModelProtocol, type ModelProtocolDefinition } from "@/lib/model-protocols";
 import { fetchPluginProviderCatalog } from "@/services/api/plugin-catalog";
 import { modelOptionName, type ModelChannel } from "@/stores/use-config-store";
@@ -169,6 +169,10 @@ export function ChannelModelSettings({ channel, onChange, draft = false, testBlo
                                     }}
                                 />
                             </section>
+                            {channel.id === "company-relay" && isYSXXAISeedanceModel(activeProtocol, activeModel) && <section className="space-y-2">
+                                <div className="text-xs font-medium">参考图服务地址</div>
+                                <Input aria-label="参考图服务地址" value={activeModelProfile?.referenceAssetService || ""} onChange={(event) => updateProfile(activeModel, { referenceAssetService: event.target.value })} />
+                            </section>}
                             {channel.scope !== "system" && activeCapability !== "text" && activeProtocol !== "full-video" && <ReferenceMediaTransportFields value={activeModelProfile?.referenceMediaTransport} onChange={(referenceMediaTransport) => updateProfile(activeModel, { referenceMediaTransport })} />}
                             <section className="space-y-2">
                                 <div className="text-xs font-medium">请求协议</div>

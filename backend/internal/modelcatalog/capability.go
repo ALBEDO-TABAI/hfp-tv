@@ -282,6 +282,19 @@ func DefaultModelCapabilityConfigForModel(protocol string, modelName string) *Mo
 			video.Operations = appendUniqueString(appendUniqueString(video.Operations, "inpaint"), "extend")
 		}
 	}
+	if isYSXXAISeedanceModel(protocol, modelName) {
+		video.Duration = VideoDurationConfig{Selection: "range", Min: 4, Max: 15, Step: 1, Default: 5}
+		video.Ratios = appendUniqueString(video.Ratios, "adaptive")
+		resolution := strings.ToLower(modelName[strings.LastIndex(modelName, "-")+1:])
+		if resolution == "720p" || resolution == "1080p" || resolution == "4k" {
+			video.Resolutions, video.DefaultResolution = []string{resolution}, resolution
+		}
+		video.Watermark = VideoBooleanConfig{Supported: true, Default: false}
+		if strings.Contains(strings.ToLower(modelName), "-fast-") || strings.Contains(strings.ToLower(modelName), "-mini-") {
+			video.References.MaxImages, video.References.MaxVideos, video.References.MaxAudios = 0, 0, 0
+			video.Operations = []string{"text_to_video"}
+		}
+	}
 	return &ModelCapabilityConfig{Version: 1, Text: text, Image: DefaultImageCapabilityConfig(protocol, modelName), Video: video}
 }
 

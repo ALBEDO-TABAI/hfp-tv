@@ -23,7 +23,11 @@ const (
 )
 
 func (s *Service) prepareArkPrivateAssetReferences(ctx context.Context, userID string, input *canvasGenerationInput) error {
-	// 可信素材 asset:// 仅方舟视频协议支持；Agent Plan Seedream 等图片渠道不能上传或改写。
+	if input != nil && input.Mode == "video" && input.Config.InterfaceType == "video-generations-json" &&
+		isSeedance2Family(input.Config.InterfaceType, input.Config.Model) && isYSXXAIReferenceService(input.Config.ReferenceAssetService) {
+		return s.reuseReferenceServiceAssets(userID, input)
+	}
+	// 其余可信素材同步仅用于方舟视频协议；Agent Plan 的图片渠道不能上传或改写。
 	if input == nil || input.Mode != "video" || !isArkPrivateAssetVideoConfig(input.Config) || !parseBool(input.Config.ArkPrivateAssetUpload, true) {
 		return nil
 	}

@@ -671,6 +671,21 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /resources/{id}/ark-private-asset:
+    post:
+      tags: [resources]
+      summary: 将本人的虚拟人像登记到公司可信素材库
+      description: 仅团队服务器工作区提供。用户确认素材权利后调用；仅使用管理员配置的参考图服务和当前成员的中转站凭据。审核通过才返回 active。
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "400":
+          $ref: "#/components/responses/Error"
   /resources/playback-cache:
     delete:
       tags: [resources]

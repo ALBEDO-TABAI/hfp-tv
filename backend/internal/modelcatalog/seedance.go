@@ -14,6 +14,11 @@ import (
 
 var opaqueVideoAssetPattern = regexp.MustCompile(`^asset://[A-Za-z0-9_-]+$`)
 var dreaminaSeedancePattern = regexp.MustCompile(`^dreamina-seedance-2[.-](0|5)(-|$)`)
+var ysxxaiSeedancePattern = regexp.MustCompile(`^doubao-seedance-(2-5-260628-2-(720p|1080p)|2-0-260128-2-(720p|1080p|4k)|2-0-fast-260128-2-720p|2-0-mini-260615-2-720p)$`)
+
+func isYSXXAISeedanceModel(protocol, modelName string) bool {
+	return strings.TrimSpace(protocol) == "video-generations-json" && ysxxaiSeedancePattern.MatchString(strings.ToLower(strings.TrimSpace(modelName)))
+}
 
 func isNativeDreaminaSeedance(protocol, modelName string) bool {
 	parts := strings.Split(strings.ToLower(strings.TrimSpace(modelName)), "/")
@@ -52,7 +57,7 @@ const (
 
 func isSeedance2Family(protocol, modelName string) bool {
 	normalizedProtocol := strings.TrimSpace(protocol)
-	if normalizedProtocol != "newapi-channel-2" && normalizedProtocol != "newapi" && normalizedProtocol != "openai" && normalizedProtocol != "openai-videos" && !model.IsVolcengineArkVideoProtocol(model.ChannelInterfaceType(normalizedProtocol)) {
+	if !isYSXXAISeedanceModel(protocol, modelName) && normalizedProtocol != "newapi-channel-2" && normalizedProtocol != "newapi" && normalizedProtocol != "openai" && normalizedProtocol != "openai-videos" && !model.IsVolcengineArkVideoProtocol(model.ChannelInterfaceType(normalizedProtocol)) {
 		return false
 	}
 	name := strings.ToLower(strings.TrimSpace(modelName))

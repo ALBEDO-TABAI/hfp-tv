@@ -1,4 +1,4 @@
-import { defaultImageCapabilityConfig, modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, STANDARD_IMAGE_SIZE_VALUES, videoDurationAllowed, type ImageCapabilityConfig } from "@/lib/model-capabilities";
+import { defaultImageCapabilityConfig, modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, STANDARD_IMAGE_SIZE_VALUES, videoDurationAllowed, ysxxaiSeedanceLabel, type ImageCapabilityConfig } from "@/lib/model-capabilities";
 import { normalizeVideoBoolean, normalizeVideoResolutionValue, videoResolutionComparisonKey } from "@/lib/video-generation-options";
 import { imageSizePresets } from "@/lib/image-size-presets";
 import { sanitizeVideoPriceQuote, seedancePortraitLabel, seedancePortraitModel } from "@/lib/seedance-portrait";
@@ -51,7 +51,8 @@ export function configuredModelDisplayName(config: AiConfig, value: string) {
     if (portrait) return portrait;
     const model = modelOptionName(value);
     const channel = resolveModelChannel(config, value);
-    return channelModelProfile(channel, model)?.displayName?.trim() || model;
+    const profile = channelModelProfile(channel, model);
+    return profile?.displayName?.trim() || ysxxaiSeedanceLabel(profile?.protocol, model) || model;
 }
 
 // Shared by selection and paid submission, including retries and batch jobs.

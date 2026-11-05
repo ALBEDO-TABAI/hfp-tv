@@ -47,6 +47,11 @@ func TestVideoGenerationsJSONPreservesMediaAndOptions(t *testing.T) {
 			t.Fatal("reference images must not become keyframes")
 		}
 	}
+	request.Images = []MediaReference{{URL: "asset://asset-virtual", Role: "reference_image"}}
+	spec, err = a.BuildCreate(context.Background(), RequestContext{Request: request})
+	if err != nil || manifestTestBody(t, spec)["images"].([]any)[0].(map[string]any)["url"] != "asset://asset-virtual" {
+		t.Fatalf("trusted image spec=%+v err=%v", spec, err)
+	}
 	created, err := a.ParseCreate(context.Background(), []byte(`{"id":"original","status":"pending"}`))
 	if err != nil || created.TaskID != "original" {
 		t.Fatalf("create=%+v err=%v", created, err)

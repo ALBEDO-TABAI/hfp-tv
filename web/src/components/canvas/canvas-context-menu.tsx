@@ -36,6 +36,7 @@ import { isCanvasFolderNode, isFrameNode } from "@/lib/canvas/canvas-frame";
 import { resolveAddNodeMenuCommands, type AddNodeMenuContext } from "@/lib/canvas/tool-registry";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import { usePluginStore } from "@/stores/use-plugin-store";
+import { isHostedMode } from "@/stores/use-platform-session";
 import { cn } from "@/lib/utils";
 import { CanvasNodeType, type CanvasNodeData, type CanvasNodeTypeId, type CanvasWorkspaceMode, type ContextMenuState, type Position } from "@/types/canvas";
 
@@ -244,6 +245,7 @@ export function CanvasNodeContextMenu({
                                     {isImage ? (
                                         <>
                                             <MenuButton icon={<Maximize2 />} label="全景预览" disabled={!canOpenPreview} onClick={() => runAction(onViewMedia)} />
+                                            {isHostedMode() ? <MenuButton icon={<CloudUpload />} label="登记虚拟人像素材" disabled={!canOpenPreview} onClick={() => runAction(onUploadToArkPrivateAsset)} /> : null}
                                             <MenuButton icon={<Tags />} label="资产分类" chevron onClick={() => setCategoryOpen(true)} />
                                             <MenuButton icon={<Copy />} label="复制节点" shortcut="⌘C" onClick={() => runAction(onCopyNode)} />
                                         </>

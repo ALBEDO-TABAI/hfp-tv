@@ -44,6 +44,8 @@ Wails 和浏览器开发模式共用同一套 `127.0.0.1` HTTP 合同。路由�
 
 生成任务按协议的图片、视频、音频传输声明分别准备素材。自定义渠道可通过 `config.referenceMediaTransport` 覆盖对应类型，取值为 `auto`、`inline`、`url` 或 `link`；托管渠道不接受该覆盖。启用本地参考素材对象存储后，需要 URL 的本机资源在任务执行阶段上传，画布、创作页及其他后端任务入口共用同一流程。`link` 要求调用方提供现成链接，不自动上传。
 
+团队服务器的 `POST /resources/:id/ark-private-asset` 仅由用户确认后登记本人工作区中的虚拟人像。服务端按公司模型配置选择参考图服务并校验资源归属；审核通过返回 `data.sync.status=active`，生成时复用该素材。桌面工作区不提供此路由。
+
 若缺少可用传输方式，提交返回 HTTP 400、`reason=reference_media_requires_url`，不创建任务。`msg` 包含受影响素材的类型和序号；`details.requiredReferences` 提供 `{ kind, index, mask? }`，`kind` 为 `image/video/audio`，`index` 从 0 开始，遮罩为 `mask: true`。客户端仅替换这些素材，补齐后可再次提交；其他网络或上游错误不适用此规则。执行阶段上传失败保留原任务的失败记录，不调用模型。声音、水印等开关接受布尔值及其字符串形式，已有任务的同类参数也按相同规则读取。
 
 `canvas.generation.propose` 是只读操作，返回的 `source` 包含 `canvasId`、`canvasRevision`、`modelConfigRevision`；模型键与配置版本来自同一次配置读取。提案不创建生成任务。

@@ -2,10 +2,34 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 // Bun 直接执行 TypeScript 测试时需要保留扩展名；生产 tsconfig 不包含 test/。
-import { DEFAULT_VIDEO_PROMPT_MAX_CHARS, defaultModelCapabilityConfig, modelCapabilityConfigFor, normalizeVideoValue, videoDurationAllowed } from "../src/lib/model-capabilities.ts";
+import { DEFAULT_VIDEO_PROMPT_MAX_CHARS, defaultModelCapabilityConfig, modelCapabilityConfigFor, normalizeVideoValue, videoDurationAllowed, ysxxaiSeedanceLabel } from "../src/lib/model-capabilities.ts";
 import { modelCompatibilityError, modelPromptLengthError } from "../src/lib/model-selection.ts";
 import type { AiConfig } from "../src/stores/use-config-store.ts";
 import { seedanceTaskOptions, seedanceOmniTaskType } from "../src/lib/seedance-task-constraints.ts";
+
+test("YSXXAI Seedance presets match each model's output tier and reference support", () => {
+    for (const [model, resolution, references] of [
+        ["doubao-seedance-2-5-260628-2-720P", "720p", true],
+        ["doubao-seedance-2-5-260628-2-1080P", "1080p", true],
+        ["doubao-seedance-2-0-260128-2-720P", "720p", true],
+        ["doubao-seedance-2-0-260128-2-1080P", "1080p", true],
+        ["doubao-seedance-2-0-260128-2-4k", "4k", true],
+        ["doubao-seedance-2-0-fast-260128-2-720P", "720p", false],
+        ["doubao-seedance-2-0-mini-260615-2-720P", "720p", false],
+    ] as const) {
+        const video = defaultModelCapabilityConfig("video-generations-json", model).video!;
+        assert.deepEqual(video.resolutions, [resolution]);
+        assert.equal(video.duration.min, 4);
+        assert.equal(video.duration.max, 15);
+        assert.ok(video.ratios.includes("adaptive"));
+        assert.equal(video.references.maxImages > 0, references);
+        assert.equal(video.references.maxVideos > 0, references);
+        assert.equal(video.references.maxAudios > 0, references);
+        assert.match(ysxxaiSeedanceLabel("video-generations-json", model), /^Seedance 2\.[05].* · (720P|1080P|4K)$/);
+    }
+    assert.deepEqual(defaultModelCapabilityConfig("video-generations-json", "another-video").video!.resolutions, ["720p", "1080p"]);
+    assert.equal(ysxxaiSeedanceLabel("volcengine-ark-video", "doubao-seedance-2-0-260128-2-720P"), "");
+});
 
 test("Dreamina native defaults expose editing and valid duration choices without expanding saved profiles", () => {
     const model = "dreamina-seedance-2-5-260628";

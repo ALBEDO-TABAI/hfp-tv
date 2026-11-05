@@ -678,6 +678,20 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.ratios = [...video.ratios, "adaptive"];
         if (isSeedance25Model(model)) video.operations = [...video.operations, "inpaint", "extend"];
     }
+    if (isYSXXAISeedanceModel(protocol, model)) {
+        video.duration = { selection: "range", min: 4, max: 15, step: 1, default: 5 };
+        video.ratios = Array.from(new Set([...video.ratios, "adaptive"]));
+        const resolution = model.split("-").pop()?.toLowerCase();
+        if (resolution && ["720p", "1080p", "4k"].includes(resolution)) {
+            video.resolutions = [resolution];
+            video.defaultResolution = resolution;
+        }
+        video.watermark = { supported: true, default: false };
+        if (/-(?:fast|mini)-/i.test(model)) {
+            video.references.maxImages = video.references.maxVideos = video.references.maxAudios = 0;
+            video.operations = ["text_to_video"];
+        }
+    }
     Object.assign(video.references, videoPromptLimits(protocol, model));
     return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video };
 }
@@ -766,7 +780,19 @@ export function modelCapabilityConfigFor(
 }
 
 export function isSeedance2Family(protocol: ModelProtocol | undefined, modelName: string) {
-    return Boolean(protocol && ["openai", "openai-videos", "newapi", "newapi-channel-2", "volcengine-ark-video", "volcengine-ark-agent-plan-video"].includes(protocol) && String(modelName).toLowerCase().includes("seedance-2"));
+    return Boolean(isYSXXAISeedanceModel(protocol, modelName) || protocol && ["openai", "openai-videos", "newapi", "newapi-channel-2", "volcengine-ark-video", "volcengine-ark-agent-plan-video"].includes(protocol) && String(modelName).toLowerCase().includes("seedance-2"));
+}
+
+export function isYSXXAISeedanceModel(protocol: ModelProtocol | undefined, modelName: string) {
+    return protocol === "video-generations-json" && /^doubao-seedance-(?:2-5-260628-2-(?:720p|1080p)|2-0-260128-2-(?:720p|1080p|4k)|2-0-fast-260128-2-720p|2-0-mini-260615-2-720p)$/i.test(modelName.trim());
+}
+
+export function ysxxaiSeedanceLabel(protocol: ModelProtocol | undefined, modelName: string) {
+    if (!isYSXXAISeedanceModel(protocol, modelName)) return "";
+    const name = modelName.toLowerCase();
+    const version = name.includes("seedance-2-5-") ? "2.5" : "2.0";
+    const variant = name.includes("-fast-") ? " Fast" : name.includes("-mini-") ? " Mini" : "";
+    return `Seedance ${version}${variant} · ${name.slice(name.lastIndexOf("-") + 1).toUpperCase()}`;
 }
 
 export function isSeedance25Model(modelName: string) {

@@ -8,7 +8,7 @@ import { beefAPIVideoContract, isBeefAPIEndpoint } from "@/lib/beefapi-video-con
 import { beefAPIImageContract } from "@/lib/beefapi-image-contracts";
 import { defaultProtocolForCapability, defaultProtocolForModel, inferProtocolCapabilityFromModel, modelProtocolCapability, normalizeModelProtocol, usesOpenAICompatibleProtocolDefault, type ModelProtocol } from "@/lib/model-protocols";
 import { normalizeVideoBoolean, normalizeVideoDuration, normalizeVideoResolution } from "@/lib/video-generation-options";
-import { defaultModelCapabilityConfig, upgradeGPTImageCapability, workflowFieldRole, workflowFieldSafeToOverride, workflowVideoFieldsFromJson, type ModelCapabilityConfig } from "@/lib/model-capabilities";
+import { defaultModelCapabilityConfig, upgradeGPTImageCapability, workflowFieldRole, workflowFieldSafeToOverride, workflowVideoFieldsFromJson, ysxxaiSeedanceLabel, type ModelCapabilityConfig } from "@/lib/model-capabilities";
 import { useUserStore } from "@/stores/use-user-store";
 import type { CapabilitySpec } from "@/services/api/logical-models";
 import { seedancePortraitLabel, seedancePortraitModel, type VideoPriceQuote } from "@/lib/seedance-portrait";
@@ -377,6 +377,7 @@ export type ModelChannel = {
         icon?: string;
         capability: ModelCapability;
         protocol?: ModelProtocol;
+        referenceAssetService?: string;
         referenceMediaTransport?: ReferenceMediaTransport;
         authType?: string;
         capabilityConfig?: ModelCapabilityConfig;
@@ -1040,7 +1041,8 @@ export function modelDisplayName(config: AiConfig, value: string) {
 	if (portrait) return portrait;
     const model = modelOptionName(value);
     const channel = resolveModelChannel(config, value);
-    const displayName = channelModelProfile(channel, model)?.displayName?.trim();
+    const profile = channelModelProfile(channel, model);
+    const displayName = profile?.displayName?.trim() || ysxxaiSeedanceLabel(profile?.protocol, model);
     if (displayName) return displayName;
     return channel.scope === "system" ? "系统模型" : model;
 }

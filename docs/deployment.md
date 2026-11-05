@@ -41,13 +41,18 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
    | --- | --- | --- | --- |
    | 文本 / 助手 | `text` | `chat-completion` | |
    | OpenAI 兼容生图 | `image` | `openai-image` | |
-   | Seedance（经 New API 的豆包任务插件） | `video` | `volcengine-ark-video` | `baseUrl` 写中转站的豆包入口，例如 `http://10.10.10.45:3000/doubao/api/v3`；`referenceAssetService` 写公司参考图服务，例如 `http://10.10.10.45:8787/v1/reference-images` |
+   | Seedance（YSXXAI，经公司 New API） | `video` | `video-generations-json` | `baseUrl` 写中转站的 `/ysxxai-seedance` 入口；参考图服务和各素材传输方式见示例配置 |
+   | 火山方舟原生视频 | `video` | `volcengine-ark-video` | `baseUrl` 写实际支持方舟原生接口的地址 |
 
    模型自己的 `baseUrl` 必须与渠道 `baseUrl` 同协议、同主机和端口，否则启动时报错；成员密钥只会发往这个中转站。模型名以中转站 `/v1/models` 实际返回的为准。
 
-   **Seedance 参考图自动登记**：Seedance 只接受已登记的德云素材编号（`asset://…`），不接受图片地址。配置了 `referenceAssetService` 后，成员用画布或素材库里的图片做参考时，团队服务器在提交视频前把图片发给公司参考图服务（旧项目的 `services/reference-upload-relay`，8787 端口）：它用成员自己的中转站密钥鉴权，把图片存进公司对象存储，登记进预设的德云素材组，等素材可用后返回素材编号；团队服务器按图片缓存这个编号，同一张图下次直接复用。参考图服务的地址会自动加入内网放行名单。服务自身的对象存储、德云密钥和素材组编号仍在它的 `.env` 里配置，见旧项目该目录的 README。纯文生视频不需要它。中转站没有取消接口，取消 Seedance 任务时会提示结果不明确。
+   **YSXXAI Seedance**：先在公司 New API 安装 `deploy/teamserver/ysxxai-task-plugin.js`，创建该插件的渠道并在渠道里保存 YSXXAI 的 `seedance` 分组密钥；工作台仍使用成员自己的公司中转站密钥。七个模型名及其分辨率必须与上游完全一致，时长为 4～15 秒；Fast 和 Mini 不接收参考素材。普通图片由参考图服务转为临时公网 HTTPS 链接；视频和音频需要已有公网 HTTPS 链接或另配对象存储。虚拟人像可在画布中主动确认权利并上传到素材库，通过上游审核后生成时会自动复用；真人素材需按上游要求认证和授权。素材组由管理员预先配置，不复用旧德云素材编号。
 
-   **参考图中转**：同一个参考图服务也提供“临时公网链接”模式。配置了 `referenceAssetService` 后，凡是只接受图片网址的模型协议（例如 NewAPI 视频），团队服务器会自动把成员的参考图经它换成临时 HTTPS 链接，不再弹出“需要在线素材链接”；成员自己添加、指向公司中转站的模型服务也一样，用的是该成员绑定的中转站密钥。成员自己添加的服务若用 `volcengine-ark-video` 协议直连中转站的豆包入口，参考图同样会先登记为德云素材。参考视频和参考音频不经这个服务；需要在线链接时仍要成员提供，或另配下面的对象存储。
+   YSXXAI 可信素材登记需先升级 8787 参考图服务并设置独立素材组，见 `hfp-allinone-tauri/services/reference-upload-relay/README.md`。七个公司模型的参考图服务地址统一改为 `/v1/ysxxai-reference-images`，供工作区中的素材登记入口选择；Fast 和 Mini 仍不接受参考素材。网页保存的公司模型配置优先于配置文件，不能只修改示例文件。
+
+   New API 的七个模型按插件的 `cost` 用量配置为每 credit 1 元：提交时按上游展示的价格预留，完成后按上游返回的最终人民币费用结算。上游尚未返回最终费用时任务会继续等待；长时间未完成时检查中转站日志，不要把预留额当成已确认的实际费用。价格变化时应更新插件中的预留估算。视频结果通过中转站使用原任务下载；不要因等待而重复提交。
+
+   **参考图中转**：公司参考图服务（旧项目的 `services/reference-upload-relay`，8787 端口）用成员自己的中转站密钥鉴权，将图片写入公司对象存储并返回临时 HTTPS 链接；参考图服务的地址会自动加入内网放行名单。旧的德云线路曾使用该服务登记 `asset://` 素材，不能把它作为 YSXXAI 线路的默认方式。参考视频和参考音频不经这个服务；需要在线链接时仍要成员提供，或另配下面的对象存储。
 2. **改部署设置** `.env`（不要提交）：示例文件里已经写好内网部署需要的几项，通常只需要改端口：
 
    ```bash

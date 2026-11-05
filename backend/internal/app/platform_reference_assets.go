@@ -41,6 +41,39 @@ var referenceAssetIDPattern = regexp.MustCompile(`^asset://[A-Za-z0-9][A-Za-z0-9
 
 var referenceServiceImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/webp": true}
 
+func isYSXXAIReferenceService(service string) bool {
+	endpoint, err := url.Parse(strings.TrimSpace(service))
+	return err == nil && endpoint.Path == "/v1/ysxxai-reference-images"
+}
+
+// Only explicitly registered virtual portraits are reused; ordinary references
+// retain their public URLs and are never silently enrolled as virtual people.
+func (s *Service) reuseReferenceServiceAssets(userID string, input *canvasGenerationInput) error {
+	service := strings.TrimSpace(input.Config.ReferenceAssetService)
+	for index := range input.ReferenceImages {
+		reference := &input.ReferenceImages[index]
+		resourceID := arkPrivateAssetResourceID(*reference)
+		if resourceID == "" {
+			continue
+		}
+		binding, err := s.repo.ArkPrivateAssetBinding(resourceID, referenceServiceBindingKind+service)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if binding.UserID != userID {
+			return errors.New("参考素材不属于当前用户")
+		}
+		if binding.Status == arkPrivateAssetStatusLive && binding.ArkAssetID != "" {
+			reference.URL = "asset://" + binding.ArkAssetID
+			reference.DataURL = ""
+		}
+	}
+	return nil
+}
+
 // registerReferenceServiceAssets replaces the local reference images of a
 // video task with asset:// IDs before the request is built. Images that are
 // already assets are kept.
@@ -78,6 +111,9 @@ func (s *Service) registerReferenceServiceAssets(ctx context.Context, userID str
 // registers it once. Only successful registrations are cached; a failed or
 // uncertain call is safe to repeat because the service deduplicates by content.
 func (s *Service) ensureReferenceServiceAsset(ctx context.Context, userID, resourceID, service, apiKey string) (string, error) {
+	if _, err := s.Resource(userID, resourceID); err != nil {
+		return "", err
+	}
 	bindingKey := referenceServiceBindingKind + service
 	if binding, err := s.repo.ArkPrivateAssetBinding(resourceID, bindingKey); err == nil && binding.Status == arkPrivateAssetStatusLive && binding.ArkAssetID != "" {
 		return "asset://" + binding.ArkAssetID, nil

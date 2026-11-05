@@ -62,6 +62,40 @@ func TestSeedanceReferenceImagesAreRegisteredThroughTheCompanyService(t *testing
 	}
 }
 
+func TestYSXXAIUsesOnlyPreviouslyRegisteredImages(t *testing.T) {
+	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
+	var calls atomic.Int32
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = w.Write([]byte(`{"url":"asset://asset-virtual","requestId":"r"}`))
+	}))
+	defer service.Close()
+	s, _, _, _ := creationTestService(t)
+	registered, err := s.UploadLocalResourceFile("user", "virtual.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ordinary, err := s.UploadLocalResourceFile("user", "ordinary.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	if err != nil {
+		t.Fatal(err)
+	}
+	serviceURL := service.URL + "/v1/ysxxai-reference-images"
+	if _, err := s.ensureReferenceServiceAsset(context.Background(), "user", registered.ID, serviceURL, "sk-member-relay"); err != nil {
+		t.Fatal(err)
+	}
+	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P", ReferenceAssetService: serviceURL},
+		ReferenceImages: []generation.Media{{StorageKey: "resource:" + registered.ID, URL: "https://example.com/virtual.png"}, {StorageKey: "resource:" + ordinary.ID, URL: "https://example.com/ordinary.png"}}}
+	if err := s.prepareArkPrivateAssetReferences(context.Background(), "user", input); err != nil {
+		t.Fatal(err)
+	}
+	if input.ReferenceImages[0].URL != "asset://asset-virtual" || input.ReferenceImages[1].URL != "https://example.com/ordinary.png" || calls.Load() != 1 {
+		t.Fatalf("references=%+v calls=%d", input.ReferenceImages, calls.Load())
+	}
+	if err := s.prepareArkPrivateAssetReferences(context.Background(), "another-user", input); err == nil {
+		t.Fatal("another user reused the registered reference")
+	}
+}
+
 func TestReferenceServiceFailuresAreExplained(t *testing.T) {
 	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
 	status, body := http.StatusUnauthorized, `{"error":"无效或已失效的应用凭据"}`
