@@ -669,6 +669,13 @@ export function channelHasGenerationCredential(channel: Pick<ModelChannel, "id" 
     return channelHasManagedBeefAPICredential(channel) || Boolean(channel.apiKey?.trim());
 }
 
+// 团队服务器把公司中转站密钥留在服务端，成员没有可填写的地方；提示要指向绑定密钥的人。
+export function missingGenerationCredentialMessage(channel: Pick<ModelChannel, "id" | "pinned">, fallback = "请先配置 API Key") {
+    if (isBuiltinBeefAPIChannel(channel)) return "请先在模型配置中连接内置模型服务";
+    if (isPlatformManagedChannel(channel)) return "公司中转站还没有为你绑定密钥：请管理员在「用户管理」里绑定；刚绑定过的话，刷新页面后再试";
+    return fallback;
+}
+
 function isAiConfigReady(config: AiConfig, model: string) {
     if (config.taskWorkflowProvider === "runninghub") {
         const key = config.runningHub.apiKey;

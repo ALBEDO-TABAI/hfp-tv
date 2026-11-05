@@ -29,7 +29,7 @@ export function OnboardingEntry({ compact = false }: { compact?: boolean }) {
 }
 
 export function FirstCreationGuide() {
-    const { mode, me } = usePlatformSession();
+    const mode = usePlatformSession((state) => state.mode);
     const hosted = mode === "hosted";
     const guide = useOnboardingStore();
     const config = useConfigStore((state) => state.config);
@@ -50,7 +50,7 @@ export function FirstCreationGuide() {
     const node = project?.nodes.find((item) => item.id === guide.nodeId);
     const result = project?.nodes.find((item) => item.type === "image" && item.metadata?.content && (item.id === guide.nodeId || item.metadata?.generatedFromNodeId === guide.nodeId) && (item.metadata?.resultOrigin === "generated" || Boolean(item.metadata?.taskId)));
     const official = config.channels.find(hosted ? isPlatformManagedChannel : isBuiltinBeefAPIChannel);
-    const connected = Boolean(official && (hosted ? official.enabled !== false && me?.relay.bound : channelHasGenerationCredential(official)) && filterModelsByCapability(modelOptionsFromChannels([official]), "image", [official]).length);
+    const connected = Boolean(official && (!hosted || official.enabled !== false) && channelHasGenerationCredential(official) && filterModelsByCapability(modelOptionsFromChannels([official]), "image", [official]).length);
     const ready = step === "official" ? connected : step === "project" ? Boolean(project) : step === "node" ? Boolean(node) : step === "generate" ? Boolean(result) : step === "assets" ? pathname === "/assets" && new URLSearchParams(search).get("tab") === "history" && Boolean(result) : guide.visitedLibrary && Boolean(project) && pathname === `/canvas/${project?.id}`;
 
     useEffect(() => {

@@ -10,12 +10,27 @@ import { getWorkspaceBootstrap, type WorkspaceBootstrapPayload } from "@/service
 import { commitModelConfig, flushModelConfig, hydrateModelConfig } from "@/services/model-config-repository";
 import { normalizeConfigSnapshot, useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
-import { isHostedMode } from "@/stores/use-platform-session";
+import { isHostedMode, usePlatformSession } from "@/stores/use-platform-session";
+import { refreshPlatformManagedChannels } from "@/services/platform-managed-channels";
 
 export function WorkspaceBootstrapHydrator({ children }: { children: ReactNode }) {
     const hydrated = useUserStore((state) => state.hydrated);
     const modelConfigReady = useRef(false);
     const [restoreStatus, setRestoreStatus] = useState<"loading" | "ready" | "error">("loading");
+    const hosted = usePlatformSession((state) => state.mode === "hosted");
+
+    useEffect(() => {
+        // 管理员在别处绑定密钥或改了公司中转站时，成员回到这个页面就按服务端更新这一个渠道，不必整页刷新。
+        if (!hosted) return;
+        let last = 0;
+        const refresh = () => {
+            if (document.visibilityState !== "visible" || !modelConfigReady.current || Date.now() - last < 30_000) return;
+            last = Date.now();
+            void refreshPlatformManagedChannels().catch(() => undefined);
+        };
+        document.addEventListener("visibilitychange", refresh);
+        return () => document.removeEventListener("visibilitychange", refresh);
+    }, [hosted]);
 
     useEffect(() => {
         let cancelled = false;

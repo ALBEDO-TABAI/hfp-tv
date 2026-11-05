@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
-import { companyRelayChannelFromTemplate, companyRelaySharedEndpoints, companyRelayTemplateFromChannel } from "../src/lib/company-relay-template";
+import { companyRelayChannelFromTemplate, companyRelayModelEndpoint, companyRelaySharedEndpoints, companyRelayTemplateFromChannel } from "../src/lib/company-relay-template";
+import { testChannelModelConnection } from "../src/lib/model-connection-test";
+import { missingGenerationCredentialMessage } from "../src/stores/use-config-store";
 import { getPlatformRelayChannel, resetPlatformRelayChannel, savePlatformRelayChannel, type RelayChannelTemplate } from "../src/services/api/platform";
 import { apiClient, ApiError } from "../src/services/api/request";
 
@@ -44,6 +46,26 @@ test("shared settings read the first Ark endpoint and first Ark video reference 
     expect(companyRelaySharedEndpoints(draft)).toEqual({ arkBaseUrl: "http://10.10.10.45:3000/image", referenceAssetService: template.modelProfiles[0].referenceAssetService! });
 });
 
+test("a model with its own Ark endpoint keeps it; the shared field moves only the models that followed it", () => {
+    const mixed: RelayChannelTemplate = { ...template, models: ["seedream", "seedance-2.5"], modelProfiles: [
+        { model: "seedream", capability: "image", protocol: "volcengine-ark-image", baseUrl: "http://10.10.10.45:3000/image" },
+        template.modelProfiles[0],
+    ] };
+    const draft = companyRelayChannelFromTemplate(mixed, { hasApiKey: true });
+    const opening = companyRelaySharedEndpoints(draft);
+    expect(opening.arkBaseUrl).toBe("http://10.10.10.45:3000/image");
+    // Unchanged: saving keeps both endpoints, so nothing is reported as an unsaved address change.
+    const unchanged = companyRelayTemplateFromChannel(draft, opening, opening);
+    expect(unchanged).toEqual(mixed);
+    for (const model of mixed.models) expect(companyRelayModelEndpoint(unchanged, model)).toBe(companyRelayModelEndpoint(mixed, model));
+    // Changing the field moves the model that used it and new Ark models, not the one with its own endpoint.
+    draft.models.push("new-video");
+    draft.modelProfiles!.push({ model: "new-video", capability: "video", protocol: "volcengine-ark-video" });
+    const moved = companyRelayTemplateFromChannel(draft, { ...opening, arkBaseUrl: "http://10.10.10.45:3000/ark" }, opening);
+    expect(moved.modelProfiles.map(profile => profile.baseUrl)).toEqual(["http://10.10.10.45:3000/ark", "http://10.10.10.45:3000/doubao/api/v3", "http://10.10.10.45:3000/ark"]);
+    expect(moved.modelProfiles[2].referenceAssetService).toBe(template.modelProfiles[0].referenceAssetService);
+});
+
 test("clearing shared endpoints removes only matching fields and output contains only template fields", () => {
     const draft = { ...companyRelayChannelFromTemplate(template), name: "   ", baseUrl: " http://10.10.10.45:3000/v1/// ", apiKey: "do-not-send", secretKey: "do-not-send", hasApiKey: true, headers: [{ name: "Authorization", value: "do-not-send" }] };
     const result = companyRelayTemplateFromChannel(draft, { arkBaseUrl: " ", referenceAssetService: "" });
@@ -56,6 +78,39 @@ test("clearing shared endpoints removes only matching fields and output contains
     expect(JSON.stringify(result)).not.toContain("do-not-send");
     expect(companyRelaySharedEndpoints(draft).arkBaseUrl).toBe(template.modelProfiles[0].baseUrl!);
     expect(companyRelayTemplateFromChannel({ ...draft, name: " 公司模型 ", apiFormat: "gemini" }, { arkBaseUrl: "", referenceAssetService: "" })).toMatchObject({ name: "公司模型", apiFormat: "gemini" });
+});
+
+test("an admin with a bound key can test the draft; the server fills the key by channel id", async () => {
+    const unbound = companyRelayChannelFromTemplate(template);
+    await expect(testChannelModelConnection(unbound, "text", "text", "chat-completion", async () => ({ text: "OK" }))).rejects.toThrow("公司中转站还没有为你绑定密钥");
+    expect(missingGenerationCredentialMessage(unbound)).not.toContain("API Key");
+
+    const draft = companyRelayChannelFromTemplate(template, { hasApiKey: true });
+    expect(draft.hasApiKey).toBe(true);
+    expect(Object.keys(companyRelayTemplateFromChannel(draft, companyRelaySharedEndpoints(draft)))).not.toContain("hasApiKey");
+    let sent: Record<string, unknown> = {};
+    const result = await testChannelModelConnection(draft, "text", "text", "chat-completion", async ({ config }) => {
+        sent = config as unknown as Record<string, unknown>;
+        return { text: "OK" };
+    });
+    expect(result).toContain("文本响应");
+    expect((sent.channels as { id: string; pinned: boolean; apiKey: string }[])[0]).toMatchObject({ id: "company-relay", pinned: true, apiKey: "" });
+});
+
+test("model endpoints mirror the server: own endpoint on the relay origin, otherwise the relay base", () => {
+    expect(companyRelayModelEndpoint(template, "seedance-2.5")).toBe("http://10.10.10.45:3000/doubao/api/v3");
+    expect(companyRelayModelEndpoint(template, "unknown")).toBe("http://10.10.10.45:3000/v1");
+    expect(companyRelayModelEndpoint({ ...template, baseUrl: "http://10.10.10.45:3000/v1/" }, "unknown")).toBe("http://10.10.10.45:3000/v1");
+    expect(companyRelayModelEndpoint({ ...template, modelProfiles: [{ model: "x", capability: "video", baseUrl: "http://other.example:3000/api/v3" }] }, "x")).toBe("http://10.10.10.45:3000/v1");
+    expect(companyRelayModelEndpoint(null, "x")).toBe("");
+
+    // A new Seedance model only gets its Ark endpoint once saved, so the editor must not test it before then.
+    const draft = companyRelayChannelFromTemplate(template, { hasApiKey: true });
+    const shared = companyRelaySharedEndpoints(draft);
+    draft.models.push("new-video");
+    draft.modelProfiles!.push({ model: "new-video", capability: "video", protocol: "volcengine-ark-video" });
+    expect(companyRelayModelEndpoint(companyRelayTemplateFromChannel(draft, shared), "new-video")).toBe(shared.arkBaseUrl);
+    expect(companyRelayModelEndpoint(template, "new-video")).toBe(template.baseUrl);
 });
 
 test("relay API unwraps GET, PUT and DELETE, forwards cancellation and preserves validation errors", async () => {

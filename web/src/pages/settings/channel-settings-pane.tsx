@@ -28,6 +28,7 @@ import { recordChannelDelete, recordChannelDeleteConfirmOpen } from "./model-set
 import { usePlatformSession } from "@/stores/use-platform-session";
 import { getPlatformRelayChannel, savePlatformRelayChannel } from "@/services/api/platform";
 import { companyRelayChannelFromTemplate, companyRelayTemplateFromChannel, type CompanyRelaySharedEndpoints } from "@/lib/company-relay-template";
+import { refreshPlatformManagedChannels } from "@/services/platform-managed-channels";
 
 type UserChannelConnection = "openai" | "gemini";
 type ChannelSettingsPaneProps = {
@@ -90,6 +91,11 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
             // Keep the connection status even if the catalog refresh fails.
         }
     };
+
+    useEffect(() => {
+        // 管理员可能刚绑定、清除了密钥或改了公司中转站；进入模型配置时按服务端刷新这一个渠道。
+        if (hosted) void refreshPlatformManagedChannels().catch(() => undefined);
+    }, [hosted]);
 
     useEffect(() => {
         if (hosted) return;
@@ -190,18 +196,23 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
     const editCompanyRelay = async () => {
         setCompanyLoading(true);
         try {
-            const state = await getPlatformRelayChannel();
-            setCompanyEditor(companyRelayChannelFromTemplate(state.channel));
+            // 测试按管理员自己工作区里的公司中转站发出；读最新的绑定状态，刚在「用户管理」绑定的密钥也算数。
+            // 刷新失败不妨碍编辑，退回页面里已有的绑定状态。
+            const [state, own] = await Promise.all([
+                getPlatformRelayChannel(),
+                refreshPlatformManagedChannels().catch(() => useConfigStore.getState().config.channels.find(isPlatformManagedChannel)),
+            ]);
+            setCompanyEditor(state.channel ? companyRelayChannelFromTemplate(state.channel, { hasApiKey: own?.hasApiKey === true }) : null);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "无法读取公司中转站配置，请重试");
         } finally { setCompanyLoading(false); }
     };
 
-    const saveCompanyRelay = async (channel: ModelChannel, shared?: CompanyRelaySharedEndpoints) => {
+    const saveCompanyRelay = async (channel: ModelChannel, shared?: CompanyRelaySharedEndpoints, previousShared?: CompanyRelaySharedEndpoints) => {
         if (!shared) throw new Error("缺少公司中转站共享地址设置");
-        const result = await savePlatformRelayChannel(companyRelayTemplateFromChannel(channel, shared));
-        const server = await getLocalModelConfig();
-        replaceConfig(localWorkspaceConfig(normalizeConfigSnapshot({ config: server.config }).config));
+        const result = await savePlatformRelayChannel(companyRelayTemplateFromChannel(channel, shared, previousShared));
+        // 定义已经保存；本页没能跟着更新时只提示刷新，不能让编辑器显示“保存失败”引来重复保存。
+        await refreshPlatformManagedChannels().catch(() => message.warning("公司中转站已保存，本页模型配置没能自动更新，请刷新页面"));
         message.success(`公司中转站已保存，已更新 ${result.applied ?? 0} 位成员的工作区；其他成员刷新页面后可见`);
         if (result.failed && result.failed > 0) message.warning(`${result.failed} 个工作区暂未更新，会在成员下次打开时更新`);
     };

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { fallbackSkillCategories } from "@/pages/skills/skill-catalog";
 import { generateSkillDraft } from "@/lib/canvas/skill-drafting";
+import { buildGenerationConfig } from "@/lib/canvas/canvas-generation-config";
 import { navigateToSettings } from "@/lib/settings-navigation";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { createSkill, updateSkill, type Skill, type SkillMutationInput, type SkillShowcaseMedia } from "@/services/api/skills";
@@ -76,7 +77,8 @@ export function SkillEditorDrawer({ open, skill, onClose, onSaved }: { open: boo
             message.warning("请先描述你想沉淀的技能");
             return;
         }
-        if (!useConfigStore.getState().isAiConfigReady(effectiveConfig, effectiveConfig.model)) {
+        const textConfig = buildGenerationConfig(effectiveConfig, undefined, "text");
+        if (!useConfigStore.getState().isAiConfigReady(textConfig, textConfig.model)) {
             message.info("尚未配置可用的文本模型，请先到设置页配置");
             navigateToSettings({ section: "models", continueCreation: true });
             return;

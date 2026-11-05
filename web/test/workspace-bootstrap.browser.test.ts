@@ -11,6 +11,7 @@ beforeAll(async () => {
         "@/lib/user-session": 'import { useUserStore } from "@/stores/use-user-store"; export const localWorkspaceConfig = value => value; export async function applyUserSession() { useUserStore.getState().setHydrated(true); window.sessionReady = true; }',
         "@/services/api/workspace": 'export async function getWorkspaceBootstrap() { return {}; }',
         "@/services/model-config-repository": 'export const commitModelConfig = async () => { window.writes = (window.writes || 0) + 1; }; export const flushModelConfig = async () => {}; export const hydrateModelConfig = () => new Promise((resolve, reject) => { window.finishRestore = () => resolve({config:{channels:[{id:"fixture",apiKey:"restored"}]},health:"ready"}); window.failRestore = () => reject(new Error("read failed")); });',
+        "@/services/platform-managed-channels": 'export async function refreshPlatformManagedChannels() { window.relayRefreshes = (window.relayRefreshes || 0) + 1; }',
         "@/lib/app-routing": 'export const appPathname = () => "/";',
         "@/lib/workspace-route-modules": 'export const preloadWorkspaceRoute = () => {};',
         "@/components/ui/aceternity/full-screen-loader": 'export const FullScreenLoader = ({label}) => <div role="status">{label}</div>;',

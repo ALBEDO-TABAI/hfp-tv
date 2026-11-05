@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { isPlatformManagedChannel, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { ChannelSettingsPane, channelValidationError, focusInvalidChannelField, isChannelReady } from "./channel-settings-pane";
 import { ModelDefaultGrid } from "./model-default-grid";
@@ -52,7 +52,8 @@ export default function SettingsPage() {
     };
 
     const finishConfig = () => {
-        const invalidChannel = customChannelsEnabled ? userChannels.find((channel) => channelValidationError(channel)) : undefined;
+        // 公司中转站由管理员维护，成员改不了它，不能因为它还没绑定密钥就挡住成员自己的渠道。
+        const invalidChannel = customChannelsEnabled ? userChannels.find((channel) => !isPlatformManagedChannel(channel) && channelValidationError(channel)) : undefined;
         if (invalidChannel) {
             selectSection("channels");
             message.warning(`${invalidChannel.name || "未命名渠道"}：${channelValidationError(invalidChannel)}`);

@@ -17,7 +17,8 @@ import { currentModelConnectionReceipt, useModelConnectionTests } from "@/stores
 
 type ModelProfile = NonNullable<ModelChannel["modelProfiles"]>[number];
 
-export function ChannelModelSettings({ channel, onChange, draft = false }: { channel: ModelChannel; onChange: (profiles: ModelProfile[]) => void; draft?: boolean }) {
+/** testBlockedReason explains why a model cannot be tested yet; the test button stays disabled while it returns text. */
+export function ChannelModelSettings({ channel, onChange, draft = false, testBlockedReason, saveLabel = "保存并使用" }: { channel: ModelChannel; onChange: (profiles: ModelProfile[]) => void; draft?: boolean; testBlockedReason?: (model: string) => string; saveLabel?: string }) {
     const { message } = App.useApp();
     const [testingModel, setTestingModel] = useState("");
     const [editorTab, setEditorTab] = useState("protocol");
@@ -79,6 +80,7 @@ export function ChannelModelSettings({ channel, onChange, draft = false }: { cha
     const inferredProtocol = activeModel ? (inferProtocolCapabilityFromModel(activeModel) === "video" ? channel.interfaceType || "" : defaultProtocolForModel(activeModel, availableProtocols)) : "";
     const activeProtocol = activeModelProfile ? activeModelProfile.protocol || channel.interfaceType || "" : inferredProtocol;
     const activeCapability = activeModelProfile?.capability || modelProtocolCapability(activeProtocol, availableProtocols) || (activeModel ? inferProtocolCapabilityFromModel(activeModel) : "text");
+    const testBlocked = activeModel ? testBlockedReason?.(activeModel) || "" : "";
 
     return (
         <div className="mt-4">
@@ -131,13 +133,13 @@ export function ChannelModelSettings({ channel, onChange, draft = false }: { cha
                 onClose={() => setActiveModel(null)}
                 footer={
                     <div className="model-editor-footer">
-                        <span className="text-xs text-foreground/50">{draft ? "完成后，点击「保存并使用」保存更改" : "更改实时保存到本地工作区"}</span>
+                        <span className="text-xs text-foreground/50">{draft ? `完成后，点击「${saveLabel}」保存更改` : "更改实时保存到本地工作区"}</span>
                         <div className="model-editor-footer-actions">
                             <Popconfirm title="生成一次测试结果？" description="会向当前服务商提交真实生成任务，费用由服务商收取。结果可在任务中心查看。" okText="开始生成" cancelText="取消" onConfirm={() => { if (activeModel && activeProtocol) void testModel(activeModel, activeCapability, activeProtocol); }}>
                             <Button
                                 icon={<FlaskConical className="size-4" />}
                                 loading={Boolean(testingModel)}
-                                disabled={!activeProtocol || protocolLoading || Boolean(protocolError)}
+                                disabled={!activeProtocol || protocolLoading || Boolean(protocolError) || Boolean(testBlocked)}
                             >
                                 生成测试
                             </Button>
@@ -201,7 +203,7 @@ export function ChannelModelSettings({ channel, onChange, draft = false }: { cha
                     },
                 ] : []}
             >
-                {(tabs) => <>{!testingModel && testResult ? <Alert className="mx-6 mt-4 shrink-0" type={testResult.success ? "success" : "error"} title={testResult.detail} showIcon /> : null}{tabs}</>}
+                {(tabs) => <>{testBlocked ? <Alert className="mx-6 mt-4 shrink-0" type="info" title={testBlocked} showIcon /> : !testingModel && testResult ? <Alert className="mx-6 mt-4 shrink-0" type={testResult.success ? "success" : "error"} title={testResult.detail} showIcon /> : null}{tabs}</>}
             </ModelEditorModal>
         </div>
     );

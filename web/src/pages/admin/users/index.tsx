@@ -9,6 +9,7 @@ import {
     type AdminUser, type PlatformRole,
 } from "@/services/api/platform";
 import { usePlatformSession } from "@/stores/use-platform-session";
+import { refreshOwnRelayBinding } from "@/services/platform-managed-channels";
 
 type Editor = { kind: "create" | "invite" } | { kind: "password" | "relay"; user: AdminUser };
 type FormValues = { username: string; displayName: string; password: string; role: PlatformRole; relayKey?: string; key: string; expiresInHours: number };
@@ -56,6 +57,7 @@ export default function AdminUsersPage() {
                     return null;
                 case "relay":
                     await bindPlatformRelayKey(editor.user.id, values.key.trim());
+                    await refreshOwnRelay(editor.user.id);
                     return null;
                 case "invite":
                     return createPlatformInvitation({ role: values.role, expiresInHours: values.expiresInHours });
@@ -70,6 +72,11 @@ export default function AdminUsersPage() {
         onError: (error) => message.error(platformErrorMessage(error)),
     });
     const busy = mutation.isPending || formMutation.isPending;
+    // 服务端已经改写了工作区里的公司中转站；给自己改密钥时，当前页面的模型配置也要同步，否则测试和生成仍按“未绑定”拦下。
+    async function refreshOwnRelay(userId: string) {
+        if (userId !== me?.user.id) return;
+        await refreshOwnRelayBinding().catch(() => message.warning("密钥已保存；模型配置没能自动更新，请刷新页面"));
+    }
     const openEditor = (next: Editor) => { form.resetFields(); setInvitation(null); setEditor(next); };
     const title = editor?.kind === "create" ? "创建用户" : editor?.kind === "invite" ? "创建邀请" : editor?.kind === "password" ? `重置密码 · ${editor.user.username}` : editor?.kind === "relay" ? `中转密钥 · ${editor.user.username}` : "";
 
@@ -138,7 +145,7 @@ export default function AdminUsersPage() {
                     </>}
                     <Space>
                         <Button type="primary" htmlType="submit" loading={formMutation.isPending}>{editor?.kind === "invite" ? "生成邀请链接" : "保存"}</Button>
-                        {editor?.kind === "relay" && editor.user.relay.bound && <Popconfirm title="确定清除中转密钥？" onConfirm={() => mutation.mutateAsync(() => clearPlatformRelayKey(editor.user.id)).then(close)}><Button danger disabled={busy}>清除密钥</Button></Popconfirm>}
+                        {editor?.kind === "relay" && editor.user.relay.bound && <Popconfirm title="确定清除中转密钥？" onConfirm={() => mutation.mutateAsync(async () => { await clearPlatformRelayKey(editor.user.id); await refreshOwnRelay(editor.user.id); }).then(close)}><Button danger disabled={busy}>清除密钥</Button></Popconfirm>}
                         <Button onClick={close}>取消</Button>
                     </Space>
                 </Form>}

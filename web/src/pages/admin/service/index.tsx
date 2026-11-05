@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { platformErrorMessage } from "@/lib/platform-account";
 import { getPlatformServiceStatus, resetPlatformRelayChannel } from "@/services/api/platform";
+import { refreshPlatformManagedChannels } from "@/services/platform-managed-channels";
 
 const capabilityLabels: Record<string, string> = { image: "图片", video: "视频", text: "文本", audio: "音频", "": "未标注能力" };
 const cookieLabels = { auto: "自动（HTTPS 访问时加 Secure）", always: "始终 Secure（仅 HTTPS）", never: "不加 Secure（HTTP）" };
@@ -16,6 +17,7 @@ export default function AdminServicePage() {
         onSuccess: (result) => {
             message.success(`已恢复为配置文件中的公司中转站，已更新 ${result.applied ?? 0} 位成员的工作区`);
             void status.refetch();
+            void refreshPlatformManagedChannels().catch(() => undefined);
         },
         onError: (error) => message.error(platformErrorMessage(error)),
     });
