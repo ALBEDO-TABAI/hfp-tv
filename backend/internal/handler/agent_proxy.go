@@ -790,11 +790,18 @@ func RegisterAgentProxyRoutes(r gin.IRouter, svc *app.Service, clients *agentops
 				SessionID string `json:"sessionId"`
 				TurnID    string `json:"turnId"`
 				Busy      bool   `json:"busy"`
+				// Frozen names why an unfinished round cannot resume on this host's model.
+				Frozen string `json:"frozen"`
 			}
 			decodeErr := json.NewDecoder(io.LimitReader(response.Body, 8192)).Decode(&active)
 			response.Body.Close()
 			if response.StatusCode != 200 || decodeErr != nil || active.SessionID != payload.SessionID || !active.Busy || active.TurnID == "" {
 				fail(c, http.StatusConflict, app.BadAuthRequest("这一轮已经结束，请发送新消息"))
+				return
+			}
+			if active.Frozen != "" {
+				// The round cannot run on this model: refuse before widening its authorization.
+				c.JSON(http.StatusConflict, gin.H{"code": http.StatusConflict, "reason": active.Frozen, "msg": "这一轮用的模型现在不可用，请先停止或换回原来的模型"})
 				return
 			}
 			input := assistantTurnInput(nil, refs)

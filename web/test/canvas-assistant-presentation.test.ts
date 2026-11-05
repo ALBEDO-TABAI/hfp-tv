@@ -38,6 +38,15 @@ describe("助手不可用原因映射成一句用户语加一个出路", () => {
         expect(notice.action).toBe("model-settings");
     });
 
+    test("换了模型而上一轮还在跑：说明原因，并给出会打断这一轮的立即切换", () => {
+        const notice = assistantStatusNotice("host_busy");
+        expect(notice.text).toContain("正在进行的一轮");
+        expect(notice.text).toContain("打断");
+        expect(notice.text).not.toBe("助手暂时用不了，请稍后再试");
+        expect(notice.action).toBe("retry");
+        expect(notice.actionLabel).toBe("立即切换");
+    });
+
     test("正在启动只报告进展，没有按钮，并要求更快复查", () => {
         const notice = assistantStatusNotice("host_starting");
         expect(notice.text).toBe("助手正在启动…");

@@ -131,6 +131,14 @@ test('public provider failures hide upstream detail while retaining internal dia
     assert.equal(internal.error, detail, 'projection must not overwrite diagnostic records');
     assert(!JSON.stringify(visible).includes('synthetic-secret'));
   }
+  const timedOut = publicDurableTurn({ error: 'Request timed out.', errorReason: 'model_error', cancelled: false, reply: '', turnId: 'slow-turn' });
+  assert.match(timedOut.error, /长时间没有响应/); assert.equal(timedOut.errorReason, 'turn_timeout');
+  for (const error of ['Request timed out. Node.js fetch timed out after 180000ms', 'Model stream idle timeout: no text or tool progress for 95000 ms']) {
+    assert.equal(publicDurableTurn({ error, errorReason: 'provider_error' }).errorReason, 'turn_timeout');
+  }
+  // Only the SDK's own wording counts; an upstream body that mentions a timeout stays generic.
+  const upstream = publicDurableTurn({ error: '504 upstream timed out at https://example.invalid/?signature=synthetic-secret', errorReason: 'provider_error' });
+  assert.equal(upstream.error, '模型没有完成回复。已经完成的操作会保留，请检查结果后再继续。');
   const budget = { error: 'local budget is exhausted', errorReason: 'turn_request_budget_exhausted' };
   assert.deepEqual(publicDurableTurn(budget), budget);
   assert.equal(publicDurableTurn({ cancelled: true, error: null }).error, null);

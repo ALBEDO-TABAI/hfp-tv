@@ -169,7 +169,9 @@ export type AssistantHistory = {
     active?: { turnId: string; requestId?: string; continuationId?: string; userText: string; selectedNodeIds: string[]; attachments?: AssistantAttachment[]; skills?: AssistantSkillSelection[];
         references?: AgentChatReference[]; supplements?: string[]; supplementInputs?: AssistantSupplementInput[]; permissionMode?: AssistantPermissionMode; createdAt: string; status: "running";
         /** 正在进行的回合此刻的进度（例如模型重试），只用于展示，结束后不再返回。 */
-        lifecycle?: AgentLifecycleEvent | null; plan?: AssistantPlan | null; streamed?: string } | null;
+        lifecycle?: AgentLifecycleEvent | null; plan?: AssistantPlan | null; streamed?: string;
+        /** 这一轮固定用开始时的模型；宿主已换成别的模型时它无法接着跑，只能换回原模型或停止。 */
+        resumeBlocked?: "model_unavailable_for_resume" | "turn_model_frozen" } | null;
 };
 
 // UI 会话凭据只保存在内存里：刷新页面即重新签发，不写入 localStorage。
@@ -181,6 +183,8 @@ let uiSessionGeneration = 0;
  * 服务端失败原因只用于分支，展示给用户的永远是用户语。
  * 这些 reason 由后端给出（见 handler/agent_proxy.go 与 agent_host_lifecycle.go）。
  */
+export const ASSISTANT_RESUME_BLOCKED_TEXT = "上一轮用的模型现在不可用（可能刚换了助手模型），这一轮没法接着完成。点「停止」结束它，就能用新模型继续；也可以在「模型配置」里换回原来的模型，让它接着完成。";
+
 export function agentAssistantFailureText(reason: string | undefined, fallback = "创作助手暂时不可用，请稍后再试") {
     switch (reason) {
         case "skill_instruction_too_large":
@@ -218,6 +222,9 @@ export function agentAssistantFailureText(reason: string | undefined, fallback =
             return "上一条消息还在处理中，请等它结束";
         case "session_not_current":
             return "你已经换到别的对话了，请重新发送这条消息";
+        case "model_unavailable_for_resume":
+        case "turn_model_frozen":
+            return ASSISTANT_RESUME_BLOCKED_TEXT;
         case "session_not_running":
             return "这一轮已经结束，请查看最新结果后发送新消息";
         default:

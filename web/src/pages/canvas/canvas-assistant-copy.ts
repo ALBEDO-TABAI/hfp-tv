@@ -30,6 +30,9 @@ export function assistantStatusNotice(reason: string | undefined): AssistantStat
         case "host_start_failed":
         case "host_unreachable":
             return { text: "助手没有启动成功", actionLabel: "重试", action: "retry" };
+        case "host_busy":
+            // 立即切换会重启助手；被打断的那一轮会停在原模型上，可以停止或换回，不会丢。
+            return { text: "助手还在用原来的设置处理正在进行的一轮（可能在别的画布上），结束或被停止后会自动换成新的模型设置。现在就切换会打断这一轮。", actionLabel: "立即切换", action: "retry" };
         default:
             return { text: ASSISTANT_UNAVAILABLE_FALLBACK, actionLabel: "重试", action: "retry" };
     }

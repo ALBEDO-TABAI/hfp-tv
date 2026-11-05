@@ -257,6 +257,8 @@ function emitDurable(entry, event) {
   for (const payload of [...(text ? [text] : []), ...events]) for (const listener of entry.listeners || []) listener(payload);
 }
 function followDurable(entry, submission) {
+  // A followed submission is running on this host's model: not frozen.
+  entry.resumeBlocked = null;
   if (!entry.running) {
     entry.listeners = new Set();
     entry.lifecycle = null;
@@ -348,7 +350,11 @@ function respond(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+// A round frozen to a model this host no longer runs.
+const RESUME_BLOCKED_REASONS = ['model_unavailable_for_resume', 'turn_model_frozen'];
+
 function respondStoreError(res, error) {
+  if (RESUME_BLOCKED_REASONS.includes(error?.reason)) { respond(res, 409, { code: 409, reason: error.reason }); return true; }
   if (['skill_context_revision_conflict','skill_context_request_conflict','skill_scope_reset_pending','skill_context_changed'].includes(error?.reason)) {
     respond(res,409,{code:409,reason:error.reason});return true;
   }
@@ -370,8 +376,33 @@ function respondStoreError(res, error) {
 }
 
 function anySessionBusy() {
-  for (const entry of durable.sessions.values()) if (entry.busy) return true;
+  // A round frozen to a model this host does not run is not running: counting
+  // it would keep the backend from restarting the host with that model again.
+  for (const entry of durable.sessions.values()) if (entry.busy && !frozenRound(entry)) return true;
   return false;
+}
+
+// An unfinished round keeps its own model. When the host now runs another
+// model it cannot resume here, but reads must still work so the person can
+// stop it (a stop is honoured before the model is needed) or switch back.
+async function recoverForRead(entry) {
+  try {
+    const submission = await durable.recover(entry);
+    entry.resumeBlocked = null;
+    if (submission) followDurable(entry,submission);
+    return '';
+  } catch (error) {
+    if (!RESUME_BLOCKED_REASONS.includes(error?.reason)) throw error;
+    // Bound to the round that could not resume, so a later round is never
+    // mistaken for it.
+    if (!entry.running) entry.resumeBlocked = { reason: error.reason, requestId: entry.input?.requestId };
+    return error.reason;
+  }
+}
+
+function frozenRound(entry) {
+  const blocked = entry.resumeBlocked;
+  return blocked && !entry.running && blocked.requestId === entry.input?.requestId ? blocked.reason : '';
 }
 
 const server = http.createServer(async (req, res) => {
@@ -415,7 +446,7 @@ const server = http.createServer(async (req, res) => {
       const sessionId = String(url.searchParams.get('sessionId') || currentId(canvasId));
       let entry = liveEntry(canvasId);
       if (isDurableSessionId(sessionId)) entry = await durable.ensureSession(canvasId,sessionId);
-      respond(res,200,{sessionId:entry?.sessionId || sessionId || null,turnId:entry?.turn.turnId || null,busy:Boolean(entry?.busy)}); return;
+      respond(res,200,{sessionId:entry?.sessionId || sessionId || null,turnId:entry?.turn.turnId || null,busy:Boolean(entry?.busy),frozen:(entry && frozenRound(entry)) || ''}); return;
     }
     if (req.method === 'GET' && url.pathname === '/sessions') {
       const canvasId = String(url.searchParams.get('canvasId') || '').trim();
@@ -445,8 +476,7 @@ const server = http.createServer(async (req, res) => {
       if (liveEntry(canvasId)?.busy) { respond(res,409,{reason:'session_busy'}); return; }
       if (isDurableSessionId(sessionId)) {
         const entry = await durable.activateSession(canvasId,sessionId);
-        const submission = await durable.recover(entry);
-        if (submission) followDurable(entry,submission);
+        await recoverForRead(entry);
         respond(res,200,{sessionId:entry.sessionId}); return;
       }
       // 旧 JSONL 会话只切换当前指针用于读取展示；执行在下一次发消息时交接给新的 Durable 会话。
@@ -472,10 +502,10 @@ const server = http.createServer(async (req, res) => {
         // A live owner of the current session is read as is: polling must not republish the pointer.
         const live = liveEntry(canvasId);
         const entry = live?.sessionId === sessionId ? live : await durable.ensureSession(canvasId,sessionId);
-        const submission = await durable.recover(entry);
-        if (submission) followDurable(entry,submission);
-        await waitForDurableProjection(entry);
+        const resumeBlocked = await recoverForRead(entry);
+        if (!resumeBlocked) await waitForDurableProjection(entry);
         const value = await durable.history(canvasId,sessionId);
+        if (value.active && resumeBlocked) value.active.resumeBlocked = resumeBlocked;
         if (value.active && entry.lifecycle) value.active.lifecycle = entry.lifecycle;
         if (value.active && entry.textProjection?.initialized) value.active.streamed = entry.textProjection.text;
         respond(res,200,value); return;
@@ -539,6 +569,7 @@ const server = http.createServer(async (req, res) => {
       if (!entry.busy || entry.completing || entry.generation.aborted) {
         respond(res,409,{code:409,reason:'session_not_running'}); return;
       }
+      if (frozenRound(entry)) { respond(res,409,{code:409,reason:frozenRound(entry)}); return; }
       const pending = durable.beginPendingInput(entry);
       try {
         const content = await attachmentContent(body,entry.turn.turnId);

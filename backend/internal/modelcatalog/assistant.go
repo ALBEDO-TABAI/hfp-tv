@@ -1,6 +1,7 @@
 package modelcatalog
 
 import (
+	"net/url"
 	"strings"
 
 	"infinite-canvas/backend/internal/assistant"
@@ -29,6 +30,9 @@ type AssistantModelProfile struct {
 	Model      string `json:"model"`
 	Capability string `json:"capability"`
 	Protocol   string `json:"protocol"`
+	// BaseURL is a model's own endpoint, e.g. a relay that serves some models
+	// under another path of the same host.
+	BaseURL string `json:"baseUrl"`
 }
 
 type AssistantChannel struct {
@@ -152,6 +156,11 @@ func resolveChannelModel(snapshot AssistantConfigSnapshot, modelKey string, look
 	if provider.BaseURL == "" {
 		provider.BaseURL = strings.TrimSpace(snapshot.BaseURL)
 	}
+	// Same rule as canvas generation: a model's own endpoint is used only on the
+	// channel's origin, so the channel key never goes to another host.
+	if own := channelModelBaseURL(channel, modelID); own != "" && sameEndpointOrigin(own, provider.BaseURL) {
+		provider.BaseURL = own
+	}
 	if lookup != nil {
 		if apiKey, baseURL, ok := lookup(channel.ID, channel.CredentialRef, provider.BaseURL); ok {
 			if strings.TrimSpace(apiKey) != "" {
@@ -219,6 +228,27 @@ func defaultTextModelProtocol(snapshot AssistantConfigSnapshot, channel Assistan
 		}
 	}
 	return assistantProtocols[declared], true
+}
+
+func channelModelBaseURL(channel AssistantChannel, modelID string) string {
+	for _, profile := range channel.ModelProfiles {
+		if profile.Model == modelID {
+			return strings.TrimSpace(profile.BaseURL)
+		}
+	}
+	return ""
+}
+
+func sameEndpointOrigin(target, base string) bool {
+	left, leftErr := url.Parse(strings.TrimSpace(target))
+	right, rightErr := url.Parse(strings.TrimSpace(base))
+	if leftErr != nil || rightErr != nil || left.User != nil || right.User != nil || left.Host == "" || right.Host == "" {
+		return false
+	}
+	if left.Scheme != "http" && left.Scheme != "https" {
+		return false
+	}
+	return strings.EqualFold(left.Scheme, right.Scheme) && strings.EqualFold(left.Host, right.Host)
 }
 
 func ChannelModelProtocol(channel AssistantChannel, modelID string) (string, bool) {

@@ -17,6 +17,7 @@ import {
     cancelAgentChat,
     createAssistantSession,
     getAgentHostStatus,
+    ASSISTANT_RESUME_BLOCKED_TEXT,
     getAssistantHistory,
     listAssistantSessions,
     restartAgentHost,
@@ -88,6 +89,8 @@ type CanvasRun = {
     historyLoaded: boolean;
     historyError: string | null;
     historyHostUnavailable: boolean;
+    /** 这一轮固定用开始时的模型，宿主已换模型时无法接着跑：只能停止或换回原模型。 */
+    resumeBlocked: boolean;
     historyRequest: number;
     sessionBusy: boolean;
     dispatched: boolean;
@@ -136,6 +139,7 @@ const createRun = (): CanvasRun => ({
     historyLoaded: false,
     historyError: null,
     historyHostUnavailable: false,
+    resumeBlocked: false,
     historyRequest: 0,
     sessionBusy: false,
     dispatched: false,
@@ -253,7 +257,10 @@ export function useCanvasAssistant({ canvasId, onCanvasChanged }: Options) {
     }, [expectedScope]);
 
     // 状态只在面板打开时复查：关着的面板不该一直问后端。正在启动时节奏更快。
-    const starting = status?.reason === "host_starting";
+    // 正在启动或在用旧模型收尾时状态会很快变化，复查要更勤。
+    // 冻结的一轮在等用户换回原模型：换回后后端要等下一次状态查询才重启宿主，所以也查得勤一些。
+    const frozen = runFor(canvasId).resumeBlocked;
+    const starting = status?.reason === "host_starting" || status?.reason === "host_busy";
     useEffect(() => {
         if (!open) return;
         let cancelled = false;
@@ -263,9 +270,9 @@ export function useCanvasAssistant({ canvasId, onCanvasChanged }: Options) {
                 .catch(() => { if (!cancelled && userScopeMatches(expectedScope)) setStatus({ available: false }); });
         };
         refresh();
-        const timer = setInterval(refresh, starting ? 2000 : 15000);
+        const timer = setInterval(refresh, starting ? 2000 : frozen ? 5000 : 15000);
         return () => { cancelled = true; clearInterval(timer); };
-    }, [open, starting, expectedScope]);
+    }, [open, starting, frozen, expectedScope]);
 
     const loadHistory = useCallback(async (targetCanvas: string, sessionId?: string) => {
         if (!userScopeMatches(expectedScope)) return false;
@@ -296,6 +303,7 @@ export function useCanvasAssistant({ canvasId, onCanvasChanged }: Options) {
                 run.supplements = [];
                 if (!run.controller) run.streaming = false;
             }
+            run.resumeBlocked = Boolean(history.active?.resumeBlocked);
             if (history.active) {
                 const active = history.active;
                 run.backgroundActive = true;
@@ -311,7 +319,7 @@ export function useCanvasAssistant({ canvasId, onCanvasChanged }: Options) {
                 run.supplements = active.supplementInputs?.length ? active.supplementInputs.map(input => ({ text: input.message, attachments: input.attachments, skills: input.skills, status: "accepted" })) : (active.supplements || []).map(text => ({ text, status: "accepted" }));
                 run.recovery = { sessionId: nextSession, turnId: active.turnId, knownTurnIds: history.turns.map(turn => turn.turnId), text: active.userText, selectedNodeIds: active.selectedNodeIds || [] };
                 run.requestId = active.requestId ?? null;
-                run.lifecycleNotice = assistantLifecycleText(active.lifecycle) || "这次创作仍在继续，正在读取最新结果。";
+                run.lifecycleNotice = active.resumeBlocked ? ASSISTANT_RESUME_BLOCKED_TEXT : assistantLifecycleText(active.lifecycle) || "这次创作仍在继续，正在读取最新结果。";
                 run.error = null;
             }
             run.sessions = sessionList.sessions;
@@ -348,9 +356,13 @@ export function useCanvasAssistant({ canvasId, onCanvasChanged }: Options) {
     useEffect(() => {
         if (!open) return;
         let reading = false;
+        let lastRead = 0;
         const timer = setInterval(() => {
             const run = runFor(canvasId);
             if (reading || run.controller || (!run.backgroundActive && !run.recovery)) return;
+            // 冻结的一轮不会自己往前走，只等停止或换回模型：放慢复查，别一直打扰后端。
+            if (run.resumeBlocked && Date.now() - lastRead < 15000) return;
+            lastRead = Date.now();
             reading = true;
             void loadHistory(canvasId).finally(() => { reading = false; });
         }, 2000);
@@ -363,6 +375,13 @@ export function useCanvasAssistant({ canvasId, onCanvasChanged }: Options) {
         if (run.historyLoaded || run.streaming || run.sessionBusy) return;
         void loadHistory(canvasId);
     }, [canvasId, loadHistory, open, runFor, status?.available]);
+
+    // 宿主换了模型（例如用户换回了冻结那一轮用的模型）并就绪后，立刻复查冻结的一轮能否接着跑。
+    const hostModel = status?.available ? status.model?.id : undefined;
+    useEffect(() => {
+        if (!open || !hostModel || !runFor(canvasId).resumeBlocked) return;
+        void loadHistory(canvasId);
+    }, [canvasId, hostModel, loadHistory, open, runFor]);
 
     const send = useCallback(async (text: string, selectedNodeIds: string[], references: AgentChatReference[] = [], input: { attachments?: AssistantAttachment[]; skills?: AssistantSkillSelection[]; permissionMode?: AssistantPermissionMode; continuation?: { id: string; sessionId: string; requestId: string } } = {}) => {
         if (!userScopeMatches(expectedScope)) return;
@@ -561,7 +580,8 @@ export function useCanvasAssistant({ canvasId, onCanvasChanged }: Options) {
             if (!userScopeMatches(expectedScope)) return;
             const current = runFor(targetCanvas);
             current.streaming = current.backgroundActive;
-            current.lifecycleNotice = null;
+            // The readback may have found the round frozen; keep that explanation.
+            if (!current.resumeBlocked) current.lifecycleNotice = null;
             current.controller = null;
             rerenderIfActive(targetCanvas);
         }
@@ -755,7 +775,7 @@ export function useCanvasAssistant({ canvasId, onCanvasChanged }: Options) {
         lifecycleNotice: run.lifecycleNotice,
         supplements: run.supplements,
         supplementBusy: run.supplementBusy,
-        canSupplement: run.streaming && run.dispatched && Boolean(run.sessionId),
+        canSupplement: run.streaming && run.dispatched && Boolean(run.sessionId) && !run.resumeBlocked,
         awaitingReceipt: Boolean(run.recovery) && !run.streaming && !run.controller,
         error: run.error,
         canRetry: Boolean(run.lastSent) && !run.dispatched,

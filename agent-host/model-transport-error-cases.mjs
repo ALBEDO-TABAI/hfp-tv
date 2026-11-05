@@ -122,8 +122,9 @@ test('header timeout is terminal and retains completed tools across an explicit 
   assert.deepEqual(wireResults, wireCalls);
   const history = await f.reopenHistory();
   assert.equal(history.turns.length, 2);
-  assert.equal(history.turns[0].error, '模型没有完成回复。已经完成的操作会保留，请检查结果后再继续。');
-  assert.equal(history.turns[0].errorReason, record.errorReason);
+  // The SDK's header timeout is reported as a timeout; the internal record keeps model_error.
+  assert.match(history.turns[0].error, /长时间没有响应/);
+  assert.equal(history.turns[0].errorReason, 'turn_timeout');
   assert.equal(history.turns[0].submissionId, f.submission.id);
   assert.equal(history.turns[1].reply, 'completed after explicit next request');
   assert.equal(f.requests.length, 3);

@@ -59,7 +59,14 @@ export function publicDurableTurn(active, running = false) {
   // Keep provider detail in the internal record; streams and old history share
   // the same public projection so an upstream body cannot become UI copy.
   if (result.error && ['model_error', 'provider_error'].includes(result.errorReason)) {
-    result.error = '模型没有完成回复。已经完成的操作会保留，请检查结果后再继续。';
+    if (/^(Request timed out\b|Model stream idle timeout\b)/.test(String(active.error).trim())) {
+      // The SDK's own timeout wording carries no upstream body. A relay that
+      // never answers is a timeout, not an unexplained model failure.
+      result.error = '模型服务长时间没有响应，这一轮没有完成。已经完成的操作会保留，请检查结果后再继续。';
+      result.errorReason = 'turn_timeout';
+    } else {
+      result.error = '模型没有完成回复。已经完成的操作会保留，请检查结果后再继续。';
+    }
   }
   if (running) { delete result.toolCalls; result.status = 'running'; }
   return result;
