@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert, App, Button, Form, Input, InputNumber, Popconfirm, Select, Space, Table, Tabs, Tag, Typography } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppModal } from "@/components/ui/product/app-modal";
@@ -6,7 +6,7 @@ import { platformErrorMessage, platformPasswordRules, platformUsernameRules } fr
 import {
     bindPlatformRelayKey, clearPlatformRelayKey, createPlatformInvitation, createPlatformUser,
     listPlatformAudit, listPlatformUsers, resetPlatformUserPassword, updatePlatformUser,
-    type AdminUser, type PlatformRole,
+    type AdminUser, type PlatformRole, type RelayKeyResult,
 } from "@/services/api/platform";
 import { usePlatformSession } from "@/stores/use-platform-session";
 import { refreshOwnRelayBinding } from "@/services/platform-managed-channels";
@@ -42,7 +42,7 @@ export default function AdminUsersPage() {
     const close = () => { setEditor(null); setInvitation(null); form.resetFields(); };
     const mutation = useMutation({
         mutationFn: (operation: () => Promise<unknown>) => operation(),
-        onSuccess: async () => { message.success("已保存"); await refresh(); },
+        onSuccess: async () => { if (!unapplied.current) message.success("已保存"); unapplied.current = false; await refresh(); },
         onError: (error) => message.error(platformErrorMessage(error)),
     });
     const formMutation = useMutation({
@@ -56,7 +56,7 @@ export default function AdminUsersPage() {
                     await resetPlatformUserPassword(editor.user.id, values.password);
                     return null;
                 case "relay":
-                    await bindPlatformRelayKey(editor.user.id, values.key.trim());
+                    warnUnapplied(await bindPlatformRelayKey(editor.user.id, values.key.trim()));
                     await refreshOwnRelay(editor.user.id);
                     return null;
                 case "invite":
@@ -66,13 +66,20 @@ export default function AdminUsersPage() {
         onSuccess: async (result) => {
             form.resetFields();
             if (result) setInvitation({ url: window.location.origin + result.url, expiresAt: result.expiresAt });
-            else { close(); message.success("已保存"); }
+            else { close(); if (!unapplied.current) message.success("已保存"); unapplied.current = false; }
             await refresh();
         },
         onError: (error) => message.error(platformErrorMessage(error)),
     });
     const busy = mutation.isPending || formMutation.isPending;
+    // 平台已保存、工作区没生效时只留警告，不再报“已保存”。
+    const unapplied = useRef(false);
     // 服务端已经改写了工作区里的公司中转站；给自己改密钥时，当前页面的模型配置也要同步，否则测试和生成仍按“未绑定”拦下。
+    // 平台已保存绑定，但成员工作区没改写成功：明说，别让“已保存”被当成已生效。
+    function warnUnapplied(result: RelayKeyResult) {
+        unapplied.current = result.applied === false;
+        if (unapplied.current) message.warning(result.message || "已保存，但工作区未生效");
+    }
     async function refreshOwnRelay(userId: string) {
         if (userId !== me?.user.id) return;
         await refreshOwnRelayBinding().catch(() => message.warning("密钥已保存；模型配置没能自动更新，请刷新页面"));
@@ -145,7 +152,7 @@ export default function AdminUsersPage() {
                     </>}
                     <Space>
                         <Button type="primary" htmlType="submit" loading={formMutation.isPending}>{editor?.kind === "invite" ? "生成邀请链接" : "保存"}</Button>
-                        {editor?.kind === "relay" && editor.user.relay.bound && <Popconfirm title="确定清除中转密钥？" onConfirm={() => mutation.mutateAsync(async () => { await clearPlatformRelayKey(editor.user.id); await refreshOwnRelay(editor.user.id); }).then(close)}><Button danger disabled={busy}>清除密钥</Button></Popconfirm>}
+                        {editor?.kind === "relay" && editor.user.relay.bound && <Popconfirm title="确定清除中转密钥？" onConfirm={() => mutation.mutateAsync(async () => { warnUnapplied(await clearPlatformRelayKey(editor.user.id)); await refreshOwnRelay(editor.user.id); }).then(close)}><Button danger disabled={busy}>清除密钥</Button></Popconfirm>}
                         <Button onClick={close}>取消</Button>
                     </Space>
                 </Form>}

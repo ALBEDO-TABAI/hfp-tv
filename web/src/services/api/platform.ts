@@ -146,8 +146,10 @@ export const listPlatformErrors = (params: { member?: string; source?: "task" | 
 export const createPlatformUser = (input: { username: string; displayName: string; password: string; role: PlatformRole; relayKey?: string }) => http.post<{ user: AdminUser }>("/platform/admin/users", input);
 export const updatePlatformUser = (id: string, input: { displayName?: string; role?: PlatformRole; status?: AdminUser["status"] }) => http.patch<{ user: AdminUser }>(`/platform/admin/users/${encodeURIComponent(id)}`, input);
 export const resetPlatformUserPassword = (id: string, password: string) => http.post<{ changed: true }>(`/platform/admin/users/${encodeURIComponent(id)}/password`, { password });
-export const bindPlatformRelayKey = (id: string, key: string) => http.put<{ user: AdminUser }>(`/platform/admin/users/${encodeURIComponent(id)}/relay-key`, { key });
-export const clearPlatformRelayKey = (id: string) => http.delete<{ user: AdminUser }>(`/platform/admin/users/${encodeURIComponent(id)}/relay-key`);
+/** applied is false when the binding is saved but the member's workspace could not be updated yet. */
+export type RelayKeyResult = { user: AdminUser; applied?: boolean; message?: string };
+export const bindPlatformRelayKey = (id: string, key: string) => http.put<RelayKeyResult>(`/platform/admin/users/${encodeURIComponent(id)}/relay-key`, { key });
+export const clearPlatformRelayKey = (id: string) => http.delete<RelayKeyResult>(`/platform/admin/users/${encodeURIComponent(id)}/relay-key`);
 export const createPlatformInvitation = (input: { role: PlatformRole; expiresInHours: number }) => http.post<{ token: string; url: string; expiresAt: string }>("/platform/admin/invitations", input);
 export const listPlatformAudit = () => http.get<{ items: PlatformAuditItem[] }>("/platform/admin/audit", { params: { limit: 100 } });
 

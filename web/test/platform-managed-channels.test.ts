@@ -1,12 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
-import { refreshOwnRelayBinding, refreshPlatformManagedChannels } from "../src/services/platform-managed-channels";
+import { refreshOwnRelayBinding, refreshPlatformManagedChannels, resetPlatformManagedChannelRefresh } from "../src/services/platform-managed-channels";
 import { apiClient } from "../src/services/api/request";
-import { createModelChannel, defaultConfig, useConfigStore } from "../src/stores/use-config-store";
+import { createModelChannel, defaultConfig, normalizeConfigSnapshot, useConfigStore } from "../src/stores/use-config-store";
 import { usePlatformSession } from "../src/stores/use-platform-session";
 
 const original = apiClient.defaults.adapter;
 afterEach(() => {
     apiClient.defaults.adapter = original;
+    resetPlatformManagedChannelRefresh();
     useConfigStore.getState().replaceConfig(defaultConfig);
     usePlatformSession.getState().setMe(null);
 });
@@ -61,4 +62,34 @@ test("refreshing one's own binding updates the account state too", async () => {
     await refreshOwnRelayBinding();
     expect(usePlatformSession.getState().me?.relay.bound).toBe(true);
     expect(useConfigStore.getState().config.channels[0]).toMatchObject({ id: "company-relay", hasApiKey: true });
+});
+
+test("a selection of a removed company model follows the server's correction; other selections stay", async () => {
+    const own = createModelChannel({ id: "mine", name: "我的服务", baseUrl: "https://api.example.com/v1", apiKey: "k", models: ["m"] });
+    useConfigStore.getState().replaceConfig({ ...defaultConfig, channels: [createModelChannel(relay(true, ["old", "new"])), own], assistantModel: "company-relay::old", textModel: "mine::m" });
+    serve({ "/workspace/model-config": { config: { ...defaultConfig, channels: [relay(true, ["new"]), own], assistantModel: "company-relay::new", textModel: "mine::m" }, revision: 7, health: "ready", source: "builtin+local" } });
+    await refreshPlatformManagedChannels();
+    const config = useConfigStore.getState().config;
+    expect(config.assistantModel).toBe("company-relay::new");
+    expect(config.textModel).toBe("mine::m");
+});
+
+test("a reply older than one already applied is ignored", async () => {
+    useConfigStore.getState().replaceConfig({ ...defaultConfig, channels: [createModelChannel(relay(false, ["a"]))] });
+    serve({ "/workspace/model-config": { config: { ...defaultConfig, channels: [relay(true, ["a"])] }, revision: 9, health: "ready", source: "builtin+local" } });
+    await refreshPlatformManagedChannels();
+    serve({ "/workspace/model-config": { config: { ...defaultConfig, channels: [relay(false, ["a"])] }, revision: 8, health: "ready", source: "builtin+local" } });
+    await refreshPlatformManagedChannels();
+    expect(useConfigStore.getState().config.channels[0]).toMatchObject({ id: "company-relay", hasApiKey: true });
+});
+
+test("a selection that cannot be corrected does not rewrite the configuration on every refresh", async () => {
+    // The store always holds a normalized configuration (hydration normalizes it).
+    const config = normalizeConfigSnapshot({ config: { ...defaultConfig, channels: [createModelChannel(relay(true, ["new"]))], assistantModel: "company-relay::old" } }).config;
+    useConfigStore.getState().replaceConfig(config);
+    // The server still reports the old choice (it was written back before the fix).
+    serve({ "/workspace/model-config": { config: { ...config, channels: [relay(true, ["new"])] }, revision: 3, health: "ready", source: "builtin+local" } });
+    const before = useConfigStore.getState().config;
+    await refreshPlatformManagedChannels();
+    expect(useConfigStore.getState().config).toBe(before);
 });
