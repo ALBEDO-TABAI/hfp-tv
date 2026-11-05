@@ -283,6 +283,15 @@ const ASSISTANT_TOOL_ACTIVITY: Record<string, [string, string]> = {
     canvas_timeline_render: ["正在提交成片合成。", "已提交成片合成"],
     canvas_timeline_deliver: ["正在合成视频并保存可编辑工程。", "已完成交付操作"],
     canvas_generation_propose: ["正在准备生成方案。", "已准备生成方案"],
+    canvas_generation_submit: ["正在提交生成。", "已提交生成"],
+    // 技能是多步的：读步骤、读参考资料，每步之后还要等模型继续，要让人看见在做什么。
+    skill_load: ["正在读取技能步骤。", "已读取技能步骤"],
+    skill_get: ["正在读取技能步骤。", "已读取技能步骤"],
+    skill_file: ["正在读取技能参考资料。", "已读取技能参考资料"],
+    skill_catalog: ["正在查看已安装的技能。", "已查看已安装的技能"],
+    skill_market_search: ["正在技能市场里查找。", "已查找技能市场"],
+    skill_market_get: ["正在读取技能市场里的技能。", "已读取技能市场里的技能"],
+    skill_market_file: ["正在读取技能市场里的技能文件。", "已读取技能市场里的技能文件"],
 };
 
 /** 只显示官方活动和已核对的操作回执，不把工具完成等同于创作质量验收。 */

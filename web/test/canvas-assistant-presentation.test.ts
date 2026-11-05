@@ -47,6 +47,14 @@ describe("助手不可用原因映射成一句用户语加一个出路", () => {
         expect(notice.actionLabel).toBe("立即切换");
     });
 
+    test("技能的每一步都有进展文案，不再只显示“助手正在处理”", () => {
+        for (const toolName of ["skill_load", "skill.file", "skill_get", "skill_catalog", "skill_market_search", "canvas.generation.submit"]) {
+            expect(assistantLifecycleText({ phase: "tool", toolName })).toBeTruthy();
+            expect(assistantLifecycleText({ phase: "tool_end", toolName, success: true })).toContain("正在继续制作");
+        }
+        expect(assistantLifecycleText({ phase: "tool", toolName: "skill_file" })).toBe("正在读取技能参考资料。");
+    });
+
     test("正在启动只报告进展，没有按钮，并要求更快复查", () => {
         const notice = assistantStatusNotice("host_starting");
         expect(notice.text).toBe("助手正在启动…");

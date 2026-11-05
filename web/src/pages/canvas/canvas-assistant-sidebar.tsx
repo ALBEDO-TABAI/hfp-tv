@@ -41,6 +41,22 @@ type Props = {
 
 const PLAN_STATUS_TEXT: Record<AssistantPlan["items"][number]["status"], string> = { todo: "待做", doing: "进行中", done: "已完成", needs_user: "等待确认", blocked: "需要处理" };
 
+// 一步之内（等模型回复、读技能、生成）没有新进展时显示已等待的秒数，让人分得清“慢”和“卡住”。
+const QUIET_SECONDS_SHOWN = 15;
+
+/** 自上次进展文案变化以来的秒数；不在处理中时为 0。 */
+function useQuietSeconds(active: boolean, marker: string) {
+    const [seconds, setSeconds] = useState(0);
+    useEffect(() => {
+        setSeconds(0);
+        if (!active) return;
+        const started = Date.now();
+        const timer = window.setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+        return () => window.clearInterval(timer);
+    }, [active, marker]);
+    return seconds;
+}
+
 export function CanvasAssistantPlan({ plan }: { plan: AssistantPlan | null | undefined }) {
     if (!plan?.items.length) return null;
     return <details className="canvas-assistant-card canvas-assistant-plan" open aria-label="当前制作计划">
@@ -149,6 +165,7 @@ export function CanvasAssistantSidebar(props: Props) {
     }, [turnCount, assistant.streamed, assistant.pendingUserText, assistant.lifecycleNotice, props.proposalFeedback]);
 
     const notice = assistant.status && !assistant.status.available && assistant.status.reason !== "host_starting" ? assistantStatusNotice(assistant.status.reason) : null;
+    const quietSeconds = useQuietSeconds(assistant.streaming, assistant.lifecycleNotice || "");
     const inputReady = draftLoaded && loadedDraftIdentity === draftIdentity;
     const composerDisabled = readOnly || !inputReady;
     const composerReason = readOnly ? "这个画布是只读的，不能让助手改动。" : !draftLoaded ? "正在读取未发送内容…" : loadedDraftIdentity !== draftIdentity ? "未能读取草稿，请重新读取后继续。" : undefined;
@@ -292,7 +309,7 @@ export function CanvasAssistantSidebar(props: Props) {
                                     <span />
                                     <span />
                                 </span>
-                                <span className="canvas-assistant-working-text">{assistant.lifecycleNotice || "助手正在处理…"}</span>
+                                <span className="canvas-assistant-working-text">{assistant.lifecycleNotice || "助手正在处理…"}{quietSeconds >= QUIET_SECONDS_SHOWN ? <span aria-hidden="true">（已等待 {quietSeconds} 秒）</span> : null}</span>
                             </div>
                         ) : null}
                     </div>
