@@ -31,6 +31,13 @@ describe("code 白名单", () => {
         }
     });
 
+    test("WebGL 不可用与渲染器创建失败各有代码，不混进通用渲染失败", () => {
+        for (const code of ["DIRECTOR_VIEWPORT_WEBGL_UNAVAILABLE", "DIRECTOR_VIEWPORT_RENDERER_FAILED"]) {
+            expect(DIRECTOR_DIAGNOSTIC_CODES).toContain(code as (typeof DIRECTOR_DIAGNOSTIC_CODES)[number]);
+            expect(projectDirectorDiagnostic(code, {})?.level).toBe("error");
+        }
+    });
+
     test("未知 code 一律拒绝，不透传", () => {
         const rejected = ["", "director_viewport_render_failed", "DIRECTOR_UNKNOWN", "SOME_OTHER_CODE", "DIRECTOR_VIEWPORT_RENDER_FAILED ", null, undefined, 42, {}, []];
         for (const code of rejected) {

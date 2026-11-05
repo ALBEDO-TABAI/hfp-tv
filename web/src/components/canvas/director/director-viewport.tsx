@@ -1,7 +1,7 @@
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Grid, Html, Line, OrbitControls, TransformControls } from "@react-three/drei";
 import { Video as VideoIcon } from "lucide-react";
-import { Component, forwardRef, memo, Suspense, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useReducer, useRef, useState, type ComponentRef, type ReactNode } from "react";
+import { Component, forwardRef, memo, Suspense, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useReducer, useRef, useState, type ComponentProps, type ComponentRef, type ReactNode } from "react";
 import { AnimationClip, AnimationMixer, BackSide, Box3, Bone, Camera, Color, EquirectangularReflectionMapping, Euler, Group, LoopOnce, LoopRepeat, Matrix4, Mesh, MeshBasicMaterial, MeshDepthMaterial, MeshNormalMaterial, MeshStandardMaterial, Object3D, OrthographicCamera, PerspectiveCamera, Plane, Quaternion, Raycaster, Scene, SphereGeometry, SRGBColorSpace, Texture, TextureLoader, Vector2, Vector3, Vector4, WebGLRenderTarget, WebGLRenderer } from "three";
 import type { Material } from "three";
 import { GLTFLoader, SkeletonUtils } from "three-stdlib";
@@ -26,6 +26,7 @@ import { createDirectorTransaction, installDirectorTerminalListeners } from "@/l
 import { emptyDirectorPlacementIntent, finiteDirectorGroundPoint, type DirectorGroundPoint, type DirectorPlacementIntent } from "@/lib/canvas/director/director-placement";
 import { directorDiagnosticObjectKind } from "@/lib/canvas/director/director-diagnostics";
 import { recordDirectorDiagnostic } from "@/lib/canvas/director/director-diagnostics-recorder";
+import { probeDirectorWebgl } from "@/lib/canvas/director/director-repro-runtime";
 import { resolveDirectorActorShape, resolveDirectorCapsuleShape } from "@/lib/canvas/director/director-actor-presets";
 import { directorCaptureInitial, directorCaptureUsable, directorLoadIdentity, directorLoadInitial, installDirectorContextListeners, reduceDirectorCapture, reduceDirectorLoad, releaseDirectorCapture, resolveDirectorDisplay, restoreDirectorCapture, upsertDirectorFailedLoad, type DirectorFailedLoads, type DirectorLoadSignal } from "@/lib/canvas/director/director-recovery";
 import { disposeDirectorAdoptionFailure, disposeDirectorHelper, disposeDirectorMaterials, disposeDirectorModelResources, disposeDirectorObject3D, resolveDirectorLoadOwnership } from "@/lib/canvas/director/director-resources";
@@ -105,6 +106,8 @@ const emptyRestPositions: Partial<Record<DirectorHumanoidBone, DirectorVec3>> = 
 // context lost 的 dispatch 触发重渲染后 R3F 会 configure 并在失效 context 上
 // 重建 WebGLRenderer，抛 getMaxPrecision / autoReset。稳定后 lost 只显示 notice。
 const directorCanvasGl = { antialias: true, preserveDrawingBuffer: true, alpha: false } as const;
+/** What R3F passes to a renderer factory (its DefaultGLProps is not exported). */
+type DirectorGlDefaults = Parameters<Extract<NonNullable<ComponentProps<typeof Canvas>["gl"]>, (defaults: never) => unknown>>[0];
 const directorCanvasCamera = { position: [0, 2, 13] as [number, number, number], fov: 45, near: 0.05, far: 1200 } as const;
 const directorCanvasDpr: [number, number] = [1, 1.5];
 // 自由视角固定环绕焦点：free 是独立观察相机，不跟随 shot 摄影机的 target 走，
@@ -177,6 +180,12 @@ export const DirectorViewport = forwardRef<DirectorViewportHandle, DirectorViewp
     }, [onViewModeChange]);
     // retryKey 变化会真正重建 Canvas 与 ErrorBoundary，而不是只换文案。
     const [retryKey, setRetryKey] = useState(0);
+    // 浏览器拿不到 WebGL（关闭了图形加速、显卡被停用）时不挂 Canvas：R3F 在 layout effect 里
+    // 创建渲染器，失败会变成未处理的 promise 拒绝，且每次重渲染都再试一次，界面只剩空白。
+    const [webglAvailable, setWebglAvailable] = useState(() => probeDirectorWebgl().available);
+    useEffect(() => {
+        if (!webglAvailable) recordDirectorDiagnostic("DIRECTOR_VIEWPORT_WEBGL_UNAVAILABLE");
+    }, [webglAvailable]);
     // capture 可用性：上下文丢失期间不得再使用失效 renderer；恢复后需重新登记。
     const [capture, dispatchCapture] = useReducer(reduceDirectorCapture, directorCaptureInitial);
     const captureReady = directorCaptureUsable(capture);
@@ -209,6 +218,16 @@ export const DirectorViewport = forwardRef<DirectorViewportHandle, DirectorViewp
         setFailedLoads({});
         setRetryKey((value) => value + 1);
     }, [releaseCapture]);
+    // 探测通过、但 three 创建渲染器仍失败：换成同一提示并卸下 Canvas，不让它每次重渲染都重试。
+    const onRendererFailed = useCallback(() => {
+        releaseCapture();
+        setWebglAvailable(false);
+    }, [releaseCapture]);
+    const recheckWebgl = useCallback(() => {
+        if (!probeDirectorWebgl().available) return;
+        setWebglAvailable(true);
+        retry();
+    }, [retry]);
     const onLoadStateChange = useCallback((id: string, signal: DirectorLoadSignal, retryLoad: () => void) => {
         setFailedLoads((current) => upsertDirectorFailedLoad(current, id, signal, retryLoad));
     }, []);
@@ -285,10 +304,11 @@ export const DirectorViewport = forwardRef<DirectorViewportHandle, DirectorViewp
         // data-renderer-ready 直接来自 directorCaptureUsable：capture context 已登记且未 lost。
         // 这是真实就绪信号，供 E2E 在触发 context loss 前确定监听器已安装。
         <div ref={shellRef} className="director-viewport-shell" data-drawing-actor-path={props.drawActorPath ? "true" : "false"} data-drawing-camera-path={props.drawCameraPath ? "true" : "false"} data-renderer-ready={directorCaptureUsable(capture) ? "true" : "false"}>
-            <DirectorViewportErrorBoundary key={`boundary-${retryKey}`} onRelease={releaseCapture} onRetry={retry}>
+            {webglAvailable ? <DirectorViewportErrorBoundary key={`boundary-${retryKey}`} onRelease={releaseCapture} onRetry={retry}>
                 <DirectorCanvasSurface
                     key={`canvas-${retryKey}`}
                     {...sceneProps}
+                    onRendererFailed={onRendererFailed}
                     onCaptureContext={onCaptureContext}
                     onRelease={releaseCapture}
                     onContextLost={onContextLost}
@@ -298,7 +318,14 @@ export const DirectorViewport = forwardRef<DirectorViewportHandle, DirectorViewp
                     onOrbitControls={onOrbitControls}
                     onCameraOrientation={onCameraOrientation}
                 />
-            </DirectorViewportErrorBoundary>
+            </DirectorViewportErrorBoundary> : (
+                <DirectorViewportNotice
+                    title="这台电脑的浏览器无法显示 3D 视口"
+                    description="浏览器当前没有可用的 WebGL，常见原因是关闭了“使用图形加速”、显卡被浏览器停用或驱动异常。打开图形加速并重启浏览器后点“重新检测”；Chrome 可在 chrome://gpu 查看 WebGL 状态。导演台其余面板仍可使用。"
+                    actionLabel="重新检测"
+                    onAction={recheckWebgl}
+                />
+            )}
             {aspectRatio !== "adaptive" && frame.width > 0 ? <div data-director-aspect-frame={aspectRatio} aria-label={`${aspectRatio} 画幅取景框`} className="pointer-events-none absolute rounded-xl border border-white/35" style={{ zIndex: 1, left: frame.x, top: frame.y, width: frame.width, height: frame.height, boxShadow: "0 0 0 100vmax rgba(0, 0, 0, 0.68)" }} /> : null}
             {/* 取景切换是纯视口状态：放在 DOM 层，不随 Canvas 重建而丢失。 */}
             {onViewModeChange ? <DirectorViewToolbar viewMode={props.viewMode ?? DIRECTOR_DEFAULT_VIEW_MODE} orientation={props.viewMode === "camera" ? cameraOrientation : freeOrientation} onViewModeChange={onViewModeChange} onResetView={resetView} /> : null}
@@ -329,6 +356,7 @@ export const DirectorViewport = forwardRef<DirectorViewportHandle, DirectorViewp
 
 // onViewModeChange 被显式排除：切换器活在 DOM 层，Canvas 子树只需要 viewMode 取值。
 type DirectorCanvasSurfaceProps = Omit<DirectorViewportProps, "onViewModeChange" | "onCaptureReadyChange"> & {
+    onRendererFailed?: () => void;
     onCaptureContext: (context: CaptureContext) => void;
     onRelease: () => void;
     onContextLost: () => void;
@@ -350,7 +378,18 @@ type DirectorCanvasSurfaceProps = Omit<DirectorViewportProps, "onViewModeChange"
  * 只有 props 真的变化才重渲染，retryKey 变化仍由外层 key 触发真正 remount。
  */
 const DirectorCanvasSurface = memo(function DirectorCanvasSurface(props: DirectorCanvasSurfaceProps) {
-    const { onCaptureContext, onRelease, onContextLost, onContextRestored, onLoadStateChange, onGroundPoint, onOrbitControls, onCameraOrientation, ...sceneProps } = props;
+    const { onRendererFailed, onCaptureContext, onRelease, onContextLost, onContextRestored, onLoadStateChange, onGroundPoint, onOrbitControls, onCameraOrientation, ...sceneProps } = props;
+    const createRenderer = useCallback(async (defaults: DirectorGlDefaults) => {
+        try {
+            return new WebGLRenderer({ ...defaults, ...directorCanvasGl });
+        } catch {
+            recordDirectorDiagnostic("DIRECTOR_VIEWPORT_RENDERER_FAILED");
+            onRendererFailed?.();
+            // The viewport replaces this surface with a notice. Leaving this creation
+            // unsettled keeps R3F's un-awaited configure from rejecting unhandled.
+            return new Promise<WebGLRenderer>(() => undefined);
+        }
+    }, [onRendererFailed]);
     const onSelectObject = sceneProps.onSelectObject;
     const transformClaimRef = useRef(false);
     const pathPointerClaimUntilRef = useRef(0);
@@ -364,11 +403,14 @@ const DirectorCanvasSurface = memo(function DirectorCanvasSurface(props: Directo
 
     return (
         <Canvas
-            shadows
+            // "percentage" is PCFShadowMap, what three 0.185 renders anyway. Boolean shadows
+            // ask for PCFSoftShadowMap on every configure (R3F reconfigures on each render),
+            // so three warned and rebuilt the shadow maps after every viewport update.
+            shadows="percentage"
             frameloop="demand"
             dpr={directorCanvasDpr}
             camera={directorCanvasCamera}
-            gl={directorCanvasGl}
+            gl={createRenderer}
             onPointerMissed={onPointerMissed}
         >
             <Suspense fallback={null}>

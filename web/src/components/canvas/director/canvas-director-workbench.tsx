@@ -101,6 +101,9 @@ export function CanvasDirectorWorkbench({ open, scene, projectId, imageNodes, on
     const [saving, setSaving] = useState(false);
     const [captureBusy, setCaptureBusy] = useState(false);
     const [captureReady, setCaptureReady] = useState(false);
+    // The close handler outlives renders; it must see the viewport's current readiness.
+    const captureReadyRef = useRef(false);
+    captureReadyRef.current = captureReady;
     const [cameraPreviewUrl, setCameraPreviewUrl] = useState<string | null>(null);
     const cameraPreviewUrlRef = useRef<string | null>(null);
     const previewPlayheadRef = useRef(0);
@@ -551,7 +554,9 @@ export function CanvasDirectorWorkbench({ open, scene, projectId, imageNodes, on
             if (decision.kind === "close") {
                 const current = draftRef.current;
                 const shot = current?.shots.find((item) => item.id === current.activeShotId) || current?.shots[0];
-                if (current && shot && onCaptureCover && onShouldCaptureCover?.(current, shot.id) && viewportRef.current) {
+                // Without a usable renderer (no WebGL, context lost) there is no frame to save:
+                // skip the cover quietly instead of reporting a screenshot failure.
+                if (current && shot && onCaptureCover && captureReadyRef.current && onShouldCaptureCover?.(current, shot.id) && viewportRef.current) {
                     const session = directorAsyncSession(sessionRef.current.signal);
                     try {
                         const beauty = await viewportRef.current.capture("beauty");

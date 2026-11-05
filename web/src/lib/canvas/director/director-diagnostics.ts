@@ -12,6 +12,8 @@
 /** 故障与恢复代码白名单。新增代码必须同时补 message 与测试。 */
 export const DIRECTOR_DIAGNOSTIC_CODES = [
     "DIRECTOR_VIEWPORT_RENDER_FAILED",
+    "DIRECTOR_VIEWPORT_WEBGL_UNAVAILABLE",
+    "DIRECTOR_VIEWPORT_RENDERER_FAILED",
     "DIRECTOR_VIEWPORT_CONTEXT_LOST",
     "DIRECTOR_VIEWPORT_CONTEXT_RESTORED",
     "DIRECTOR_MODEL_LOAD_FAILED",
@@ -31,6 +33,8 @@ const CODE_SET: ReadonlySet<string> = new Set(DIRECTOR_DIAGNOSTIC_CODES);
 /** 固定文案：调用方不得传入任意字符串，避免业务正文经 message 泄漏。 */
 const MESSAGES: Record<DirectorDiagnosticCode, string> = {
     DIRECTOR_VIEWPORT_RENDER_FAILED: "导演台 3D 视口渲染失败",
+    DIRECTOR_VIEWPORT_WEBGL_UNAVAILABLE: "浏览器没有可用的 WebGL，导演台 3D 视口未启动",
+    DIRECTOR_VIEWPORT_RENDERER_FAILED: "导演台 3D 渲染器创建失败",
     DIRECTOR_VIEWPORT_CONTEXT_LOST: "导演台 WebGL 上下文丢失",
     DIRECTOR_VIEWPORT_CONTEXT_RESTORED: "导演台 WebGL 上下文已恢复",
     DIRECTOR_MODEL_LOAD_FAILED: "导演台 3D 模型加载失败",
@@ -45,6 +49,8 @@ const MESSAGES: Record<DirectorDiagnosticCode, string> = {
 
 const LEVELS: Record<DirectorDiagnosticCode, "info" | "warning" | "error"> = {
     DIRECTOR_VIEWPORT_RENDER_FAILED: "error",
+    DIRECTOR_VIEWPORT_WEBGL_UNAVAILABLE: "error",
+    DIRECTOR_VIEWPORT_RENDERER_FAILED: "error",
     DIRECTOR_VIEWPORT_CONTEXT_LOST: "warning",
     DIRECTOR_VIEWPORT_CONTEXT_RESTORED: "info",
     DIRECTOR_MODEL_LOAD_FAILED: "warning",
