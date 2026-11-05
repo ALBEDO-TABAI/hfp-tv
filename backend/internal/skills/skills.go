@@ -3,6 +3,7 @@ package skills
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -22,6 +23,12 @@ const (
 	skillStatusEnabled = 1
 	skillSourceUser    = 1
 )
+
+// MaxDescriptionRunes follows the Agent Skills format (description up to
+// 1024 characters), the same limit the skill market checks.
+const MaxDescriptionRunes = 1024
+
+var descriptionLengthMessage = fmt.Sprintf("技能简介必须为 1-%d 个字符", MaxDescriptionRunes)
 
 var skillCategoryLabels = map[string]string{
 	"drama":     "短剧影视",
@@ -425,8 +432,8 @@ func normalizeSkillMutationRequest(req SkillMutationRequest, requireInstruction 
 	if req.SkillName == "" || utf8.RuneCountInString(req.SkillName) > 80 {
 		return req, "", kernel.BadAuthRequest("技能名称必须为 1-80 个字符")
 	}
-	if req.Description == "" || utf8.RuneCountInString(req.Description) > 500 {
-		return req, "", kernel.BadAuthRequest("技能简介必须为 1-500 个字符")
+	if req.Description == "" || utf8.RuneCountInString(req.Description) > MaxDescriptionRunes {
+		return req, "", kernel.BadAuthRequest(descriptionLengthMessage)
 	}
 	if (requireInstruction && req.Instruction == "") || utf8.RuneCountInString(req.Instruction) > 100000 {
 		return req, "", kernel.BadAuthRequest("技能指令必须为 1-100000 个字符")

@@ -11,6 +11,8 @@ import (
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"strings"
+	"unicode/utf8"
 )
 
 func TestArchiveFromMarkdownInfersMetadata(t *testing.T) {
@@ -156,4 +158,31 @@ func skillZip(t *testing.T, files map[string]string) []byte {
 		t.Fatal(err)
 	}
 	return buffer.Bytes()
+}
+
+// Agent Skills allow a description up to 1024 characters; a longer header
+// still installs (the listing text is shortened, SKILL.md stays whole).
+func TestLongSkillDescriptionsInstall(t *testing.T) {
+	for _, tc := range []struct {
+		runes  int
+		intact bool
+	}{{800, true}, {1024, true}, {1500, false}} {
+		description := strings.Repeat("描", tc.runes)
+		body := []byte("---\nname: long-skill\ndescription: " + description + "\n---\n\n# Long skill\n")
+		archive, err := archiveFromMarkdown(body, "", "")
+		if err != nil {
+			t.Fatalf("%d-rune description: %v", tc.runes, err)
+		}
+		got := archive.Metadata.Description
+		if count := utf8.RuneCountInString(got); count > MaxDescriptionRunes || (got == description) != tc.intact {
+			t.Fatalf("%d-rune description stored as %d runes (intact=%v)", tc.runes, count, got == description)
+		}
+		if string(archive.Files["SKILL.md"]) != string(body) {
+			t.Fatal("SKILL.md was changed")
+		}
+	}
+	long := strings.Repeat("n", 120)
+	if archive, err := archiveFromMarkdown([]byte("---\nname: "+long+"\ndescription: x\n---\n"), "", ""); err != nil || utf8.RuneCountInString(archive.Metadata.Name) > 80 {
+		t.Fatalf("long name: %v", err)
+	}
 }

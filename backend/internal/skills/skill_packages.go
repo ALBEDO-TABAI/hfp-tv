@@ -327,8 +327,8 @@ func (s *Service) createSkillFromArchive(userID string, archive skillPackageArch
 	if utf8.RuneCountInString(name) == 0 || utf8.RuneCountInString(name) > 80 {
 		return nil, kernel.BadAuthRequest("技能名称必须为 1-80 个字符")
 	}
-	if utf8.RuneCountInString(description) == 0 || utf8.RuneCountInString(description) > 500 {
-		return nil, kernel.BadAuthRequest("技能简介必须为 1-500 个字符")
+	if utf8.RuneCountInString(description) == 0 || utf8.RuneCountInString(description) > MaxDescriptionRunes {
+		return nil, kernel.BadAuthRequest(descriptionLengthMessage)
 	}
 	tag := strings.TrimSpace(req.Tag)
 	if _, ok := skillCategoryLabels[tag]; !ok {
@@ -773,8 +773,11 @@ func finalizeSkillArchive(files map[string][]byte, metadata skillPackageMetadata
 	if metadata.Description == "" {
 		return skillPackageArchive{}, kernel.BadAuthRequest("SKILL.md 缺少 description，且无法从正文推断")
 	}
-	if utf8.RuneCountInString(metadata.Name) > 80 || utf8.RuneCountInString(metadata.Description) > 500 {
-		return skillPackageArchive{}, kernel.BadAuthRequest("技能名称或简介超过长度限制")
+	if utf8.RuneCountInString(metadata.Name) > 80 {
+		return skillPackageArchive{}, kernel.BadAuthRequest("技能名称不能超过 80 个字符")
+	}
+	if utf8.RuneCountInString(metadata.Description) > MaxDescriptionRunes {
+		return skillPackageArchive{}, kernel.BadAuthRequest(fmt.Sprintf("SKILL.md 的 description 有 %d 个字符，超过 %d 个字符的上限", utf8.RuneCountInString(metadata.Description), MaxDescriptionRunes))
 	}
 	hash := sha256.New()
 	var total int64
@@ -870,12 +873,23 @@ func parseSkillPackageMetadata(data []byte) skillPackageMetadata {
 			}
 			paragraph = append(paragraph, trimmed)
 		}
-		metadata.Description = kernel.TruncateRunes(strings.Join(paragraph, " "), 500)
+		metadata.Description = truncateWithin(strings.Join(paragraph, " "), MaxDescriptionRunes)
 	}
-	metadata.Name = kernel.TruncateRunes(strings.TrimSpace(metadata.Name), 80)
-	metadata.Description = kernel.TruncateRunes(strings.TrimSpace(metadata.Description), 500)
-	metadata.Version = kernel.TruncateRunes(strings.TrimSpace(metadata.Version), 64)
+	// Listing text only: SKILL.md itself is kept whole. The marker stays within
+	// the limit, so a long header never fails the length check after this.
+	metadata.Name = truncateWithin(strings.TrimSpace(metadata.Name), 80)
+	metadata.Description = truncateWithin(strings.TrimSpace(metadata.Description), MaxDescriptionRunes)
+	metadata.Version = truncateWithin(strings.TrimSpace(metadata.Version), 64)
 	return metadata
+}
+
+// truncateWithin shortens value to at most limit runes, ending with "…" when cut.
+func truncateWithin(value string, limit int) string {
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit-1]) + "…"
 }
 
 func yamlScalar(value string) string {

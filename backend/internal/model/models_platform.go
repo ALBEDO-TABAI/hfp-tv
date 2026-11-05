@@ -78,7 +78,7 @@ type Skill struct {
 	AuthorName        string     `json:"authorName" gorm:"size:120;index"`
 	AuthorAvatarURL   string     `json:"authorAvatarUrl" gorm:"size:1000"`
 	Name              string     `json:"name" gorm:"size:80;index"`
-	Description       string     `json:"description" gorm:"size:500"`
+	Description       string     `json:"description" gorm:"size:1024"`
 	Instruction       string     `json:"instruction" gorm:"type:text"`
 	CurrentVersionID  string     `json:"currentVersionId" gorm:"size:36;index"`
 	VersionLabel      string     `json:"versionLabel" gorm:"size:64"`
