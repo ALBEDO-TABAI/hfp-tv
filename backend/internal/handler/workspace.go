@@ -11,6 +11,8 @@ import (
 
 	"infinite-canvas/backend/internal/app"
 	"infinite-canvas/backend/internal/beefapi"
+	"infinite-canvas/backend/internal/modelcatalog"
+	httptransport "infinite-canvas/backend/internal/transport/http"
 	"infinite-canvas/backend/internal/workspace"
 
 	"github.com/gin-gonic/gin"
@@ -112,7 +114,7 @@ func RegisterWorkspaceRoutes(r *gin.RouterGroup, svc *app.Service) {
 			fail(c, http.StatusBadRequest, errors.New("本地模型配置格式错误"))
 			return
 		}
-		if _, external := externalBusiness(c); external && envelope.ExpectedRevision == nil {
+		if _, external := externalBusiness(c); (external || httptransport.HostedOwner(c.Request)) && envelope.ExpectedRevision == nil {
 			fail(c, http.StatusBadRequest, errors.New("修改模型配置需要 expectedRevision"))
 			return
 		}
@@ -302,6 +304,11 @@ func preservePlatformChannels(incoming, existing map[string]any, ids []string) {
 			next = append([]any{stored}, next...)
 		}
 		incomingChannels = next
+		if stored != nil {
+			// A page loaded before the administrator removed a model still
+			// holds it as a default; never write that choice back.
+			_ = modelcatalog.CorrectPlatformChannelSelections(incoming, stored)
+		}
 	}
 	incoming["channels"] = incomingChannels
 }

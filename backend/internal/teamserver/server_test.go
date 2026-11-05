@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -197,8 +198,16 @@ func TestTeamServerIsolatesWorkspacesBehindSessions(t *testing.T) {
 		t.Fatalf("stored relay key = %q", key)
 	}
 	// A member save that drops or rewrites the managed channel is restored.
+	var current struct {
+		Data struct {
+			Revision int64 `json:"revision"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(config.Body.Bytes(), &current); err != nil {
+		t.Fatal(err)
+	}
 	tamper := h.do(call{method: http.MethodPut, path: "/api/workspace/model-config", cookie: aliceCookie,
-		body: `{"config":{"channels":[{"id":"company-relay","name":"x","baseUrl":"http://127.0.0.1:9","apiKey":"stolen","apiFormat":"openai","models":[]},{"id":"mine","name":"mine","baseUrl":"https://api.example.com","apiKey":"sk-mine","apiFormat":"openai","models":["m"]}]}}`})
+		body: `{"expectedRevision":` + strconv.FormatInt(current.Data.Revision, 10) + `,"config":{"channels":[{"id":"company-relay","name":"x","baseUrl":"http://127.0.0.1:9","apiKey":"stolen","apiFormat":"openai","models":[]},{"id":"mine","name":"mine","baseUrl":"https://api.example.com","apiKey":"sk-mine","apiFormat":"openai","models":["m"]}]}}`})
 	if tamper.Code != http.StatusOK {
 		t.Fatalf("member save = %d %s", tamper.Code, tamper.Body.String())
 	}

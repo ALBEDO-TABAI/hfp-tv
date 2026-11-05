@@ -19,6 +19,18 @@ func (s *Service) processTask(ctx context.Context, task model.Task) (result map[
 	if err := validateTaskType(task.Type); err != nil {
 		return nil, nil, err
 	}
+	refreshed, err := s.preparePlatformTaskCredentials(task)
+	if err != nil {
+		return nil, nil, err
+	}
+	if refreshed != "" {
+		// The existing route write fences execution against cancellation; keep
+		// the same route and persist encrypted credentials for later polling.
+		if err := s.repo.SwitchTaskLogicalRoute(task.ID, task.RouteID, task.RouteID, refreshed, task.ChannelModelID); err != nil {
+			return nil, nil, err
+		}
+		task.InputJSON = refreshed
+	}
 	decryptedInput, err := s.decryptTaskInputJSON(task.InputJSON)
 	if err != nil {
 		return nil, nil, err

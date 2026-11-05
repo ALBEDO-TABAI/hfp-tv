@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"infinite-canvas/backend/internal/modelcatalog"
 	"infinite-canvas/backend/internal/outbound"
 	"infinite-canvas/backend/internal/referencestorage"
 	"infinite-canvas/backend/internal/workspace"
@@ -234,47 +235,69 @@ func applyRelayChannel(dataDir string, template map[string]any, apiKey string) e
 	if err != nil {
 		return err
 	}
-	effective, _, err := store.LoadEffectiveModelConfig()
-	if err != nil {
-		return err
-	}
-	config, err := cloneJSONMap(effective.Config)
-	if err != nil {
-		return err
-	}
-	channel, err := cloneJSONMap(template)
-	if err != nil {
-		return err
-	}
-	channel["id"] = RelayChannelID
-	if name, _ := channel["name"].(string); strings.TrimSpace(name) == "" {
-		channel["name"] = "公司中转站"
-	}
-	channel["apiKey"] = apiKey
-	channel["enabled"] = apiKey != ""
-	channel["pinned"] = true
-	channels, _ := config["channels"].([]any)
-	next := make([]any, 0, len(channels)+1)
-	next = append(next, channel)
-	for _, raw := range channels {
-		if existing, ok := raw.(map[string]any); ok && existing["id"] == RelayChannelID {
+	return updateRelayChannel(store, template, apiKey)
+}
+
+type relayConfigStore interface {
+	LoadEffectiveModelConfig() (workspace.EffectiveModelConfig, workspace.ConfigHealth, error)
+	SaveLocalModelConfigRevision([]byte, int64) (int64, error)
+}
+
+// maxRelayWriteAttempts bounds retries when a member saves between our read
+// and write; each retry rereads, so the member's newer save is kept.
+const maxRelayWriteAttempts = 8
+
+func updateRelayChannel(store relayConfigStore, template map[string]any, apiKey string) error {
+	for attempt := 1; ; attempt++ {
+		effective, _, err := store.LoadEffectiveModelConfig()
+		if err != nil {
+			return err
+		}
+		config, err := cloneJSONMap(effective.Config)
+		if err != nil {
+			return err
+		}
+		channel, err := cloneJSONMap(template)
+		if err != nil {
+			return err
+		}
+		channel["id"] = RelayChannelID
+		if name, _ := channel["name"].(string); strings.TrimSpace(name) == "" {
+			channel["name"] = "公司中转站"
+		}
+		channel["apiKey"] = apiKey
+		channel["enabled"] = apiKey != ""
+		channel["pinned"] = true
+		channels, _ := config["channels"].([]any)
+		next := make([]any, 0, len(channels)+1)
+		next = append(next, channel)
+		for _, raw := range channels {
+			if existing, ok := raw.(map[string]any); ok && existing["id"] == RelayChannelID {
+				continue
+			}
+			next = append(next, raw)
+		}
+		config["channels"] = next
+		if err := modelcatalog.CorrectPlatformChannelSelections(config, channel); err != nil {
+			return err
+		}
+		// The assistant reads the stored text model; give a member who never
+		// picked one the relay's first text model.
+		if current, _ := config["textModel"].(string); strings.TrimSpace(current) == "" {
+			if models := modelcatalog.PlatformChannelModels(channel, "text"); len(models) > 0 {
+				config["textModel"] = RelayChannelID + "::" + models[0]
+			}
+		}
+		body, err := json.Marshal(config)
+		if err != nil {
+			return err
+		}
+		_, err = store.SaveLocalModelConfigRevision(body, effective.Revision)
+		if errors.Is(err, workspace.ErrProviderConfigRevisionConflict) && attempt < maxRelayWriteAttempts {
 			continue
 		}
-		next = append(next, raw)
-	}
-	config["channels"] = next
-	// The assistant reads the stored text model; the page only displays a
-	// fallback. Give a member who never picked one the relay's text model.
-	if current, _ := config["textModel"].(string); strings.TrimSpace(current) == "" {
-		if model := firstRelayModel(template, "text"); model != "" {
-			config["textModel"] = RelayChannelID + "::" + model
-		}
-	}
-	body, err := json.Marshal(config)
-	if err != nil {
 		return err
 	}
-	return store.SaveLocalModelConfig(body)
 }
 
 func applyReferenceStorage(dataDir string, config *referencestorage.Config) error {
@@ -283,17 +306,4 @@ func applyReferenceStorage(dataDir string, config *referencestorage.Config) erro
 	}
 	_, err := referencestorage.Save(dataDir, *config)
 	return err
-}
-
-func firstRelayModel(template map[string]any, capability string) string {
-	profiles, _ := template["modelProfiles"].([]any)
-	for _, raw := range profiles {
-		profile, _ := raw.(map[string]any)
-		if value, _ := profile["capability"].(string); strings.EqualFold(strings.TrimSpace(value), capability) {
-			if model, _ := profile["model"].(string); strings.TrimSpace(model) != "" {
-				return strings.TrimSpace(model)
-			}
-		}
-	}
-	return ""
 }

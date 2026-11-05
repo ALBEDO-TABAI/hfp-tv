@@ -3,8 +3,10 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	httptransport "infinite-canvas/backend/internal/transport/http"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"infinite-canvas/backend/internal/app"
@@ -12,6 +14,20 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+func TestHostedModelConfigRequiresRevision(t *testing.T) {
+	router, store := newModelConfigTestRouter(t)
+	req := httptest.NewRequest(http.MethodPut, "/api/workspace/model-config", strings.NewReader(`{"config":{"textModel":"personal::new"}}`))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptransport.WithHostedOwner(req))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("missing revision: %d", recorder.Code)
+	}
+	got, _, err := store.LoadEffectiveModelConfig()
+	if err != nil || got.Revision != 0 {
+		t.Fatal("unversioned hosted save changed config")
+	}
+}
 
 func TestWorkspaceModelConfigReturnsBuiltinBeefAPIAndPersistenceMetadata(t *testing.T) {
 	router, _ := newModelConfigTestRouter(t)
@@ -114,4 +130,17 @@ func modelConfigResponseData(t *testing.T, recorder *httptest.ResponseRecorder) 
 		t.Fatal(err)
 	}
 	return envelope.Data
+}
+
+// A page loaded before the administrator removed a company model still holds
+// it as a default; saving must not write that choice back.
+func TestPlatformChannelSaveCorrectsRemovedCompanySelections(t *testing.T) {
+	existing := map[string]any{"channels": []any{map[string]any{"id": "company-relay", "baseUrl": "https://relay.invalid/v1", "apiKey": "SYNTHETIC_MEMBER_KEY", "enabled": true, "models": []any{"new"},
+		"modelProfiles": []any{map[string]any{"model": "new", "capability": "text", "protocol": "chat-completion"}}}}}
+	incoming := map[string]any{"assistantModel": "company-relay::old", "textModel": "mine::m", "imageModel": "company-relay::new",
+		"channels": []any{map[string]any{"id": "company-relay", "models": []any{"old", "new"}}, map[string]any{"id": "mine", "models": []any{"m"}}}}
+	preservePlatformChannels(incoming, existing, []string{"company-relay"})
+	if incoming["assistantModel"] != "company-relay::new" || incoming["textModel"] != "mine::m" || incoming["imageModel"] != "company-relay::new" {
+		t.Fatalf("selections after save: assistant=%v text=%v image=%v", incoming["assistantModel"], incoming["textModel"], incoming["imageModel"])
+	}
 }

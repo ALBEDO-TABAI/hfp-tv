@@ -56,6 +56,19 @@ func (s *Service) retry(userID, id string, refresh *retryCredentialRefresh) (*mo
 	if s.deps.Failures.IsModeration(task.Error) {
 		return nil, kernel.BadAuthRequest(ContentModerationRetryMessage)
 	}
+	if refresh == nil {
+		if resolver, ok := s.deps.Secrets.(interface {
+			PrepareRetryCredentials(*model.Task) (string, error)
+		}); ok {
+			inputJSON, err := resolver.PrepareRetryCredentials(task)
+			if err != nil {
+				return nil, err
+			}
+			if inputJSON != "" {
+				refresh = &retryCredentialRefresh{task.InputJSON, inputJSON}
+			}
+		}
+	}
 	if refresh != nil {
 		if err := s.validateRetryCredentialRefresh(task, *refresh); err != nil {
 			return nil, err

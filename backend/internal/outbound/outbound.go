@@ -111,6 +111,13 @@ func OutboundHTTPClient(timeout time.Duration) *http.Client {
 		Transport: outboundTransport,
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// A key belongs to the origin it was configured for. Go drops
+			// Authorization only across hostnames; a provider can also hand
+			// off to a CDN or another port, so on any origin change only
+			// headers that cannot carry a key follow the redirect.
+			if len(via) > 0 && !sameOrigin(req.URL, via[0].URL) {
+				stripRequestCredentials(req)
+			}
 			if len(via) >= maxOutboundRedirects {
 				return errors.New("外部服务重定向次数过多")
 			}
@@ -118,6 +125,35 @@ func OutboundHTTPClient(timeout time.Duration) *http.Client {
 			return err
 		},
 	}
+}
+
+// redirectSafeHeaders may follow a request to another origin. Everything else
+// is dropped there: a channel can send its key in any custom header.
+var redirectSafeHeaders = map[string]bool{
+	"Accept": true, "Accept-Encoding": true, "Accept-Language": true, "User-Agent": true,
+	"Range": true, "If-Range": true, "If-None-Match": true, "If-Modified-Since": true,
+	"Cache-Control": true, "Content-Type": true,
+}
+
+func stripRequestCredentials(req *http.Request) {
+	for name := range req.Header {
+		if !redirectSafeHeaders[http.CanonicalHeaderKey(name)] {
+			req.Header.Del(name)
+		}
+	}
+}
+
+func sameOrigin(a, b *url.URL) bool {
+	port := func(u *url.URL) string {
+		if p := u.Port(); p != "" {
+			return p
+		}
+		if strings.EqualFold(u.Scheme, "https") {
+			return "443"
+		}
+		return "80"
+	}
+	return a.User == nil && strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Hostname(), b.Hostname()) && port(a) == port(b)
 }
 
 func CustomRelayHTTPClient(timeout time.Duration) *http.Client {

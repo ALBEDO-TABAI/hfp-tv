@@ -75,8 +75,9 @@ type Pool struct {
 	openKernel func(Spec) (Kernel, error)
 	// relay is the company relay definition written into every workspace; an
 	// administrator can replace it while the server runs.
-	relayMu sync.RWMutex
-	relay   map[string]any
+	relayMu         sync.RWMutex
+	relay           map[string]any
+	provisionGuards sync.Map // workspace ID -> *sync.Mutex
 }
 
 // RelayTemplate returns the company relay definition in effect, or nil.
@@ -209,7 +210,12 @@ func (p *Pool) open(spec Spec) (Kernel, error) {
 	if err := os.MkdirAll(spec.DataDir, 0o700); err != nil {
 		return nil, err
 	}
-	if err := p.provision(spec); err != nil {
+	// Hold the provisioning lock until the kernel has started, so a
+	// reprovision never interleaves with a kernel that read its settings and
+	// is still starting.
+	unlock := p.lockProvision(spec.ID)
+	defer unlock()
+	if err := p.provisionLocked(spec); err != nil {
 		return nil, fmt.Errorf("准备工作区配置失败：%w", err)
 	}
 	hosted := p.opts.Hosted
@@ -233,6 +239,20 @@ func (p *Pool) open(spec Spec) (Kernel, error) {
 }
 
 func (p *Pool) provision(spec Spec) error {
+	unlock := p.lockProvision(spec.ID)
+	defer unlock()
+	return p.provisionLocked(spec)
+}
+
+// lockProvision serializes provisioning of one workspace.
+func (p *Pool) lockProvision(id string) func() {
+	guard, _ := p.provisionGuards.LoadOrStore(id, &sync.Mutex{})
+	mu := guard.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
+
+func (p *Pool) provisionLocked(spec Spec) error {
 	if err := applyReferenceStorage(spec.DataDir, p.opts.ReferenceStorage); err != nil {
 		return err
 	}
@@ -255,10 +275,37 @@ func (p *Pool) provision(spec Spec) error {
 // this is safe while the kernel is open; the assistant child picks up a changed
 // provider on its next status check.
 func (p *Pool) Reprovision(spec Spec) error {
-	if err := os.MkdirAll(spec.DataDir, 0o700); err != nil {
+	for {
+		// The close happens under the same provisioning lock, so a later
+		// successful reprovision of this kernel cannot be undone by this failure.
+		unlock := p.lockProvision(spec.ID)
+		p.mu.Lock()
+		stale := p.kernels[spec.ID]
+		p.mu.Unlock()
+		if stale != nil {
+			select {
+			case <-stale.ready:
+			default:
+				// Still opening: let it finish (it provisions under this lock),
+				// then decide against the started kernel. Waiting while holding
+				// the lock would deadlock with that open.
+				unlock()
+				<-stale.ready
+				continue
+			}
+		}
+		err := os.MkdirAll(spec.DataDir, 0o700)
+		if err == nil {
+			err = p.provisionLocked(spec)
+		}
+		if err != nil && stale != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), p.opts.ShutdownTimeout)
+			err = errors.Join(err, p.closeEntry(ctx, spec.ID, stale))
+			cancel()
+		}
+		unlock()
 		return err
 	}
-	return p.provision(spec)
 }
 
 // detach removes an open kernel from the pool and marks it closing. The
@@ -279,9 +326,15 @@ func (p *Pool) detach(id string) func() {
 
 // Close shuts one kernel down (account disabled). Missing kernels are a no-op.
 func (p *Pool) Close(ctx context.Context, id string) error {
+	return p.closeEntry(ctx, id, nil)
+}
+
+// closeEntry closes the workspace's kernel; with expected set, only if that
+// exact kernel is still the open one.
+func (p *Pool) closeEntry(ctx context.Context, id string, expected *entry) error {
 	p.mu.Lock()
 	current, exists := p.kernels[id]
-	if !exists {
+	if !exists || (expected != nil && current != expected) {
 		p.mu.Unlock()
 		return nil
 	}

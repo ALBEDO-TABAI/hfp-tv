@@ -26,6 +26,7 @@ const (
 	minPasswordLength = 8
 	maxPasswordLength = 256
 	maxRelayKeyLength = 512
+	minRelayKeyLength = 8
 )
 
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{3,32}$`)
@@ -527,7 +528,9 @@ func (s *Service) sealRelayKey(key string) (string, string, error) {
 	if key == "" {
 		return "", "", nil
 	}
-	if len(key) > maxRelayKeyLength || strings.ContainsAny(key, " \t\r\n") {
+	// Real relay keys are long; a very short value is a typo, and it could not
+	// be told apart from ordinary words when keys are removed from reports.
+	if len(key) < minRelayKeyLength || len(key) > maxRelayKeyLength || strings.ContainsAny(key, " \t\r\n") {
 		return "", "", ErrInvalidRelayKey
 	}
 	ciphertext, err := localcrypto.Encrypt(s.secretsDir, key)
@@ -598,6 +601,11 @@ func (s *Service) ResetPasswordByUsername(ctx context.Context, username, passwor
 
 // RelayKey decrypts the bound key for a workspace; empty when unbound.
 func (s *Service) RelayKey(workspace Workspace) (string, error) {
+	latest, err := s.Workspace(context.Background(), workspace.ID)
+	if err != nil {
+		return "", err
+	}
+	workspace = *latest
 	if workspace.RelayKeyCiphertext == "" {
 		return "", nil
 	}

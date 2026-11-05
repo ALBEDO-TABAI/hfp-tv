@@ -8,6 +8,7 @@ import (
 	"infinite-canvas/backend/internal/generation"
 	"infinite-canvas/backend/internal/model"
 	"infinite-canvas/backend/internal/modelcatalog"
+	localtask "infinite-canvas/backend/internal/task"
 	"infinite-canvas/backend/internal/workspace"
 )
 
@@ -88,12 +89,7 @@ func (s *Service) prepareCanvasWorkflowRetryCredentials(run model.CanvasWorkflow
 
 func canvasWorkflowCredentialFingerprint(input map[string]any) string {
 	config, _ := input["config"].(map[string]any)
-	credentials := map[string]any{}
-	for _, key := range []string{"apiKey", "secretKey", "headers", "baseUrl", "credentialRef", "runningHubUploadApiKey"} {
-		if value, ok := config[key]; ok {
-			credentials[key] = value
-		}
-	}
+	credentials := localtask.ConnectionCredentials(config)
 	encoded, _ := json.Marshal(credentials)
 	return string(encoded)
 }
@@ -104,6 +100,9 @@ func (s *Service) canvasWorkflowChannelID(input map[string]any, logical string) 
 	config, _ := input["config"].(map[string]any)
 	if config == nil {
 		return "", workflowBad("原生成步骤缺少模型配置")
+	}
+	if channelID := stringValue(config["platformChannelId"]); s.IsPlatformChannel(channelID) {
+		return channelID, nil
 	}
 	if taskInputUsesWorkflowProvider(input) {
 		return "@runninghub", nil

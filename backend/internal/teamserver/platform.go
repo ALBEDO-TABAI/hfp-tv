@@ -205,13 +205,27 @@ func (s *Server) adminRoutes(r *gin.RouterGroup) {
 		}
 		spec, err := s.workspaceSpec(*workspace)
 		if err == nil {
+			// On failure Reprovision closes the open kernel itself, so it stops
+			// using the old key. Closing again here could stop a kernel that a
+			// member has reopened, with the binding applied, in the meantime.
 			err = s.opts.Pool.Reprovision(spec)
+		} else {
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+			defer cancel()
+			if closeErr := s.opts.Pool.Close(ctx, workspace.ID); closeErr != nil {
+				log.Printf("close workspace after relay apply failure workspace=%s: %v", workspace.ID, closeErr)
+			}
 		}
 		if err != nil {
-			// The binding is saved; the next kernel open applies it.
 			log.Printf("apply relay key workspace=%s: %v", workspace.ID, err)
+			message := "绑定已保存，但工作区未生效，请修复下发问题后重新打开工作区"
+			if key == "" {
+				message = "密钥已清除，但工作区未生效，请修复下发问题后重新打开工作区"
+			}
+			ok(c, gin.H{"user": view, "applied": false, "message": message})
+			return
 		}
-		ok(c, gin.H{"user": view})
+		ok(c, gin.H{"user": view, "applied": true})
 	}
 	r.PUT("/users/:id/relay-key", func(c *gin.Context) {
 		var body struct {

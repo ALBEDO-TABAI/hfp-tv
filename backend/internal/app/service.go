@@ -281,6 +281,12 @@ func (s *Service) refreshTaskProviderState(task *model.Task) error {
 	if latest.ProviderRequestID != "" {
 		task.ProviderRequestID = latest.ProviderRequestID
 	}
+	// Execution may have refreshed the stored credentials (a company relay key
+	// rotated while the task waited); delivery and failure reports must use the
+	// input the request was actually sent with.
+	if latest.InputJSON != "" && latest.RouteID == task.RouteID {
+		task.InputJSON = latest.InputJSON
+	}
 	task.Stage, task.Progress = latest.Stage, latest.Progress
 	task.PollStage = latest.PollStage
 	task.NextPollAt = latest.NextPollAt

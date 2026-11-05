@@ -174,7 +174,7 @@ type referenceServiceReply struct {
 func callReferenceService(ctx context.Context, service, apiKey, mode, contentType string, data []byte) (referenceServiceReply, error) {
 	requestID := newID()
 	fail := func(unauthorized bool, message string, args ...any) (referenceServiceReply, error) {
-		return referenceServiceReply{}, generation.ReferenceRelayError{RequestID: requestID, Unauthorized: unauthorized, Cause: fmt.Errorf(message, args...)}
+		return referenceServiceReply{}, referenceServiceFailure(requestID, apiKey, unauthorized, fmt.Errorf(message, args...))
 	}
 	if strings.TrimSpace(apiKey) == "" {
 		return fail(true, "没有可用的中转站密钥，无法上传参考图")
@@ -213,6 +213,13 @@ func callReferenceService(ctx context.Context, service, apiKey, mode, contentTyp
 	default:
 		return fail(false, "参考图服务处理失败（HTTP %d）", response.StatusCode)
 	}
+}
+
+func referenceServiceFailure(requestID, apiKey string, unauthorized bool, cause error) error {
+	if apiKey = strings.TrimSpace(apiKey); apiKey != "" {
+		cause = errors.New(strings.ReplaceAll(cause.Error(), apiKey, "[REDACTED]"))
+	}
+	return generation.ReferenceRelayError{RequestID: requestID, Unauthorized: unauthorized, Cause: cause}
 }
 
 // relayReplyError reports a successful call whose answer cannot be used.

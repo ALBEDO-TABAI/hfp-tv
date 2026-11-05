@@ -14,6 +14,18 @@ type credentialRetryStore interface {
 	RetryWithExpectedInput(userID string, prepared *model.Task, limit int, expectedInputJSON string) (*model.Task, error)
 }
 
+// ConnectionCredentials is the shared allowlist for comparing and validating
+// a retry's connection changes. Generation content is deliberately excluded.
+func ConnectionCredentials(config map[string]any) map[string]any {
+	connection := map[string]any{}
+	for _, key := range []string{"apiKey", "secretKey", "headers", "baseUrl", "credentialRef", "referenceAssetOrigin", "referenceAssetService", "runningHubUploadApiKey"} {
+		if value, ok := config[key]; ok {
+			connection[key] = value
+		}
+	}
+	return connection
+}
+
 func (s *Service) validateRetryCredentialRefresh(task *model.Task, refresh retryCredentialRefresh) error {
 	if task.InputJSON != refresh.expectedInputJSON || task.ProviderRequestID != "" || task.PollStage != "" || task.NextPollAt != nil || task.Stage == "submission_unknown" {
 		return kernel.BadAuthRequest("原任务已被接纳或状态发生变化，请先查询原任务，避免重复生成")
@@ -36,11 +48,8 @@ func (s *Service) validateRetryCredentialRefresh(task *model.Task, refresh retry
 		if config == nil {
 			return kernel.BadAuthRequest("原任务缺少渠道配置")
 		}
-		connection := map[string]any{}
-		for _, key := range []string{"apiKey", "secretKey", "headers", "baseUrl", "credentialRef", "referenceAssetOrigin", "runningHubUploadApiKey"} {
-			if value, ok := config[key]; ok {
-				connection[key] = value
-			}
+		connection := ConnectionCredentials(config)
+		for key := range connection {
 			delete(config, key)
 		}
 		encoded, _ := json.Marshal(connection)

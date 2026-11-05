@@ -131,6 +131,12 @@ func (s *Service) resolvePlatformChannelSecrets(input map[string]any) (map[strin
 		return input, nil
 	}
 	channelID := strings.TrimSpace(stringValue(config["channelId"]))
+	if marked := strings.TrimSpace(stringValue(config["platformChannelId"])); marked != "" {
+		if !s.IsPlatformChannel(marked) {
+			return nil, BadAuthRequest("公司模型服务暂不可用，请联系管理员")
+		}
+		channelID = marked
+	}
 	if !s.IsPlatformChannel(channelID) {
 		// A member's own channel never names the reference-image service. Only
 		// a Seedance task sent to the company relay itself gets the company's.
@@ -155,6 +161,7 @@ func (s *Service) resolvePlatformChannelSecrets(input map[string]any) (map[strin
 		}
 	}
 	next["apiKey"] = credential.apiKey
+	next["platformChannelId"] = channelID
 	next["baseUrl"] = credential.baseURLFor(stringValue(config["model"]))
 	next["secretKey"] = ""
 	if service := credential.referenceServiceFor(stringValue(config["model"])); service != "" {

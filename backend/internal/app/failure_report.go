@@ -1,12 +1,18 @@
 package app
 
 import (
+	"encoding/json"
+	"errors"
 	"log"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
 	"infinite-canvas/backend/internal/kernel"
 	"infinite-canvas/backend/internal/model"
+
+	"gorm.io/gorm"
 )
 
 const failureReportLogLines = 12
@@ -71,5 +77,101 @@ func (s *Service) taskFailureReport(task model.Task) kernel.FailureReport {
 			}
 		}
 	}
+	// The report leaves this workspace for the administrators' error page. An
+	// upstream may echo the request's key in any format, so remove this task's
+	// own keys exactly, on top of the pattern-based redaction.
+	secrets, readable := s.taskInputSecrets(task)
+	if !readable {
+		// The task's keys are unknown, so no upstream text can be cleared of
+		// them: report only that the task failed, at which stage.
+		report.Message, report.UpstreamDetail, report.ProviderTaskID, report.Log = "任务失败（无法确认上游原文不含密钥，未上报详情）", "", "", nil
+	}
+	if len(secrets) > 0 {
+		scrub := func(value string) string {
+			for _, secret := range secrets {
+				value = strings.ReplaceAll(value, secret, "[REDACTED]")
+			}
+			return value
+		}
+		report.Message, report.UpstreamDetail, report.Stage, report.Model = scrub(report.Message), scrub(report.UpstreamDetail), scrub(report.Stage), scrub(report.Model)
+		report.ProviderTaskID = scrub(report.ProviderTaskID)
+		for i := range report.Log {
+			report.Log[i] = scrub(report.Log[i])
+		}
+	}
 	return report
+}
+
+// taskInputSecrets lists the credentials a task was sent with, longest first,
+// so they can be removed from anything that leaves the workspace.
+func (s *Service) taskInputSecrets(task model.Task) ([]string, bool) {
+	if s == nil {
+		return nil, strings.TrimSpace(task.InputJSON) == ""
+	}
+	inputs := []string{task.InputJSON}
+	// Execution may have refreshed a company relay task's key after this copy
+	// was read; the stored input has the key the request actually carried.
+	if s.repo != nil && task.ID != "" {
+		latest, err := s.repo.Task(task.ID)
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			// No stored row: the copy at hand is all there is.
+		case err != nil:
+			return nil, false
+		case latest.InputJSON != task.InputJSON:
+			inputs = append(inputs, latest.InputJSON)
+		}
+	}
+	var secrets []string
+	readable := true
+	for _, raw := range inputs {
+		values, ok := s.inputSecrets(raw)
+		readable = readable && ok
+		for _, secret := range values {
+			if !slices.Contains(secrets, secret) {
+				secrets = append(secrets, secret)
+			}
+		}
+	}
+	sort.Slice(secrets, func(i, j int) bool { return len(secrets[i]) > len(secrets[j]) })
+	return secrets, readable
+}
+
+func (s *Service) inputSecrets(raw string) ([]string, bool) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, true
+	}
+	plain, err := s.decryptTaskInputJSON(raw)
+	if err != nil {
+		return nil, false
+	}
+	var input struct {
+		Config struct {
+			APIKey                 string `json:"apiKey"`
+			SecretKey              string `json:"secretKey"`
+			RunningHubUploadAPIKey string `json:"runningHubUploadApiKey"`
+			Headers                []struct {
+				Value string `json:"value"`
+			} `json:"headers"`
+		} `json:"config"`
+	}
+	if json.Unmarshal([]byte(plain), &input) != nil {
+		return nil, false
+	}
+	values := []string{input.Config.APIKey, input.Config.SecretKey, input.Config.RunningHubUploadAPIKey}
+	for _, header := range input.Config.Headers {
+		value := strings.TrimSpace(header.Value)
+		if scheme, token, found := strings.Cut(value, " "); found && strings.EqualFold(scheme, "Bearer") {
+			value = token
+		}
+		values = append(values, value)
+	}
+	var secrets []string
+	for _, value := range values {
+		// Very short values would garble ordinary words; real keys are longer.
+		if value = strings.TrimSpace(value); len(value) >= 6 && !slices.Contains(secrets, value) {
+			secrets = append(secrets, value)
+		}
+	}
+	return secrets, true
 }
