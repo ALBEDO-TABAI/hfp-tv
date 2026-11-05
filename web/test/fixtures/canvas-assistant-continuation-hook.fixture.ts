@@ -39,7 +39,7 @@ mock.module("@/services/api/assistant-continuation", () => ({
 }));
 mock.module("@/services/api/task-center", () => ({subscribeGenerationTasks: (_ids: string[], listener: () => void) => {taskListener = listener; return () => {};}}));
 mock.module("@/lib/user-scope-guard", () => ({captureUserScope: () => "owner", userScopeMatches: () => true}));
-mock.module("@/services/api/agent-assistant", () => ({cancelAgentChat: async () => {}}));
+mock.module("@/services/api/agent-assistant", () => ({cancelAgentChat: async () => {}, isAgentHostRunning: async () => true}));
 const { useCanvasAssistantContinuation } = await import("@/pages/canvas/use-canvas-assistant-continuation");
 let nodes: any[] = [];
 const controller: any = {canvasId:"canvas",sessionId:"session",historyLoaded:true,streaming:false,sessionBusy:false,awaitingReceipt:false,reloadHistory:async()=>{},send:async()=>{sends++;}};

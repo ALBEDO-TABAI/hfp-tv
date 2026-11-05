@@ -466,6 +466,13 @@ paths:
       tags: [assistant]
       security: []
       summary: 内置创作助手宿主状态（免身份、不含凭据）
+      description: 宿主未运行时会启动它。ensure=0 只探测宿主此刻是否在运行，不启动也不重启。
+      parameters:
+        - name: ensure
+          in: query
+          required: false
+          schema: { type: string, enum: ["0"] }
+          description: 传 0 时只探测；未运行返回 available=false、reason=host_stopped
       responses:
         "200":
           description: 信封 data 为 { available, reason?, url?, health? }；未就绪时给出明确原因

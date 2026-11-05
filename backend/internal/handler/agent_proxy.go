@@ -110,6 +110,17 @@ func RegisterAgentProxyRoutes(r gin.IRouter, svc *app.Service, clients *agentops
 			unavailable(c, "host_unreachable")
 			return
 		}
+		// ensure=0 only asks whether the host answers now, e.g. before reading
+		// history for auto-continuation on a canvas whose panel is closed. It never
+		// starts or restarts the host, so opening a canvas costs no assistant process.
+		if c.Query("ensure") == "0" {
+			if host.Probe(c.Request.Context()).OK {
+				ok(c, gin.H{"available": true})
+			} else {
+				unavailable(c, "host_stopped")
+			}
+			return
+		}
 		provider, reason := host.ResolveProvider()
 		if reason != "" {
 			unavailable(c, reason)

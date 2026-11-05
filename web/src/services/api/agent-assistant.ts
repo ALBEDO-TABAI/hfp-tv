@@ -238,6 +238,15 @@ export async function getAgentHostStatus(): Promise<AgentHostStatus> {
 }
 
 /**
+ * 只问助手宿主此刻是否在运行，不会启动它。用于面板关着时决定要不要读对话记录：
+ * 宿主没起来时读记录只会得到 503 host_unreachable。
+ */
+export async function isAgentHostRunning(): Promise<boolean> {
+    const data = await http.get<AgentHostStatus>("/assistant/status", { params: { ensure: "0" } });
+    return data.available === true;
+}
+
+/**
  * UI 会话头由页面内存里的凭据提供；助手的每条路由都走同一套认证。
  * 凭据只存在于工作区内核内存里：内核重启或空闲回收后旧凭据会被 403 unauthenticated
  * 拒绝（此时请求在认证层被拦下，没有执行任何操作），换一次新凭据再试。

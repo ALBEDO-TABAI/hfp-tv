@@ -293,6 +293,16 @@ func TestRepeatedStatusStartStopShareHostOwnership(t *testing.T) {
 		t.Fatal("停止后注入的 Host 必须不再持有子进程")
 	}
 
+	// The read-only probe reports a stopped host and must not start it.
+	probe := lifecycleRequest(router, http.MethodGet, "/api/assistant/status?ensure=0", "", "")
+	if probe.Code != http.StatusOK || !strings.Contains(probe.Body.String(), `"host_stopped"`) {
+		t.Fatalf("probe = %d body=%s", probe.Code, probe.Body.String())
+	}
+	time.Sleep(200 * time.Millisecond)
+	if host.Running() {
+		t.Fatal("ensure=0 的状态查询不能启动宿主")
+	}
+
 	relaunched := lifecycleRequest(router, http.MethodGet, "/api/assistant/status", "", "")
 	if relaunched.Code != http.StatusOK {
 		t.Fatalf("relaunched status = %d body=%s", relaunched.Code, relaunched.Body.String())

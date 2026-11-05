@@ -369,12 +369,16 @@ export function useCanvasAssistant({ canvasId, onCanvasChanged }: Options) {
         return () => clearInterval(timer);
     }, [canvasId, loadHistory, open, runFor]);
 
+    // 对话记录由助手宿主提供。状态还没回来、宿主正在启动或起不来时去读，网关只能回
+    // 503 host_unreachable；等状态说明宿主在运行再读，起不来时由状态提示说明原因。
+    // 没配模型时宿主可能仍在运行并保有此前的对话，照旧读一次；读不到时显示配置提示而不是报错。
+    const historyReadable = status?.available === true || status?.reason === "host_busy" || status?.reason === "model_not_configured";
     useEffect(() => {
-        if (!open) return;
+        if (!open || !historyReadable) return;
         const run = runFor(canvasId);
         if (run.historyLoaded || run.streaming || run.sessionBusy) return;
         void loadHistory(canvasId);
-    }, [canvasId, loadHistory, open, runFor, status?.available]);
+    }, [canvasId, historyReadable, loadHistory, open, runFor, status?.available]);
 
     // 宿主换了模型（例如用户换回了冻结那一轮用的模型）并就绪后，立刻复查冻结的一轮能否接着跑。
     const hostModel = status?.available ? status.model?.id : undefined;

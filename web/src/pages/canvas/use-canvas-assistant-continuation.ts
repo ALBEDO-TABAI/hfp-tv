@@ -5,7 +5,7 @@ import { subscribeGenerationTasks } from "@/services/api/task-center";
 import { captureUserScope, userScopeMatches } from "@/lib/user-scope-guard";
 import type { CanvasNodeData } from "@/types/canvas";
 import type { CanvasAssistantController } from "./use-canvas-assistant";
-import { cancelAgentChat } from "@/services/api/agent-assistant";
+import { cancelAgentChat, isAgentHostRunning } from "@/services/api/agent-assistant";
 
 type ContinuationController = Pick<CanvasAssistantController, "historyLoaded" | "streaming" | "sessionBusy" | "awaitingReceipt" | "sessionId" | "canvasId" | "send">;
 export function canContinueAssistant(controller: ContinuationController, row: AssistantContinuation) {
@@ -45,7 +45,16 @@ export function useCanvasAssistantContinuation(assistant: CanvasAssistantControl
     const activeEnabled = useRef(enabled); activeEnabled.current = enabled;
     const stopped = useRef(false);
     useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-    useEffect(() => { if (enabled && !live.current.historyLoaded) void live.current.reloadHistory(); }, [assistant.canvasId, enabled]);
+    // 自动继续要先知道当前会话。面板关着时没有状态轮询：只在宿主已在运行时读记录，
+    // 宿主没起来时读只会 503；之后打开面板会按状态正常读取。
+    useEffect(() => {
+        if (!enabled || live.current.historyLoaded) return;
+        let cancelled = false;
+        void isAgentHostRunning()
+            .then((running) => { if (!cancelled && running && !live.current.historyLoaded) void live.current.reloadHistory(); })
+            .catch(() => undefined);
+        return () => { cancelled = true; };
+    }, [assistant.canvasId, enabled]);
     useEffect(() => { sent.current.clear(); stopped.current = false; setRows([]); setNotice(""); }, [identity]);
     useEffect(() => {
         if (!enabled || !assistant.sessionId || !assistant.historyLoaded) return;
