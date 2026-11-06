@@ -1,5 +1,7 @@
 import { createModelChannel, type ModelChannel } from "@/stores/use-config-store";
 import type { RelayChannelProfile, RelayChannelTemplate } from "@/services/api/platform";
+import { isYSXXAISeedanceModel } from "@/lib/model-capabilities";
+import type { ModelProtocol } from "@/lib/model-protocols";
 
 export type CompanyRelaySharedEndpoints = { arkBaseUrl: string; referenceAssetService: string };
 
@@ -22,11 +24,17 @@ export function companyRelayChannelFromTemplate(template: RelayChannelTemplate |
     };
 }
 
+// Seedance models that register reference images: the Ark-protocol line and the
+// YSXXAI line (video-generations-json), which the shared field once skipped.
+function usesReferenceService(profile: RelayChannelProfile) {
+    return profile.protocol === "volcengine-ark-video" || isYSXXAISeedanceModel(profile.protocol as ModelProtocol | undefined, profile.model);
+}
+
 export function companyRelaySharedEndpoints(channel: ModelChannel): CompanyRelaySharedEndpoints {
     const profiles: RelayChannelProfile[] = channel.modelProfiles ?? [];
     return {
         arkBaseUrl: profiles.find(profile => profile.protocol?.startsWith("volcengine-ark-"))?.baseUrl ?? "",
-        referenceAssetService: profiles.find(profile => profile.protocol === "volcengine-ark-video")?.referenceAssetService ?? "",
+        referenceAssetService: profiles.find(profile => usesReferenceService(profile) && profile.referenceAssetService?.trim())?.referenceAssetService ?? "",
     };
 }
 
@@ -45,7 +53,7 @@ export function companyRelayTemplateFromChannel(channel: ModelChannel, shared: C
             if (shared.arkBaseUrl.trim()) next.baseUrl = shared.arkBaseUrl.trim();
             else delete next.baseUrl;
         }
-        if (profile.protocol === "volcengine-ark-video" && follows(profile.referenceAssetService, previous.referenceAssetService)) {
+        if (usesReferenceService(profile) && follows(profile.referenceAssetService, previous.referenceAssetService)) {
             if (shared.referenceAssetService.trim()) next.referenceAssetService = shared.referenceAssetService.trim();
             else delete next.referenceAssetService;
         }

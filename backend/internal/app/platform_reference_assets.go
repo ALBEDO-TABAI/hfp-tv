@@ -48,9 +48,62 @@ var referenceAssetIDPattern = regexp.MustCompile(`^asset://[A-Za-z0-9][A-Za-z0-9
 
 var referenceServiceImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/webp": true}
 
+const ysxxaiReferencePath = "/v1/ysxxai-reference-images"
+
 func isYSXXAIReferenceService(service string) bool {
 	endpoint, err := url.Parse(strings.TrimSpace(service))
-	return err == nil && endpoint.Path == "/v1/ysxxai-reference-images"
+	return err == nil && strings.TrimRight(endpoint.Path, "/") == ysxxaiReferencePath
+}
+
+// ysxxaiReferenceService is the YSXXAI asset endpoint of a configured company
+// reference service. The older /v1/reference-images sits on the same 8787
+// service but registers into the Deyun group, which YSXXAI generation can
+// never use, so it is read as its YSXXAI sibling.
+func ysxxaiReferenceService(service string) string {
+	endpoint, err := url.Parse(strings.TrimSpace(service))
+	if err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+		return ""
+	}
+	switch strings.TrimRight(endpoint.Path, "/") {
+	case ysxxaiReferencePath, "/v1/reference-images":
+		endpoint.Path, endpoint.RawQuery, endpoint.Fragment = ysxxaiReferencePath, "", ""
+		return endpoint.String()
+	}
+	return ""
+}
+
+// firstVirtualPortraitService prefers a service configured with the YSXXAI
+// path over one derived from the older path.
+func firstVirtualPortraitService(services []string) string {
+	for _, service := range services {
+		if isYSXXAIReferenceService(service) {
+			return ysxxaiReferenceService(service)
+		}
+	}
+	for _, service := range services {
+		if derived := ysxxaiReferenceService(service); derived != "" {
+			return derived
+		}
+	}
+	return ""
+}
+
+// ysxxaiAssetServiceFor is where a YSXXAI Seedance task registers its
+// reference images: the model's own service, else, for a task sent to the
+// company relay, the relay's reference service (the member's relay key is
+// what that service authenticates).
+func (s *Service) ysxxaiAssetServiceFor(config generation.Config) string {
+	if service := ysxxaiReferenceService(config.ReferenceAssetService); service != "" {
+		return service
+	}
+	for _, credential := range s.platformChannelCredentials() {
+		if credential.apiKey != "" && strings.TrimSpace(config.BaseURL) != "" && sameCredentialOrigin(config.BaseURL, credential.baseURL) {
+			if service := firstVirtualPortraitService(credential.referenceServices); service != "" {
+				return service
+			}
+		}
+	}
+	return ""
 }
 
 // registerYSXXAIReferenceAssets gives every library image of a YSXXAI Seedance
@@ -62,9 +115,10 @@ func isYSXXAIReferenceService(service string) bool {
 func (s *Service) registerYSXXAIReferenceAssets(ctx context.Context, userID string, input *canvasGenerationInput) error {
 	service := strings.TrimSpace(input.Config.ReferenceAssetService)
 	taskID := taskExecutionID(ctx)
+	// Only a log's message reaches the browser (payloads stay server-side).
 	note := func(index int, message string) {
 		if taskID != "" {
-			_ = s.log(userID, taskID, "info", fmt.Sprintf("参考图 %d", index+1), message)
+			_ = s.log(userID, taskID, "info", fmt.Sprintf("参考图 %d：%s", index+1, message), "")
 		}
 	}
 	registering := false
@@ -343,10 +397,8 @@ func (s *Service) platformVirtualPortraitService() (service, apiKey string, ok b
 		if credential.apiKey == "" {
 			continue
 		}
-		for _, service := range credential.referenceServices {
-			if isYSXXAIReferenceService(service) {
-				return service, credential.apiKey, true
-			}
+		if service := firstVirtualPortraitService(credential.referenceServices); service != "" {
+			return service, credential.apiKey, true
 		}
 	}
 	return "", "", false

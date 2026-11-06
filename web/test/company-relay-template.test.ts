@@ -135,3 +135,23 @@ test("relay API unwraps GET, PUT and DELETE, forwards cancellation and preserves
         await expect(savePlatformRelayChannel(template)).rejects.toMatchObject({ name: new ApiError("").name, status: 400, reason: "relay_channel_invalid", message: "模型接口地址必须与中转站同主机" });
     } finally { apiClient.defaults.adapter = original; }
 });
+
+test("the shared reference service also reaches the YSXXAI Seedance models", () => {
+    const ysxxai: RelayChannelTemplate = {
+        name: "公司中转站", baseUrl: "http://10.10.10.45:3000/v1", apiFormat: "openai",
+        models: ["doubao-seedance-2-0-260128-2-720P", "doubao-seedance-2-5-260628-2-1080P", "gpt-image-2"],
+        modelProfiles: [
+            { model: "doubao-seedance-2-0-260128-2-720P", capability: "video", protocol: "video-generations-json", baseUrl: "http://10.10.10.45:3000/ysxxai-seedance" },
+            { model: "doubao-seedance-2-5-260628-2-1080P", capability: "video", protocol: "video-generations-json", baseUrl: "http://10.10.10.45:3000/ysxxai-seedance", referenceAssetService: "http://10.10.10.45:8787/v1/reference-images" },
+            { model: "gpt-image-2", capability: "image", protocol: "openai-image" },
+        ],
+    };
+    const draft = companyRelayChannelFromTemplate(ysxxai);
+    const opening = companyRelaySharedEndpoints(draft);
+    expect(opening.referenceAssetService).toBe("http://10.10.10.45:8787/v1/reference-images");
+    const saved = companyRelayTemplateFromChannel(draft, { ...opening, referenceAssetService: "http://10.10.10.45:8787/v1/ysxxai-reference-images" }, opening);
+    for (const model of ["doubao-seedance-2-0-260128-2-720P", "doubao-seedance-2-5-260628-2-1080P"]) {
+        expect(saved.modelProfiles.find(profile => profile.model === model)?.referenceAssetService).toBe("http://10.10.10.45:8787/v1/ysxxai-reference-images");
+    }
+    expect(saved.modelProfiles.find(profile => profile.model === "gpt-image-2")).not.toHaveProperty("referenceAssetService");
+});

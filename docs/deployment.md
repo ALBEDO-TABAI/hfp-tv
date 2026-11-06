@@ -48,7 +48,7 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
 
    **YSXXAI Seedance**：先在公司 New API 安装 `deploy/teamserver/ysxxai-task-plugin.js`，创建该插件的渠道并在渠道里保存 YSXXAI 的 `seedance` 分组密钥；工作台仍使用成员自己的公司中转站密钥。七个模型名及其分辨率必须与上游完全一致，时长为 4～15 秒；Fast 和 Mini 不接收参考素材。普通图片由参考图服务转为临时公网 HTTPS 链接；视频和音频需要已有公网 HTTPS 链接或另配对象存储。画布或素材库里的参考图在提交前自动登记为虚拟人像素材并等待审核；真人素材需按上游要求认证和授权。素材组由管理员预先配置，不复用旧德云素材编号。
 
-   YSXXAI 可信素材登记需先升级 8787 参考图服务并设置独立素材组，见 `hfp-allinone-tauri/services/reference-upload-relay/README.md`。七个公司模型的参考图服务地址统一改为 `/v1/ysxxai-reference-images`，生成前的自动登记和画布里的“登记虚拟人像素材”都只发往这个入口；Fast 和 Mini 仍不接受参考素材。网页保存的公司模型配置优先于配置文件，不能只修改示例文件。顺序必须是先升级 8787（`/health` 显示 `ysxxaiAssetReady: true`）再改地址：旧版 8787 没有这个入口，提前改地址会让普通参考图的临时链接也失败。配置里还留着旧 `/v1/reference-images` 的模型也不会被选中；某个 YSXXAI 模型没配这个地址时，任务日志会写明参考图按原链接提交。
+   YSXXAI 可信素材登记需先升级 8787 参考图服务并设置独立素材组，见 `hfp-allinone-tauri/services/reference-upload-relay/README.md`。七个公司模型的参考图服务地址统一改为 `/v1/ysxxai-reference-images`，生成前的自动登记和画布里的“登记虚拟人像素材”都只发往这个入口；Fast 和 Mini 仍不接受参考素材。网页保存的公司模型配置优先于配置文件，不能只修改示例文件。顺序必须是先升级 8787（`/health` 显示 `ysxxaiAssetReady: true`）再改地址：旧版 8787 没有这个入口，提前改地址会让普通参考图的临时链接也失败。YSXXAI 模型配成旧地址 `/v1/reference-images` 或没配地址时，工作区自动改用同一台参考图服务的 `/v1/ysxxai-reference-images` 并在任务日志注明；只有公司中转站完全没有参考图服务时，任务日志才会写“没有配置虚拟人像素材服务”，参考图按原链接提交。管理员页面的公共“参考图服务地址”也会套用到这七个模型。
 
    Seedance 2.x 不接受直接用写实人脸图做参考（上游提示 “may contain real person”），与图片放在哪里无关。所以 YSXXAI Seedance 任务在调用模型前，会把画布或素材库里还没登记过的参考图自动登记为虚拟人像素材：8787 把图片传到对象存储，用 YSXXAI 的 `CreateAsset` 登记进预设素材组，轮询 `GetAsset` 直到审核通过（`Active`），通常 1～3 分钟，任务最多等 12 分钟；之后以 `asset://` 素材编号提交，同一张图再用时直接复用。审核未通过或登记失败时任务在调用模型前结束，不产生生成费用，原因写在任务日志的“上游原始错误”。成员也可以在画布里右键图片“登记虚拟人像素材”提前登记。所有参考图（包括场景、产品图）都会入库，占用服务商的素材额度。真人只能由本人在火山方舟完成认证授权后入库，不能当虚拟人像登记。
 

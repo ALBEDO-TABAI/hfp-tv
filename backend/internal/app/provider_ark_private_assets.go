@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -25,13 +26,18 @@ const (
 func (s *Service) prepareArkPrivateAssetReferences(ctx context.Context, userID string, input *canvasGenerationInput) error {
 	if input != nil && input.Mode == "video" && input.Config.InterfaceType == "video-generations-json" &&
 		isSeedance2Family(input.Config.InterfaceType, input.Config.Model) {
-		if isYSXXAIReferenceService(input.Config.ReferenceAssetService) {
+		taskID := taskExecutionID(ctx)
+		if service := s.ysxxaiAssetServiceFor(input.Config); service != "" {
+			if configured := strings.TrimSpace(input.Config.ReferenceAssetService); configured != service && taskID != "" && len(input.ReferenceImages) > 0 {
+				_ = s.log(userID, taskID, "info", "参考图：素材登记使用参考图服务的 YSXXAI 入口 "+ysxxaiReferencePath+"（模型配置的是"+referenceServicePathLabel(configured)+"）", "")
+			}
+			input.Config.ReferenceAssetService = service
 			return s.registerYSXXAIReferenceAssets(ctx, userID, input)
 		}
 		// Without the asset service every image goes as a plain link; say so in
-		// the task log, since a face in it will be refused.
-		if taskID := taskExecutionID(ctx); taskID != "" && len(input.ReferenceImages) > 0 {
-			_ = s.log(userID, taskID, "warn", "参考图", "这个模型没有配置虚拟人像素材服务（参考图服务地址应为参考图服务的 /v1/ysxxai-reference-images），参考图按原链接提交，含写实人脸会被拒")
+		// the task log (message only: payloads never reach the browser).
+		if taskID != "" && len(input.ReferenceImages) > 0 {
+			_ = s.log(userID, taskID, "warn", "参考图：这个模型没有配置虚拟人像素材服务（参考图服务地址应为参考图服务的 "+ysxxaiReferencePath+"），参考图按原链接提交，含写实人脸会被拒", "")
 		}
 		return nil
 	}
@@ -343,3 +349,17 @@ func (s *Service) failArkPrivateAssetBinding(binding *model.ArkPrivateAssetBindi
 
 // arkPrivateAssetUpstreamDetail 提取方舟控制面响应里 ResponseMetadata.Error 的 Code/Message，
 // 用于把上游真实失败原因透传给用户；没有上游错误时返回空串。
+
+// referenceServicePathLabel names a configured service by its path only: the
+// task log hides host-like text, which would mangle a full address.
+func referenceServicePathLabel(service string) string {
+	endpoint, err := url.Parse(strings.TrimSpace(service))
+	switch {
+	case strings.TrimSpace(service) == "":
+		return "空地址"
+	case err != nil || endpoint.Path == "":
+		return "无法识别的地址"
+	default:
+		return " " + endpoint.Path + " "
+	}
+}

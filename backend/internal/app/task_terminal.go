@@ -167,7 +167,8 @@ func (c *taskTerminalCoordinator) handleExecutionFailure(task *model.Task, err e
 	c.finalizeReplay(task, model.TaskStatusFailed, "文本回放草稿归并失败")
 	_ = c.logger.log(task.UserID, task.ID, "error", "任务处理失败", task.Error)
 	if line := failureEvidenceLine(task.FailureDiagnostics, task.Error); line != "" {
-		_ = c.logger.log(task.UserID, task.ID, "error", "上游原始错误", line)
+		// In the message: an error payload is shown only as its classified copy.
+		_ = c.logger.log(task.UserID, task.ID, "error", "上游原始错误："+line, "")
 	}
 	return err
 }

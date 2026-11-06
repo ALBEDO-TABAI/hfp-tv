@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"infinite-canvas/backend/internal/generation"
+	"infinite-canvas/backend/internal/model"
 )
 
 const onePixelPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
@@ -161,14 +162,51 @@ func TestYSXXAIRefusedRegistrationFailsBeforeTheModel(t *testing.T) {
 
 func TestYSXXAIModelWithoutTheAssetServiceSaysSo(t *testing.T) {
 	s, _, _, _ := creationTestService(t)
-	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P", ReferenceAssetService: "http://10.0.0.1:8787/v1/reference-images"},
+	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P"},
 		ReferenceImages: []generation.Media{{StorageKey: "resource:any", URL: "https://example.com/a.png"}}}
 	if err := s.prepareArkPrivateAssetReferences(generation.WithTaskExecutionID(context.Background(), "task-misconfigured"), "user", input); err != nil {
 		t.Fatal(err)
 	}
 	logs, _ := s.repo.TaskLogs("user", "task-misconfigured")
-	if len(logs) != 1 || !strings.Contains(logs[0].Payload, "没有配置虚拟人像素材服务") || input.ReferenceImages[0].URL != "https://example.com/a.png" {
+	if len(logs) != 1 || !strings.Contains(logs[0].Message, "没有配置虚拟人像素材服务") || input.ReferenceImages[0].URL != "https://example.com/a.png" {
 		t.Fatalf("logs=%+v reference=%+v", logs, input.ReferenceImages[0])
+	}
+}
+
+func TestYSXXAIOlderReferencePathUsesItsYSXXAISibling(t *testing.T) {
+	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
+	var paths []string
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		_, _ = w.Write([]byte(`{"url":"asset://asset-sibling"}`))
+	}))
+	defer service.Close()
+	s, _, _, _ := creationTestService(t)
+	image, _ := s.UploadLocalResourceFile("user", "portrait.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P", ReferenceAssetService: service.URL + "/v1/reference-images/", APIKey: "sk-member-relay"},
+		ReferenceImages: []generation.Media{{StorageKey: "resource:" + image.ID}}}
+	if err := s.prepareArkPrivateAssetReferences(generation.WithTaskExecutionID(context.Background(), "task-sibling"), "user", input); err != nil {
+		t.Fatal(err)
+	}
+	if input.ReferenceImages[0].URL != "asset://asset-sibling" || len(paths) != 1 || paths[0] != "/v1/ysxxai-reference-images" {
+		t.Fatalf("reference=%+v paths=%v", input.ReferenceImages[0], paths)
+	}
+	logs, _ := s.repo.TaskLogs("user", "task-sibling")
+	if len(logs) == 0 || !strings.Contains(logs[0].Message, "YSXXAI 入口") || !strings.Contains(taskPresenterAdapter{}.Logs(logs[:1])[0].Summary, "模型配置的是 /v1/reference-images/ ") {
+		t.Fatalf("logs=%+v", logs)
+	}
+}
+
+func TestTaskLogLinesReachTheBrowserInFull(t *testing.T) {
+	logs := taskPresenterAdapter{}.Logs([]model.TaskLog{
+		{Level: "info", Message: "参考图 1：首次使用，正在登记为虚拟人像素材并等待审核（通常 1～3 分钟）"},
+		{Level: "warn", Message: "参考图：这个模型没有配置虚拟人像素材服务（参考图服务地址应为参考图服务的 /v1/ysxxai-reference-images），参考图按原链接提交，含写实人脸会被拒"},
+		{Level: "error", Message: "上游原始错误：代码 upstream_error；HTTP 400；原文：The request failed because the input image may contain real person"},
+	})
+	for i, want := range []string{"正在登记为虚拟人像素材", "/v1/ysxxai-reference-images", "原文：The request failed because the input image may contain real person"} {
+		if !strings.Contains(logs[i].Summary, want) || logs[i].Message != "" || logs[i].Payload != "" {
+			t.Fatalf("log %d summary=%q", i, logs[i].Summary)
+		}
 	}
 }
 

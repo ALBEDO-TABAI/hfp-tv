@@ -89,7 +89,9 @@ func TestCompanyReferenceAssetRouteUsesTheVirtualPortraitService(t *testing.T) {
 	}{
 		// The older Deyun endpoint is listed first, as a leftover model would be.
 		{"ysxxai after an older service", fmt.Sprintf(`{"model":"doubao-seedance-2-0-260128","protocol":"volcengine-ark-video","referenceAssetService":%q},{"model":"doubao-seedance-2-0-260128-2-720P","protocol":"video-generations-json","referenceAssetService":%q}`, relay.URL+"/v1/reference-images", relay.URL+"/v1/ysxxai-reference-images"), "/v1/ysxxai-reference-images"},
-		{"only the older service", fmt.Sprintf(`{"model":"doubao-seedance-2-0-260128","protocol":"volcengine-ark-video","referenceAssetService":%q}`, relay.URL+"/v1/reference-images"), ""},
+		// Only the older path configured: its YSXXAI sibling on the same service is used.
+		{"only the older service", fmt.Sprintf(`{"model":"doubao-seedance-2-0-260128","protocol":"volcengine-ark-video","referenceAssetService":%q}`, relay.URL+"/v1/reference-images"), "/v1/ysxxai-reference-images"},
+		{"no reference service", `{"model":"doubao-seedance-2-0-260128-2-720P","protocol":"video-generations-json"}`, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			paths = nil
@@ -121,7 +123,7 @@ func TestCompanyReferenceAssetRouteUsesTheVirtualPortraitService(t *testing.T) {
 			result := httptest.NewRecorder()
 			router.ServeHTTP(result, httptest.NewRequest(http.MethodPost, "/api/resources/"+resource.ID+"/ark-private-asset", nil))
 			if tc.wantPath == "" {
-				if result.Code != http.StatusBadRequest || !bytes.Contains(result.Body.Bytes(), []byte("/v1/ysxxai-reference-images")) || len(paths) != 0 {
+				if result.Code != http.StatusBadRequest || len(paths) != 0 {
 					t.Fatalf("response=%d %s, calls=%v", result.Code, result.Body.String(), paths)
 				}
 				return
