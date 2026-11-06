@@ -25,7 +25,7 @@ export function moderationErrorCopy(code: string, message: string): ModerationCo
         direction = subject[1] === "reference" ? "input" : subject[1];
         media = subject[2];
         if (/copyright restrictions/i.test(message)) cause = "policyviolation";
-        else if (/may contain real person/i.test(message)) cause = "privacyinformation";
+        else if (mentionsRealPerson(message)) cause = "privacyinformation";
         else if (/counterfeit documents or credentials/i.test(message)) cause = "deepfake";
     }
     const label = labels[direction][mediaTypes.indexOf(media!)];
@@ -42,6 +42,13 @@ export function moderationErrorCopy(code: string, message: string): ModerationCo
         reason = `${label}未通过伪造内容审核`;
     }
     return { category, reason, action };
+}
+
+// Relays reword Ark's PrivacyInformation (backend: mentionsRealPerson).
+// An echoed prompt ("prompt=real person …") is what the user asked for, not the refusal reason.
+export function mentionsRealPerson(message: string) {
+    const ownWords = message.replace(/(?:\b(?:prompt|input|query)|提示词|输入内容)["']?\s*[=:：][\s\S]*/i, "");
+    return /real person|real human|human face|privacyinformation|真人|人脸|肖像/i.test(ownWords);
 }
 
 // Persist only our exact generated copy, never arbitrary provider instructions.

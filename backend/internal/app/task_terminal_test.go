@@ -244,3 +244,16 @@ func TestTaskTerminalReportsStoredFailuresOnly(t *testing.T) {
 		t.Fatalf("reported = %+v", reported)
 	}
 }
+
+func TestFailureEvidenceLineRepeatsOnlyNewProviderWords(t *testing.T) {
+	d := &model.TaskFailureDiagnostics{Summary: "输入图片可能包含真人", ProviderCode: "upstream_error", HTTPStatus: 400, ProviderTaskID: "task_up"}
+	if got := failureEvidenceLine(d, "参考图片疑似包含真人形象。"); got != "代码 upstream_error；HTTP 400；上游任务 task_up；原文：输入图片可能包含真人" {
+		t.Fatalf("line = %q", got)
+	}
+	if got := failureEvidenceLine(&model.TaskFailureDiagnostics{Summary: "same"}, "already says same"); got != "" {
+		t.Fatalf("repeated summary = %q", got)
+	}
+	if failureEvidenceLine(nil, "x") != "" {
+		t.Fatal("nil diagnostics")
+	}
+}

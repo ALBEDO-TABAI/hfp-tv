@@ -40,7 +40,7 @@ func moderationErrorCopy(code, message string) (Failure, bool) {
 		switch {
 		case strings.Contains(message, "copyright restrictions"):
 			cause = "policyviolation"
-		case strings.Contains(message, "may contain real person"):
+		case mentionsRealPerson(message):
 			cause = "privacyinformation"
 		case strings.Contains(message, "counterfeit documents or credentials"):
 			cause = "deepfake"

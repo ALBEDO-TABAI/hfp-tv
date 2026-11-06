@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"infinite-canvas/backend/internal/generation"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -69,5 +70,23 @@ func TestGenericWrapperRefinementPreservesAuthoritativeCodes(t *testing.T) {
 		if got := generation.ClassifyText(tc.Raw); got.Category != tc.Want {
 			t.Fatalf("%s: %+v", tc.Raw, got)
 		}
+	}
+}
+
+func TestRewordedRealPersonRejectionGetsTheVirtualPortraitStep(t *testing.T) {
+	for _, body := range []string{
+		`{"error":{"code":"upstream_error","message":"参考图未通过内容安全审核：检测到真人人脸"}}`,
+		`{"code":"fail","message":"input image blocked by content safety policy: real person detected"}`,
+	} {
+		failure := generation.ClassifyText(body)
+		if failure.Category != generation.CategoryModerationReference || !strings.Contains(failure.UserMessage(), "登记虚拟人像素材") {
+			t.Fatalf("%s => %+v", body, failure)
+		}
+	}
+	if failure := generation.ClassifyText(`{"error":{"code":"upstream_error","message":"output video blocked by content safety policy: real person"}}`); strings.Contains(failure.UserMessage(), "登记虚拟人像素材") {
+		t.Fatalf("output moderation got the reference step: %+v", failure)
+	}
+	if failure := generation.ClassifyText(`{"error":{"code":"upstream_error","message":"参考图未通过内容安全审核，提示词：真人肖像写真"}}`); strings.Contains(failure.UserMessage(), "真人形象") {
+		t.Fatalf("echoed prompt read as a likeness refusal: %+v", failure)
 	}
 }

@@ -1113,6 +1113,25 @@ func specializeModeration(failure *Failure, fields extractedFields) {
 		return
 	}
 	failure.Category = moderationCategoryFromMessage(normalized)
+	// Relays often reword Ark's PrivacyInformation; the face rule still needs
+	// the virtual-portrait next step instead of the generic copy.
+	if failure.Category != CategoryModerationOutput && mentionsRealPerson(normalized) {
+		if f, ok := moderationErrorCopy("InputImageSensitiveContentDetected.PrivacyInformation", ""); ok {
+			failure.Category, failure.Reason, failure.Action = f.Category, f.Reason, f.Action
+		}
+	}
+}
+
+// The provider's own words only: an echoed prompt ("prompt=real person …")
+// says what the user asked for, not why the request was refused.
+func mentionsRealPerson(text string) bool {
+	normalized := strings.ToLower(promptEchoPattern.ReplaceAllString(text, ""))
+	for _, hint := range []string{"real person", "real human", "human face", "privacyinformation", "真人", "人脸", "肖像"} {
+		if strings.Contains(normalized, hint) {
+			return true
+		}
+	}
+	return false
 }
 
 func genericProviderCode(code string) bool {

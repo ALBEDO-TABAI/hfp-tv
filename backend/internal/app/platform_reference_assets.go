@@ -48,16 +48,26 @@ func isYSXXAIReferenceService(service string) bool {
 
 // Only explicitly registered virtual portraits are reused; ordinary references
 // retain their public URLs and are never silently enrolled as virtual people.
-func (s *Service) reuseReferenceServiceAssets(userID string, input *canvasGenerationInput) error {
+// Each image's route is written to the task log, so a rejected task shows
+// whether the provider saw a registered asset or a plain public link.
+func (s *Service) reuseReferenceServiceAssets(ctx context.Context, userID string, input *canvasGenerationInput) error {
 	service := strings.TrimSpace(input.Config.ReferenceAssetService)
+	taskID := taskExecutionID(ctx)
+	note := func(index int, message string) {
+		if taskID != "" {
+			_ = s.log(userID, taskID, "info", fmt.Sprintf("参考图 %d", index+1), message)
+		}
+	}
 	for index := range input.ReferenceImages {
 		reference := &input.ReferenceImages[index]
 		resourceID := arkPrivateAssetResourceID(*reference)
 		if resourceID == "" {
+			note(index, "不是素材库里的图片，无法匹配虚拟人像登记记录，按原链接提交")
 			continue
 		}
 		binding, err := s.repo.ArkPrivateAssetBinding(resourceID, referenceServiceBindingKind+service)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			note(index, "这张图没有登记过虚拟人像素材，按临时公网链接提交；含写实人脸会被拒，需先在画布右键这张图「登记虚拟人像素材」")
 			continue
 		}
 		if err != nil {
@@ -69,7 +79,10 @@ func (s *Service) reuseReferenceServiceAssets(userID string, input *canvasGenera
 		if binding.Status == arkPrivateAssetStatusLive && binding.ArkAssetID != "" {
 			reference.URL = "asset://" + binding.ArkAssetID
 			reference.DataURL = ""
+			note(index, "使用已登记的虚拟人像素材 "+binding.ArkAssetID)
+			continue
 		}
+		note(index, "虚拟人像登记未完成（"+binding.Status+"），按临时公网链接提交")
 	}
 	return nil
 }

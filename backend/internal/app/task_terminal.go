@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"infinite-canvas/backend/internal/generation"
@@ -165,7 +166,33 @@ func (c *taskTerminalCoordinator) handleExecutionFailure(task *model.Task, err e
 	}
 	c.finalizeReplay(task, model.TaskStatusFailed, "文本回放草稿归并失败")
 	_ = c.logger.log(task.UserID, task.ID, "error", "任务处理失败", task.Error)
+	if line := failureEvidenceLine(task.FailureDiagnostics, task.Error); line != "" {
+		_ = c.logger.log(task.UserID, task.ID, "error", "上游原始错误", line)
+	}
 	return err
+}
+
+// failureEvidenceLine repeats the provider's own, already sanitized words in
+// the task log: the friendly copy alone hides which rule a relay applied.
+func failureEvidenceLine(d *model.TaskFailureDiagnostics, shown string) string {
+	if d == nil {
+		return ""
+	}
+	summary := strings.TrimSpace(d.Summary)
+	if summary == "" || strings.Contains(shown, summary) {
+		return ""
+	}
+	var parts []string
+	if d.ProviderCode != "" {
+		parts = append(parts, "代码 "+d.ProviderCode)
+	}
+	if d.HTTPStatus != 0 {
+		parts = append(parts, fmt.Sprintf("HTTP %d", d.HTTPStatus))
+	}
+	if d.ProviderTaskID != "" {
+		parts = append(parts, "上游任务 "+d.ProviderTaskID)
+	}
+	return strings.Join(append(parts, "原文："+summary), "；")
 }
 
 func (c *taskTerminalCoordinator) handleAlreadyCancelled(task model.Task) error {

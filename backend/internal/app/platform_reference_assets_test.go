@@ -96,6 +96,35 @@ func TestYSXXAIUsesOnlyPreviouslyRegisteredImages(t *testing.T) {
 	}
 }
 
+func TestYSXXAIReferenceRouteIsWrittenToTheTaskLog(t *testing.T) {
+	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"url":"asset://asset-virtual","requestId":"r"}`))
+	}))
+	defer service.Close()
+	s, _, _, _ := creationTestService(t)
+	registered, _ := s.UploadLocalResourceFile("user", "virtual.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	ordinary, _ := s.UploadLocalResourceFile("user", "ordinary.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	serviceURL := service.URL + "/v1/ysxxai-reference-images"
+	if _, err := s.ensureReferenceServiceAsset(context.Background(), "user", registered.ID, serviceURL, "sk-member-relay"); err != nil {
+		t.Fatal(err)
+	}
+	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P", ReferenceAssetService: serviceURL},
+		ReferenceImages: []generation.Media{{StorageKey: "resource:" + registered.ID}, {StorageKey: "resource:" + ordinary.ID}, {URL: "https://example.com/linked.png"}}}
+	if err := s.prepareArkPrivateAssetReferences(generation.WithTaskExecutionID(context.Background(), "task-1"), "user", input); err != nil {
+		t.Fatal(err)
+	}
+	logs, err := s.repo.TaskLogs("user", "task-1")
+	if err != nil || len(logs) != 3 {
+		t.Fatalf("logs=%+v err=%v", logs, err)
+	}
+	for i, want := range []string{"asset-virtual", "没有登记过虚拟人像素材", "不是素材库里的图片"} {
+		if logs[i].Message != fmt.Sprintf("参考图 %d", i+1) || !strings.Contains(logs[i].Payload, want) {
+			t.Fatalf("log %d = %s：%s", i, logs[i].Message, logs[i].Payload)
+		}
+	}
+}
+
 func TestReferenceServiceFailuresAreExplained(t *testing.T) {
 	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
 	status, body := http.StatusUnauthorized, `{"error":"无效或已失效的应用凭据"}`
