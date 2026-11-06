@@ -9,6 +9,11 @@ var moderationCodePattern = regexp.MustCompile(`^(input|output)(text|image|video
 var moderationSubjectPattern = regexp.MustCompile(`\b(input|output|reference)\s+(text|image|video|audio)\b`)
 var moderationMessagePattern = regexp.MustCompile(`may contain sensitive information|includes sensitive content|content (?:safety|policy)|safety policy|copyright restrictions|may contain real person|counterfeit documents or credentials`)
 
+// Seedance 2.x refuses realistic faces sent as plain links; an AI-made person
+// passes only after registration in the provider's asset library (web mirror:
+// web/src/lib/moderation-error.ts).
+const virtualPortraitAction = "虚拟人像请先在画布中右键该图片选「登记虚拟人像素材」，审核通过后再用同一张图生成（团队服务器）；真人需本人完成认证授权，否则请更换参考图片"
+
 // Ark codes encode direction, medium and cause independently. In this family
 // PolicyViolation means copyright, while PrivacyInformation concerns likeness.
 func moderationErrorCopy(code, message string) (Failure, bool) {
@@ -66,6 +71,9 @@ func moderationErrorCopy(code, message string) (Failure, bool) {
 		f.Reason = label + "未通过隐私审核"
 		if direction == "input" && (media == "image" || media == "video") {
 			f.Reason = label + "疑似包含真人形象，该模型拒绝生成"
+		}
+		if direction == "input" && media == "image" {
+			f.Action = virtualPortraitAction
 		}
 	case "deepfake":
 		f.Reason = label + "未通过伪造内容审核"

@@ -263,9 +263,26 @@ func relayReplyError(message string) error {
 	return generation.ReferenceRelayError{Cause: errors.New(message)}
 }
 
+// platformVirtualPortraitService is where a member's explicit "register
+// virtual portrait" goes: the YSXXAI asset endpoint whose bindings Seedance
+// generation reuses. Other services are skipped even when listed first,
+// otherwise the image would land in a group generation never reads.
+func (s *Service) platformVirtualPortraitService() (service, apiKey string, ok bool) {
+	for _, credential := range s.platformChannelCredentials() {
+		if credential.apiKey == "" {
+			continue
+		}
+		for _, service := range credential.referenceServices {
+			if isYSXXAIReferenceService(service) {
+				return service, credential.apiKey, true
+			}
+		}
+	}
+	return "", "", false
+}
+
 // platformReferenceService is the reference-image service of any company relay
-// model with the member's company key, used for registering a library image
-// ahead of generation and as the workspace's image relay.
+// model with the member's company key, used as the workspace's image relay.
 func (s *Service) platformReferenceService() (service, apiKey string, ok bool) {
 	for _, credential := range s.platformChannelCredentials() {
 		if service := credential.anyReferenceService(); service != "" && credential.apiKey != "" {

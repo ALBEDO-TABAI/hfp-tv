@@ -2134,7 +2134,7 @@ function InfiniteCanvasPage() {
             if (arkPrivateAssetUploadNodeId === node.id) return;
             const feedbackKey = `ark-private-asset-${node.id}`;
             setArkPrivateAssetUploadNodeId(node.id);
-            message.loading({ key: feedbackKey, content: "正在保存并上传到方舟素材库...", duration: 0 });
+            message.loading({ key: feedbackKey, content: "正在上传到素材库并等待审核，通常需要 1～3 分钟…", duration: 0 });
             try {
                 let resourceID = resourceIdFromStorageKey(node.metadata.storageKey);
                 let persistedNode = node;
@@ -2148,9 +2148,9 @@ function InfiniteCanvasPage() {
                 const asset = await ensureCanvasNodeAsset({ canvasId: projectId, domainProjectId: currentProject?.projectId, node: persistedNode, source: "canvas-manual" });
                 handleConfigNodeChange(node.id, { assetId: asset.assetId });
                 await syncResourceToArkPrivateAsset(resourceID);
-                message.success({ key: feedbackKey, content: "已同步到方舟素材库，Seedance 将自动复用该素材", duration: 4 });
+                message.success({ key: feedbackKey, content: "审核通过，已登记为虚拟人像素材；用这张图生成 Seedance 视频时会自动使用", duration: 5 });
             } catch (error) {
-                message.error({ key: feedbackKey, content: error instanceof Error ? error.message : "上传到方舟素材库失败", duration: 5 });
+                message.error({ key: feedbackKey, content: error instanceof Error ? error.message : "登记虚拟人像素材失败", duration: 8 });
             } finally {
                 setArkPrivateAssetUploadNodeId((current) => (current === node.id ? null : current));
             }
@@ -2161,8 +2161,8 @@ function InfiniteCanvasPage() {
     const confirmUploadNodeImageToArkPrivateAsset = useCallback(
         (node: CanvasNodeData) => {
             modal.confirm({
-                title: "上传到方舟素材库",
-                content: "请确认这是你拥有使用权的虚拟人像。真人素材需先完成人像本人的认证与授权。素材审核通过后，Seedance 才能使用。",
+                title: "登记虚拟人像素材",
+                content: "请确认这是你拥有使用权的 AI 虚拟人像，且不与任何真实人物雷同。真人需本人完成认证授权，不能在这里登记。登记后要等服务商审核通过，Seedance 才能使用这张图。",
                 okText: "确认并上传",
                 cancelText: "取消",
                 onOk: () => uploadNodeImageToArkPrivateAsset(node),

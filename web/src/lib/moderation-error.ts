@@ -6,6 +6,8 @@ const labels: Record<string, string[]> = {
     output: ["生成文字", "生成图片", "生成视频", "生成音频"],
 };
 const mediaTypes = ["text", "image", "video", "audio"];
+// Mirrors backend/internal/generation/moderation_error.go.
+const VIRTUAL_PORTRAIT_ACTION = "虚拟人像请先在画布中右键该图片选「登记虚拟人像素材」，审核通过后再用同一张图生成（团队服务器）；真人需本人完成认证授权，否则请更换参考图片";
 
 // Ark's documented families encode direction, medium and cause separately.
 // PolicyViolation means copyright here; it is not a generic real-person rule.
@@ -35,6 +37,7 @@ export function moderationErrorCopy(code: string, message: string): ModerationCo
         if (direction === "output" && media === "audio") action = "请调整音乐或音频相关提示词；如使用了参考音频，请检查并更换后重新生成";
     } else if (cause === "privacyinformation") {
         reason = direction === "input" && (media === "image" || media === "video") ? `${label}疑似包含真人形象，该模型拒绝生成` : `${label}未通过隐私审核`;
+        if (direction === "input" && media === "image") action = VIRTUAL_PORTRAIT_ACTION;
     } else if (cause === "deepfake") {
         reason = `${label}未通过伪造内容审核`;
     }

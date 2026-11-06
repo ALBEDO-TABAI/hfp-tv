@@ -106,12 +106,15 @@ func (s *Service) prepareArkPrivateAssetReferences(ctx context.Context, userID s
 // 它与任务 worker 共用团队资源归属、就绪状态和审核规则，客户端不能借此向方舟提交任意 URL。
 func (s *Service) SyncResourceToArkPrivateAsset(ctx context.Context, actor *model.User, resourceID string) (*ArkPrivateAssetSyncResult, error) {
 	if s.IsLocalMode() {
-		// 团队服务器配置了公司参考图服务时，提前把图片登记进预设素材组，生成时直接复用。
-		if service, apiKey, ok := s.platformReferenceService(); ok && actor != nil {
+		// 团队服务器：成员确认过的虚拟人像登记进 YSXXAI 素材组，审核通过后生成时按图片复用。
+		if service, apiKey, ok := s.platformVirtualPortraitService(); ok && actor != nil {
 			if _, err := s.ensureReferenceServiceAsset(ctx, actor.ID, strings.TrimSpace(resourceID), service, apiKey); err != nil {
 				return nil, BadAuthRequest(err.Error())
 			}
 			return &ArkPrivateAssetSyncResult{ResourceID: strings.TrimSpace(resourceID), Status: arkPrivateAssetStatusLive}, nil
+		}
+		if _, _, ok := s.platformReferenceService(); ok {
+			return nil, BadAuthRequest("公司 Seedance 模型还没有配置虚拟人像素材服务，请管理员把模型的参考图服务地址改为参考图服务的 /v1/ysxxai-reference-images")
 		}
 		return nil, BadAuthRequest("本地工作区不支持将素材同步到云端可信素材库")
 	}
