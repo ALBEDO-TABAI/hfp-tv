@@ -201,6 +201,7 @@ const PROVIDER_CODE_CATEGORIES: Record<string, GenerationErrorCategory> = {
     reference_preupload_failed: "provider_unavailable",
     reference_relay_failed: "provider_unavailable",
     reference_relay_unauthorized: "provider_unavailable",
+    reference_asset_failed: "provider_unavailable",
     upstream_rejected: "unknown",
     upstream_error: "unknown",
     invalid_api_key: "auth",
@@ -1152,6 +1153,7 @@ const REFERENCE_PREPARATION_COPY: Record<string, CategoryCopy> = {
     // Team server: the company reference-image service (keep in sync with the backend copy).
     reference_relay_failed: { reason: "参考图没能通过公司参考图服务上传，本次尚未开始生成", action: "请稍后重试；仍然失败时请把排查编号发给管理员" },
     reference_relay_unauthorized: { reason: "公司参考图服务不接受你的中转站密钥，本次尚未开始生成", action: "请联系管理员核对为你绑定的密钥后重试" },
+    reference_asset_failed: { reason: "参考图没能登记为虚拟人像素材，本次尚未开始生成", action: "原因见任务日志“上游原始错误”：审核未通过请换图，人物可拆成正面半身特写和全身正面两张；真人需本人完成认证授权；服务未配置或密钥问题请联系管理员" },
 };
 
 function persistedReferencePreparation(raw: string): Classified | undefined {

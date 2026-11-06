@@ -10,7 +10,7 @@ import (
 
 func TestReferenceFailureRedactsActualKeyBeforeDiagnosticsAndReport(t *testing.T) {
 	const key = "FAKE_CREDENTIAL_123456"
-	err := referenceServiceFailure("synthetic-request", key, false, errors.New("reference rejected "+key))
+	err := referenceServiceFailure("synthetic-request", key, false, false, errors.New("reference rejected "+key))
 	task := model.Task{ID: "synthetic-task", Status: model.TaskStatusFailed, Error: err.Error()}
 	captureTaskFailureDiagnostics(&task, err, "unknown")
 	report := (&Service{}).taskFailureReport(task)

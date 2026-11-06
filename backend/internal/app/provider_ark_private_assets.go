@@ -24,8 +24,16 @@ const (
 
 func (s *Service) prepareArkPrivateAssetReferences(ctx context.Context, userID string, input *canvasGenerationInput) error {
 	if input != nil && input.Mode == "video" && input.Config.InterfaceType == "video-generations-json" &&
-		isSeedance2Family(input.Config.InterfaceType, input.Config.Model) && isYSXXAIReferenceService(input.Config.ReferenceAssetService) {
-		return s.reuseReferenceServiceAssets(ctx, userID, input)
+		isSeedance2Family(input.Config.InterfaceType, input.Config.Model) {
+		if isYSXXAIReferenceService(input.Config.ReferenceAssetService) {
+			return s.registerYSXXAIReferenceAssets(ctx, userID, input)
+		}
+		// Without the asset service every image goes as a plain link; say so in
+		// the task log, since a face in it will be refused.
+		if taskID := taskExecutionID(ctx); taskID != "" && len(input.ReferenceImages) > 0 {
+			_ = s.log(userID, taskID, "warn", "参考图", "这个模型没有配置虚拟人像素材服务（参考图服务地址应为参考图服务的 /v1/ysxxai-reference-images），参考图按原链接提交，含写实人脸会被拒")
+		}
+		return nil
 	}
 	// 其余可信素材同步仅用于方舟视频协议；Agent Plan 的图片渠道不能上传或改写。
 	if input == nil || input.Mode != "video" || !isArkPrivateAssetVideoConfig(input.Config) || !parseBool(input.Config.ArkPrivateAssetUpload, true) {

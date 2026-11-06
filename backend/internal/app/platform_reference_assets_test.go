@@ -62,66 +62,113 @@ func TestSeedanceReferenceImagesAreRegisteredThroughTheCompanyService(t *testing
 	}
 }
 
-func TestYSXXAIUsesOnlyPreviouslyRegisteredImages(t *testing.T) {
+func TestYSXXAIRegistersLibraryImagesBeforeGeneration(t *testing.T) {
 	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
 	var calls atomic.Int32
 	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if r.Header.Get("X-HFP-Reference-Mode") != "seedance-asset" {
+			t.Errorf("mode = %q", r.Header.Get("X-HFP-Reference-Mode"))
+		}
 		_, _ = w.Write([]byte(`{"url":"asset://asset-virtual","requestId":"r"}`))
 	}))
 	defer service.Close()
 	s, _, _, _ := creationTestService(t)
-	registered, err := s.UploadLocalResourceFile("user", "virtual.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
-	if err != nil {
-		t.Fatal(err)
-	}
-	ordinary, err := s.UploadLocalResourceFile("user", "ordinary.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
-	if err != nil {
-		t.Fatal(err)
-	}
+	registered, _ := s.UploadLocalResourceFile("user", "registered.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	fresh, _ := s.UploadLocalResourceFile("user", "fresh.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
 	serviceURL := service.URL + "/v1/ysxxai-reference-images"
 	if _, err := s.ensureReferenceServiceAsset(context.Background(), "user", registered.ID, serviceURL, "sk-member-relay"); err != nil {
 		t.Fatal(err)
 	}
-	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P", ReferenceAssetService: serviceURL},
-		ReferenceImages: []generation.Media{{StorageKey: "resource:" + registered.ID, URL: "https://example.com/virtual.png"}, {StorageKey: "resource:" + ordinary.ID, URL: "https://example.com/ordinary.png"}}}
-	if err := s.prepareArkPrivateAssetReferences(context.Background(), "user", input); err != nil {
+	newInput := func() *generation.Input {
+		return &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P", ReferenceAssetService: serviceURL, APIKey: "sk-member-relay"},
+			ReferenceImages: []generation.Media{{StorageKey: "resource:" + registered.ID, URL: "https://example.com/registered.png"}, {StorageKey: "resource:" + fresh.ID, URL: "https://example.com/fresh.png"}, {URL: "https://example.com/linked.png"}}}
+	}
+	input := newInput()
+	if err := s.prepareArkPrivateAssetReferences(generation.WithTaskExecutionID(context.Background(), "task-1"), "user", input); err != nil {
 		t.Fatal(err)
 	}
-	if input.ReferenceImages[0].URL != "asset://asset-virtual" || input.ReferenceImages[1].URL != "https://example.com/ordinary.png" || calls.Load() != 1 {
+	if input.ReferenceImages[0].URL != "asset://asset-virtual" || input.ReferenceImages[1].URL != "asset://asset-virtual" || input.ReferenceImages[2].URL != "https://example.com/linked.png" || calls.Load() != 2 {
 		t.Fatalf("references=%+v calls=%d", input.ReferenceImages, calls.Load())
 	}
-	if err := s.prepareArkPrivateAssetReferences(context.Background(), "another-user", input); err == nil {
+	logs, err := s.repo.TaskLogs("user", "task-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for _, log := range logs {
+		lines = append(lines, log.Message+"："+log.Payload)
+	}
+	joined := strings.Join(lines, "\n")
+	for _, want := range []string{"参考图 1：使用已登记的虚拟人像素材 asset-virtual", "参考图 2：首次使用，正在登记", "参考图 2：审核通过，使用素材编号 asset-virtual", "参考图 3：不是画布或素材库里的图片"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("task log lacks %q:\n%s", want, joined)
+		}
+	}
+	// The second run reuses both registrations without calling the service.
+	if err := s.prepareArkPrivateAssetReferences(context.Background(), "user", newInput()); err != nil || calls.Load() != 2 {
+		t.Fatalf("second run err=%v calls=%d", err, calls.Load())
+	}
+	if err := s.prepareArkPrivateAssetReferences(context.Background(), "another-user", newInput()); err == nil {
 		t.Fatal("another user reused the registered reference")
 	}
 }
 
-func TestYSXXAIReferenceRouteIsWrittenToTheTaskLog(t *testing.T) {
+func TestYSXXAIWaitsWhileTheReviewIsStillRunning(t *testing.T) {
+	previous := referenceAssetReviewPause
+	referenceAssetReviewPause = time.Millisecond
+	defer func() { referenceAssetReviewPause = previous }()
 	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
+	var calls atomic.Int32
 	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"url":"asset://asset-virtual","requestId":"r"}`))
+		if calls.Add(1) < 3 {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"error":"YSXXAI素材还在审核中","code":"YSXXAI_ASSET_TIMEOUT","stage":"ysxxai-asset"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"url":"asset://asset-reviewed"}`))
 	}))
 	defer service.Close()
 	s, _, _, _ := creationTestService(t)
-	registered, _ := s.UploadLocalResourceFile("user", "virtual.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
-	ordinary, _ := s.UploadLocalResourceFile("user", "ordinary.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
-	serviceURL := service.URL + "/v1/ysxxai-reference-images"
-	if _, err := s.ensureReferenceServiceAsset(context.Background(), "user", registered.ID, serviceURL, "sk-member-relay"); err != nil {
+	image, _ := s.UploadLocalResourceFile("user", "portrait.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-5-260628-2-720P", ReferenceAssetService: service.URL + "/v1/ysxxai-reference-images", APIKey: "sk-member-relay"},
+		ReferenceImages: []generation.Media{{StorageKey: "resource:" + image.ID}}}
+	if err := s.prepareArkPrivateAssetReferences(generation.WithTaskExecutionID(context.Background(), "task-wait"), "user", input); err != nil {
 		t.Fatal(err)
 	}
-	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P", ReferenceAssetService: serviceURL},
-		ReferenceImages: []generation.Media{{StorageKey: "resource:" + registered.ID}, {StorageKey: "resource:" + ordinary.ID}, {URL: "https://example.com/linked.png"}}}
-	if err := s.prepareArkPrivateAssetReferences(generation.WithTaskExecutionID(context.Background(), "task-1"), "user", input); err != nil {
+	if input.ReferenceImages[0].URL != "asset://asset-reviewed" || calls.Load() != 3 {
+		t.Fatalf("reference=%+v calls=%d", input.ReferenceImages[0], calls.Load())
+	}
+}
+
+func TestYSXXAIRefusedRegistrationFailsBeforeTheModel(t *testing.T) {
+	png, _ := base64.StdEncoding.DecodeString(onePixelPNG)
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"error":"素材审核未通过","code":"YSXXAI_ASSET_FAILED","stage":"ysxxai-asset"}`))
+	}))
+	defer service.Close()
+	s, _, _, _ := creationTestService(t)
+	image, _ := s.UploadLocalResourceFile("user", "portrait.png", int64(len(png)), "image", 1, 1, 0, bytes.NewReader(png))
+	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P", ReferenceAssetService: service.URL + "/v1/ysxxai-reference-images", APIKey: "sk-member-relay"},
+		ReferenceImages: []generation.Media{{StorageKey: "resource:" + image.ID}}}
+	err := s.prepareArkPrivateAssetReferences(context.Background(), "user", input)
+	failure := generation.ClassifyError(err)
+	if err == nil || !strings.Contains(err.Error(), "素材审核未通过") || failure.ProviderCode != "reference_asset_failed" || !strings.Contains(failure.UserMessage(), "没能登记为虚拟人像素材") {
+		t.Fatalf("err=%v failure=%+v", err, failure)
+	}
+}
+
+func TestYSXXAIModelWithoutTheAssetServiceSaysSo(t *testing.T) {
+	s, _, _, _ := creationTestService(t)
+	input := &generation.Input{Mode: "video", Config: generation.Config{InterfaceType: "video-generations-json", Model: "doubao-seedance-2-0-260128-2-720P", ReferenceAssetService: "http://10.0.0.1:8787/v1/reference-images"},
+		ReferenceImages: []generation.Media{{StorageKey: "resource:any", URL: "https://example.com/a.png"}}}
+	if err := s.prepareArkPrivateAssetReferences(generation.WithTaskExecutionID(context.Background(), "task-misconfigured"), "user", input); err != nil {
 		t.Fatal(err)
 	}
-	logs, err := s.repo.TaskLogs("user", "task-1")
-	if err != nil || len(logs) != 3 {
-		t.Fatalf("logs=%+v err=%v", logs, err)
-	}
-	for i, want := range []string{"asset-virtual", "没有登记过虚拟人像素材", "不是素材库里的图片"} {
-		if logs[i].Message != fmt.Sprintf("参考图 %d", i+1) || !strings.Contains(logs[i].Payload, want) {
-			t.Fatalf("log %d = %s：%s", i, logs[i].Message, logs[i].Payload)
-		}
+	logs, _ := s.repo.TaskLogs("user", "task-misconfigured")
+	if len(logs) != 1 || !strings.Contains(logs[0].Payload, "没有配置虚拟人像素材服务") || input.ReferenceImages[0].URL != "https://example.com/a.png" {
+		t.Fatalf("logs=%+v reference=%+v", logs, input.ReferenceImages[0])
 	}
 }
 

@@ -287,6 +287,7 @@ var providerCodeCategories = map[string]FailureCategory{
 	"reference_preupload_failed":           CategoryProviderUnavailable,
 	"reference_relay_failed":               CategoryProviderUnavailable,
 	"reference_relay_unauthorized":         CategoryProviderUnavailable,
+	"reference_asset_failed":               CategoryProviderUnavailable,
 	"upscale_unavailable":                  CategoryProviderUnavailable,
 	"fal_billing_unavailable":              CategoryProviderUnavailable,
 	"invalid_upscale_source":               CategoryInvalidParams,

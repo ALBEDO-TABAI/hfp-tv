@@ -560,3 +560,11 @@ test("media details preserve authentication and ignore prompt echoes", () => {
     }
     expect(explainGenerationError({error: {code: "unknown", message: "Failure"}, prompt: "unsupported video codec"}).category).toBe("unknown");
 });
+
+test("a refused virtual-portrait registration keeps its own copy after reload", () => {
+    const saved = "参考图没能登记为虚拟人像素材，本次尚未开始生成。原因见任务日志“上游原始错误”：审核未通过请换图，人物可拆成正面半身特写和全身正面两张；真人需本人完成认证授权；服务未配置或密钥问题请联系管理员。";
+    const explained = explainGenerationError(saved);
+    expect(explained.category).toBe("provider_unavailable");
+    expect(explained.reason).toBe("参考图没能登记为虚拟人像素材，本次尚未开始生成");
+    expect(explained.action).toContain("审核未通过请换图");
+});
