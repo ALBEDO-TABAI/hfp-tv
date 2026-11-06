@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"infinite-canvas/backend/internal/buildinfo"
+	"infinite-canvas/backend/internal/generation"
 	"infinite-canvas/backend/internal/model"
 	"infinite-canvas/backend/internal/repository"
 )
@@ -255,5 +257,18 @@ func TestFailureEvidenceLineRepeatsOnlyNewProviderWords(t *testing.T) {
 	}
 	if failureEvidenceLine(nil, "x") != "" {
 		t.Fatal("nil diagnostics")
+	}
+}
+
+func TestDiagnosticBuildVersionNamesTheCommit(t *testing.T) {
+	previousVersion, previousCommit := buildinfo.Version, buildinfo.Commit
+	t.Cleanup(func() { buildinfo.Version, buildinfo.Commit = previousVersion, previousCommit })
+	buildinfo.Version, buildinfo.Commit = "v2.0.3", "adc6487"
+	if got := diagnosticBuildVersion(); got != "v2.0.3-adc6487" || generation.SanitizeTaskDiagnostics(&model.TaskFailureDiagnostics{Version: got}).Version != got {
+		t.Fatalf("version = %q", got)
+	}
+	buildinfo.Commit = "unknown"
+	if got := diagnosticBuildVersion(); got != "v2.0.3" {
+		t.Fatalf("version without commit = %q", got)
 	}
 }

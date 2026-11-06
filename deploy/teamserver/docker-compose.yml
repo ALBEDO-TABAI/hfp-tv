@@ -10,6 +10,9 @@ services:
       args:
         # Go 依赖源：默认先走国内镜像，出错再换官方源；公司有自己的 Go 代理时在 .env 里设置 GOPROXY。
         GOPROXY: ${GOPROXY:-https://goproxy.cn|https://proxy.golang.org,direct}
+        # update.sh 填入当前提交和构建时间，排查信息和任务诊断据此显示实际运行的版本。
+        BUILD_COMMIT: ${BUILD_COMMIT:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
     # .env 里的设置原样传进容器（TEAMSERVER_*、CANVAS_* 等）；下面 environment 写死的几项优先。
     env_file:
       - path: .env

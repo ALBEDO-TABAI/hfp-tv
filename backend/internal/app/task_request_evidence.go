@@ -10,7 +10,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"infinite-canvas/backend/internal/buildinfo"
 	"infinite-canvas/backend/internal/generation"
 	"infinite-canvas/backend/internal/model"
 )
@@ -24,7 +23,7 @@ type taskRequestEvidenceRecorder struct {
 }
 
 func withTaskRequestEvidence(ctx context.Context, previous ...*model.TaskFailureDiagnostics) (context.Context, *taskRequestEvidenceRecorder) {
-	r := &taskRequestEvidenceRecorder{diagnostics: model.TaskFailureDiagnostics{Source: "unknown", Version: buildinfo.Current().Version, Platform: runtime.GOOS + "/" + runtime.GOARCH}}
+	r := &taskRequestEvidenceRecorder{diagnostics: model.TaskFailureDiagnostics{Source: "unknown", Version: diagnosticBuildVersion(), Platform: runtime.GOOS + "/" + runtime.GOARCH}}
 	if len(previous) > 0 && previous[0] != nil {
 		prior := generation.SanitizeTaskDiagnostics(previous[0])
 		r.diagnostics.Requests, r.diagnostics.OmittedRequests, r.diagnostics.Input = prior.Requests, prior.OmittedRequests, prior.Input

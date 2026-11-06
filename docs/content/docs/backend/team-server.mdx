@@ -55,7 +55,7 @@ title: 团队服务器
 ```bash
 cd deploy/teamserver
 cp .env.example .env   # 默认内网 HTTP；有域名时按注释启用 docker-compose.https.yml
-docker compose up -d --build
+./update.sh   # 拉取代码、带提交号构建，等新容器健康后返回；以后升级也用它
 # 创建首个管理员（密码从标准输入读一行，不进 shell 历史）
 read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver admin create --username admin --display-name 管理员
 ```

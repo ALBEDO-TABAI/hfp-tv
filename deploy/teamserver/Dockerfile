@@ -16,6 +16,9 @@ COPY scripts/distribution-notices.mjs /app/scripts/distribution-notices.mjs
 COPY assets /app/assets
 COPY backend/internal/providerpreset/image_contracts.json backend/internal/providerpreset/video_contracts.json /app/backend/internal/providerpreset/
 COPY web ./
+# 构建上下文不含 .git，提交号由 update.sh 经 Compose 传入；排查信息里的“构建提交”来自这里。
+ARG BUILD_COMMIT=unknown
+ENV VITE_BUILD_COMMIT=${BUILD_COMMIT}
 RUN bun --bun ./node_modules/vite/bin/vite.js build
 
 # 助手锁文件是 Bun lockfile v2，Bun 1.3.x 无法解析，版本与本地开发要求的 1.4.4 对齐；前端锁文件仍是 v1，上面的阶段不受影响。

@@ -120,9 +120,10 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
 ## 升级
 
 ```bash
-cd hfp-tv && git pull
-cd deploy/teamserver && docker compose up -d --build
+cd hfp-tv/deploy/teamserver && ./update.sh
 ```
+
+`update.sh` 依次拉取代码、带上提交号重建镜像，并等新容器通过健康检查后才打印“现在可以测试”。构建和旧容器停止（最长 3 分钟）期间旧版本仍在服务，这段时间提交的任务按旧版本执行，验证新功能要等脚本结束。之后成员“复制排查信息”里的“构建提交”和“运行版本”会带上提交号，可据此确认任务由哪个版本执行。不用脚本时，手动执行 `BUILD_COMMIT=$(git rev-parse --short HEAD) docker compose up -d --build` 效果相同，但要自己确认新容器已启动。
 
 数据都在 `teamserver-data` 卷里，升级不会清除。平台库和各工作区数据库在启动时自动迁移；迁移失败时进程会退出并在日志里说明原因，旧数据不会被改动。大版本升级前先做一次备份。
 

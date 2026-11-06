@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"runtime"
+	"strings"
 	"time"
 
 	"infinite-canvas/backend/internal/buildinfo"
@@ -20,7 +21,7 @@ func captureTaskFailureDiagnostics(task *model.Task, err error, source string) {
 	d := &model.TaskFailureDiagnostics{Source: source, Summary: firstNonEmpty(failure.ProviderMessage, err.Error()),
 		RequestID: failure.RequestID, ProviderTaskID: failure.TaskID, Param: failure.Param,
 		Stage: task.Stage, CapturedAt: time.Now().Format(time.RFC3339Nano)}
-	d.Version, d.Platform = buildinfo.Current().Version, runtime.GOOS+"/"+runtime.GOARCH
+	d.Version, d.Platform = diagnosticBuildVersion(), runtime.GOOS+"/"+runtime.GOARCH
 	if prior := task.FailureDiagnostics; prior != nil {
 		d.Requests, d.OmittedRequests, d.Input, d.ExecutionResult = prior.Requests, prior.OmittedRequests, prior.Input, prior.ExecutionResult
 	}
@@ -71,4 +72,14 @@ func captureTaskFailureDiagnostics(task *model.Task, err error, source string) {
 		d.Source, d.Summary = "local_validation", appErr.Message
 	}
 	task.FailureDiagnostics = generation.SanitizeTaskDiagnostics(d)
+}
+
+// diagnosticBuildVersion names the exact build that ran the task ("v2.0.3-adc6487"):
+// a team-server rebuild keeps the old container serving until it finishes.
+func diagnosticBuildVersion() string {
+	info := buildinfo.Current()
+	if commit := strings.TrimSpace(info.Commit); commit != "" && commit != "unknown" {
+		return info.Version + "-" + commit
+	}
+	return info.Version
 }
