@@ -692,6 +692,7 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
             video.operations = ["text_to_video"];
         }
     }
+    if (isYSXXAIVideoModel(protocol, model)) applyYSXXAIVideoCapability(video, model);
     Object.assign(video.references, videoPromptLimits(protocol, model));
     return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video };
 }
@@ -785,6 +786,46 @@ export function isSeedance2Family(protocol: ModelProtocol | undefined, modelName
 
 export function isYSXXAISeedanceModel(protocol: ModelProtocol | undefined, modelName: string) {
     return protocol === "video-generations-json" && /^doubao-seedance-(?:2-5-260628-2-(?:720p|1080p)|2-0-260128-2-(?:720p|1080p|4k)|2-0-fast-260128-2-720p|2-0-mini-260615-2-720p)$/i.test(modelName.trim());
+}
+
+/** YSXXAI Kling 4.0 / Wan 3.0 on the relay's "ysxxai-video" plugin; same cases as backend/internal/modelcatalog/ysxxai_video.go. */
+export function isYSXXAIVideoModel(protocol: ModelProtocol | undefined, modelName: string) {
+    return protocol === "video-generations-json" && ["kling-4.0", "kling-4.0-flash", "wan3.0-video"].includes(modelName.trim().toLowerCase());
+}
+
+function applyYSXXAIVideoCapability(video: VideoCapabilityConfig, model: string) {
+    const name = model.trim().toLowerCase();
+    const refs = video.references;
+    video.operations = ["text_to_video", "image_to_video", "reference_to_video"];
+    video.watermark = { supported: true, default: false };
+    refs.maxImages = 10;
+    refs.maxVideos = 5;
+    refs.maxVideoBytes = 200 * 1024 * 1024;
+    if (name.startsWith("kling-")) {
+        video.duration = { selection: "range", min: 3, max: name === "kling-4.0-flash" ? 20 : 30, step: 1, default: 5 };
+        video.ratios = ["16:9", "9:16", "1:1", "21:9"];
+        video.defaultRatio = "16:9";
+        video.resolutions = ["720p", "1080p"];
+        video.defaultResolution = "720p";
+        // Kling refuses generate_audio; its voices are voice IDs, not audio files.
+        video.generateAudio = { supported: false, default: false };
+        refs.minVideoDurationSeconds = 3;
+        refs.maxVideoDurationSeconds = 30;
+        refs.maxVideoTotalDurationSeconds = 30;
+        refs.maxAudios = refs.maxAudioBytes = refs.maxAudioDurationSeconds = 0;
+        return;
+    }
+    video.duration = { selection: "range", min: 2, max: 30, step: 1, default: 5 };
+    video.ratios = ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"];
+    video.defaultRatio = "16:9";
+    video.resolutions = ["480p", "720p", "1080p"];
+    video.defaultResolution = "720p";
+    video.generateAudio = { supported: true, default: true };
+    refs.maxVideoDurationSeconds = 15;
+    refs.maxVideoTotalDurationSeconds = 15;
+    refs.maxAudios = 5;
+    refs.maxAudioBytes = 15 * 1024 * 1024;
+    refs.maxAudioDurationSeconds = 15;
 }
 
 export function ysxxaiSeedanceLabel(protocol: ModelProtocol | undefined, modelName: string) {

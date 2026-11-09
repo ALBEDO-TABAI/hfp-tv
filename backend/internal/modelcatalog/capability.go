@@ -295,6 +295,9 @@ func DefaultModelCapabilityConfigForModel(protocol string, modelName string) *Mo
 			video.Operations = []string{"text_to_video"}
 		}
 	}
+	if IsYSXXAIVideoModel(protocol, modelName) {
+		applyYSXXAIVideoCapability(video, modelName)
+	}
 	return &ModelCapabilityConfig{Version: 1, Text: text, Image: DefaultImageCapabilityConfig(protocol, modelName), Video: video}
 }
 

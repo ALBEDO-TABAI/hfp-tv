@@ -19,13 +19,13 @@ test("empty company draft has a managed identity, no credentials and no models",
     expect(draft).toMatchObject({ id: "company-relay", pinned: true, name: "公司中转站", baseUrl: "", apiFormat: "openai", apiKey: "", models: [], modelProfiles: [] });
     expect(draft).not.toHaveProperty("secretKey");
     expect(draft).not.toHaveProperty("headers");
-    expect(companyRelaySharedEndpoints(draft)).toEqual({ arkBaseUrl: "", referenceAssetService: "" });
+    expect(companyRelaySharedEndpoints(draft)).toEqual({ arkBaseUrl: "", referenceAssetService: "", ysxxaiVideoBaseUrl: "" });
 });
 
 test("Seedance endpoints survive the editor round trip and new Ark models inherit shared settings", () => {
     const draft = companyRelayChannelFromTemplate(template);
     const shared = companyRelaySharedEndpoints(draft);
-    expect(shared).toEqual({ arkBaseUrl: template.modelProfiles[0].baseUrl!, referenceAssetService: template.modelProfiles[0].referenceAssetService! });
+    expect(shared).toEqual({ arkBaseUrl: template.modelProfiles[0].baseUrl!, referenceAssetService: template.modelProfiles[0].referenceAssetService!, ysxxaiVideoBaseUrl: "" });
     expect(companyRelayTemplateFromChannel(draft, shared)).toEqual(template);
     draft.models.push("new-video", "seedream");
     draft.modelProfiles!.push({ model: "new-video", capability: "video", protocol: "volcengine-ark-video" }, { model: "seedream", capability: "image", protocol: "volcengine-ark-image" }, { model: "removed", capability: "text", protocol: "chat-completion" });
@@ -43,7 +43,7 @@ test("shared settings read the first Ark endpoint and first Ark video reference 
         { model: "seedream", capability: "image", protocol: "volcengine-ark-image", baseUrl: "http://10.10.10.45:3000/image", referenceAssetService: "ignored" },
         ...template.modelProfiles,
     ] });
-    expect(companyRelaySharedEndpoints(draft)).toEqual({ arkBaseUrl: "http://10.10.10.45:3000/image", referenceAssetService: template.modelProfiles[0].referenceAssetService! });
+    expect(companyRelaySharedEndpoints(draft)).toEqual({ arkBaseUrl: "http://10.10.10.45:3000/image", referenceAssetService: template.modelProfiles[0].referenceAssetService!, ysxxaiVideoBaseUrl: "" });
 });
 
 test("a model with its own Ark endpoint keeps it; the shared field moves only the models that followed it", () => {
@@ -68,7 +68,7 @@ test("a model with its own Ark endpoint keeps it; the shared field moves only th
 
 test("clearing shared endpoints removes only matching fields and output contains only template fields", () => {
     const draft = { ...companyRelayChannelFromTemplate(template), name: "   ", baseUrl: " http://10.10.10.45:3000/v1/// ", apiKey: "do-not-send", secretKey: "do-not-send", hasApiKey: true, headers: [{ name: "Authorization", value: "do-not-send" }] };
-    const result = companyRelayTemplateFromChannel(draft, { arkBaseUrl: " ", referenceAssetService: "" });
+    const result = companyRelayTemplateFromChannel(draft, { arkBaseUrl: " ", referenceAssetService: "", ysxxaiVideoBaseUrl: "" });
     expect(Object.keys(result).sort()).toEqual(["apiFormat", "baseUrl", "modelProfiles", "models", "name"]);
     expect(result.name).toBe("公司中转站");
     expect(result.baseUrl).toBe(template.baseUrl);
@@ -77,7 +77,7 @@ test("clearing shared endpoints removes only matching fields and output contains
     expect(result.modelProfiles[1]).toEqual(template.modelProfiles[1]);
     expect(JSON.stringify(result)).not.toContain("do-not-send");
     expect(companyRelaySharedEndpoints(draft).arkBaseUrl).toBe(template.modelProfiles[0].baseUrl!);
-    expect(companyRelayTemplateFromChannel({ ...draft, name: " 公司模型 ", apiFormat: "gemini" }, { arkBaseUrl: "", referenceAssetService: "" })).toMatchObject({ name: "公司模型", apiFormat: "gemini" });
+    expect(companyRelayTemplateFromChannel({ ...draft, name: " 公司模型 ", apiFormat: "gemini" }, { arkBaseUrl: "", referenceAssetService: "", ysxxaiVideoBaseUrl: "" })).toMatchObject({ name: "公司模型", apiFormat: "gemini" });
 });
 
 test("an admin with a bound key can test the draft; the server fills the key by channel id", async () => {
@@ -154,4 +154,29 @@ test("the shared reference service also reaches the YSXXAI Seedance models", () 
         expect(saved.modelProfiles.find(profile => profile.model === model)?.referenceAssetService).toBe("http://10.10.10.45:8787/v1/ysxxai-reference-images");
     }
     expect(saved.modelProfiles.find(profile => profile.model === "gpt-image-2")).not.toHaveProperty("referenceAssetService");
+});
+
+test("YSXXAI Kling and Wan models take the shared ysxxai-video entry, not the Seedance services", () => {
+    const draft = companyRelayChannelFromTemplate(template);
+    const opening = companyRelaySharedEndpoints(draft);
+    draft.models.push("kling-4.0", "wan3.0-video", "kling-elsewhere");
+    draft.modelProfiles!.push(
+        { model: "kling-4.0", capability: "video", protocol: "video-generations-json" },
+        { model: "wan3.0-video", capability: "video", protocol: "video-generations-json" },
+        { model: "kling-elsewhere", capability: "video", protocol: "newapi" },
+    );
+    const entry = "http://10.10.10.45:3000/ysxxai-video";
+    const result = companyRelayTemplateFromChannel(draft, { ...opening, ysxxaiVideoBaseUrl: ` ${entry} ` }, opening);
+    for (const model of ["kling-4.0", "wan3.0-video"]) {
+        const profile = result.modelProfiles.find(item => item.model === model)!;
+        expect(profile.baseUrl).toBe(entry);
+        expect(profile).not.toHaveProperty("referenceAssetService");
+        expect(companyRelayModelEndpoint(result, model)).toBe(entry);
+    }
+    expect(result.modelProfiles.find(item => item.model === "kling-elsewhere")).not.toHaveProperty("baseUrl");
+    expect(result.modelProfiles.find(item => item.model === "seedance-2.5")?.baseUrl).toBe(template.modelProfiles[0].baseUrl);
+    const reopened = companyRelayChannelFromTemplate(result);
+    expect(companyRelaySharedEndpoints(reopened).ysxxaiVideoBaseUrl).toBe(entry);
+    const cleared = companyRelayTemplateFromChannel(reopened, { ...companyRelaySharedEndpoints(reopened), ysxxaiVideoBaseUrl: "" });
+    expect(cleared.modelProfiles.find(item => item.model === "kling-4.0")).not.toHaveProperty("baseUrl");
 });

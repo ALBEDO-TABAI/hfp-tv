@@ -26,6 +26,7 @@ Seedance 专用调度与声明式视频插件共用该下载合同，包括直�
 - OpenAI Videos / Sora 使用 `POST /v1/videos` 和 multipart，最多一张参考图。不支持的多图、参考视频、参考音频、尾帧及蒙版会在提交前报错。
 - 「视频生成 JSON · ratio / duration」使用 `POST /v1/video/generations` 和 JSON，发送 `images` 对象数组及图片角色、整数 `duration`、`ratio`，并从查询结果 `data[].url` 取回视频。只有服务商文档符合该格式时才选择。
 - 公司 YSXXAI Seedance 线路使用该协议到 New API 的 `/ysxxai-seedance` 入口，由中转站转换为上游的 `metadata.content` 格式并按原任务下载结果。参考视频和音频需要公网 HTTPS 地址；画布或素材库里的参考图在提交前自动登记进新素材库，审核通过后以素材编号提交（Seedance 2.x 不接受以链接形式提交的写实人脸）。Fast 和 Mini 不接收参考素材。
+- 公司 YSXXAI 可灵与万相线路（`kling-4.0`、`kling-4.0-flash`、`wan3.0-video`）同样使用该协议，地址是 New API 的 `/ysxxai-video` 入口。中转站插件（`deploy/teamserver/ysxxai-video-task-plugin.js` 1.1.0 起）把通用请求体改写为上游格式：可灵用 `contents`（首帧、尾帧、`refer_image`、`feature_video`），并去掉上游拒收的 `generate_audio`；万相的首尾帧用 `image`/`images`，参考图、视频、音频用 `metadata.input.media`，声音和水印用 `metadata.parameters`。只有首尾帧时不发送画幅，由图片决定。参考图经公司参考图服务转成临时公网链接，不登记虚拟人像素材；参考视频和音频需要公网链接。可灵不接收参考音频，也没有声音开关；万相的首尾帧不能与参考素材同时使用，违反时中转站在提交上游前拒绝，不扣费。
 - 既有 NewAPI Video Generations 使用 `seconds/aspect_ratio/image_urls`，与上一项的字段不同；方舟原生、fal 和其他专用协议也须按各自文档选择。
 
 在「设置 → 模型服务 → 管理服务 → 高级模型设置与测试 → 配置使用」选择协议，并按服务商文档设置素材与参数限制。生成测试会收费；保存配置和选择协议本身不会提交生成。HTTP 错误或超时后不会自动改用其他协议重发。

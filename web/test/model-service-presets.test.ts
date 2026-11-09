@@ -89,6 +89,19 @@ test("external video protocols require an explicit contract and keep user select
     expect(serviceModelProfile({ ...channel, baseUrl: "https://api.openai.com/v1" }, { id: "sora-2" }, installed).protocol).toBe("newapi");
 });
 
+test("company relay defaults the YSXXAI plugin models to the video-generations-json body", () => {
+    const installed = [...protocols, { value: "video-generations-json", capability: "video", enabled: true } as ModelProtocolDefinition];
+    const company = createModelChannel({ id: "company-relay", baseUrl: "http://10.10.10.45:3000/v1" });
+    for (const id of ["kling-4.0", "kling-4.0-flash", "wan3.0-video", "doubao-seedance-2-0-260128-2-720P"]) {
+        expect(serviceModelProfile(company, { id, supportedEndpointTypes: ["openai-video"] }, installed).protocol).toBe("video-generations-json");
+    }
+    expect(serviceModelProfile(company, { id: "kling-video-v3" }, installed, "video").protocol).toBeUndefined();
+    const member = createModelChannel({ id: "custom", baseUrl: "https://video.example.com/v1" });
+    expect(serviceModelProfile(member, { id: "kling-4.0" }, installed, "video").protocol).toBeUndefined();
+    const chosen = { ...company, modelProfiles: [{ model: "kling-4.0", capability: "video" as const, protocol: "newapi" }] };
+    expect(serviceModelProfile(chosen, { id: "kling-4.0" }, installed).protocol).toBe("newapi");
+});
+
 test("saving a model inherits an enabled channel protocol of the same capability without mutating its draft", () => {
     const channel = createModelChannel({ baseUrl: "https://video.example.com/v1", interfaceType: "video-generations-json", modelProfiles: [{ model: "seedance-2.5", capability: "video" }] });
     const installed = [...protocols, { value: "video-generations-json", capability: "video", enabled: true } as ModelProtocolDefinition];

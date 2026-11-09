@@ -24,3 +24,26 @@ func TestYSXXAISeedanceModelCapabilities(t *testing.T) {
 		}
 	}
 }
+
+func TestYSXXAIKlingAndWanCapabilities(t *testing.T) {
+	kling := DefaultModelCapabilityConfigForModel("video-generations-json", "kling-4.0").Video
+	if kling.Duration.Min != 3 || kling.Duration.Max != 30 || kling.GenerateAudio.Supported || kling.References.MaxAudios != 0 || kling.References.MaxImages != 10 || kling.References.MaxVideos != 5 || kling.References.MaxVideoTotalDuration != 30 {
+		t.Fatalf("kling-4.0: %#v", kling)
+	}
+	for _, ratio := range kling.Ratios {
+		if ratio == "adaptive" || ratio == "4:3" {
+			t.Fatalf("kling-4.0 text-to-video does not take %s: %v", ratio, kling.Ratios)
+		}
+	}
+	if flash := DefaultModelCapabilityConfigForModel("video-generations-json", "kling-4.0-flash").Video; flash.Duration.Max != 20 {
+		t.Fatalf("kling-4.0-flash: %#v", flash.Duration)
+	}
+	wan := DefaultModelCapabilityConfigForModel("video-generations-json", "wan3.0-video").Video
+	if wan.Duration.Min != 2 || wan.Duration.Max != 30 || !wan.GenerateAudio.Supported || wan.References.MaxAudios != 5 || wan.References.MaxVideoTotalDuration != 15 || len(wan.Resolutions) != 3 || wan.Resolutions[0] != "480p" {
+		t.Fatalf("wan3.0-video: %#v", wan)
+	}
+	// Same model names on other protocols keep their own contracts.
+	if other := DefaultModelCapabilityConfigForModel("newapi-channel-2", "wan3.0-video").Video; other.Duration.Max == 30 && other.References.MaxAudios == 5 {
+		t.Fatalf("newapi-channel-2 wan3.0-video picked up the YSXXAI profile: %#v", other)
+	}
+}

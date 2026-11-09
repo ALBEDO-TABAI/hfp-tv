@@ -31,6 +31,26 @@ test("YSXXAI Seedance presets match each model's output tier and reference suppo
     assert.equal(ysxxaiSeedanceLabel("volcengine-ark-video", "doubao-seedance-2-0-260128-2-720P"), "");
 });
 
+test("YSXXAI Kling and Wan presets follow the published request limits", () => {
+    const kling = defaultModelCapabilityConfig("video-generations-json", "kling-4.0").video!;
+    assert.deepEqual([kling.duration.min, kling.duration.max, kling.duration.default], [3, 30, 5]);
+    assert.equal(kling.generateAudio.supported, false, "Kling refuses generate_audio");
+    assert.deepEqual(kling.resolutions, ["720p", "1080p"]);
+    assert.ok(!kling.ratios.includes("adaptive"));
+    assert.deepEqual([kling.references.maxImages, kling.references.maxVideos, kling.references.maxAudios], [10, 5, 0]);
+    assert.equal(kling.references.maxVideoTotalDurationSeconds, 30);
+    assert.ok(kling.operations.includes("reference_to_video"));
+    assert.equal(defaultModelCapabilityConfig("video-generations-json", "kling-4.0-flash").video!.duration.max, 20);
+    const wan = defaultModelCapabilityConfig("video-generations-json", "wan3.0-video").video!;
+    assert.deepEqual([wan.duration.min, wan.duration.max], [2, 30]);
+    assert.equal(wan.generateAudio.supported, true);
+    assert.deepEqual(wan.resolutions, ["480p", "720p", "1080p"]);
+    assert.ok(wan.ratios.includes("adaptive"));
+    assert.deepEqual([wan.references.maxImages, wan.references.maxVideos, wan.references.maxAudios, wan.references.maxVideoTotalDurationSeconds], [10, 5, 5, 15]);
+    // The same names on other protocols keep their own contracts.
+    assert.notEqual(defaultModelCapabilityConfig("newapi-channel-2", "wan3.0-video").video!.references.maxAudios, 5);
+});
+
 test("Dreamina native defaults expose editing and valid duration choices without expanding saved profiles", () => {
     const model = "dreamina-seedance-2-5-260628";
     const profile = defaultModelCapabilityConfig("volcengine-ark-video", model).video!;

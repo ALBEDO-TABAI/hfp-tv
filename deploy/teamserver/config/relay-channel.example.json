@@ -11,6 +11,9 @@
     "doubao-seedance-2-0-260128-2-4k",
     "doubao-seedance-2-0-fast-260128-2-720P",
     "doubao-seedance-2-0-mini-260615-2-720P",
+    "kling-4.0",
+    "kling-4.0-flash",
+    "wan3.0-video",
     "gpt-5.5"
   ],
   "modelProfiles": [
@@ -22,6 +25,9 @@
     {"model": "doubao-seedance-2-0-260128-2-4k", "displayName": "Seedance 2.0 · 4K", "capability": "video", "protocol": "video-generations-json", "baseUrl": "http://10.10.10.45:3000/ysxxai-seedance", "referenceAssetService": "http://10.10.10.45:8787/v1/ysxxai-reference-images", "referenceMediaTransport": {"image": "url", "video": "url", "audio": "url"}},
     {"model": "doubao-seedance-2-0-fast-260128-2-720P", "displayName": "Seedance 2.0 Fast · 720P", "capability": "video", "protocol": "video-generations-json", "baseUrl": "http://10.10.10.45:3000/ysxxai-seedance", "referenceAssetService": "http://10.10.10.45:8787/v1/ysxxai-reference-images"},
     {"model": "doubao-seedance-2-0-mini-260615-2-720P", "displayName": "Seedance 2.0 Mini · 720P", "capability": "video", "protocol": "video-generations-json", "baseUrl": "http://10.10.10.45:3000/ysxxai-seedance", "referenceAssetService": "http://10.10.10.45:8787/v1/ysxxai-reference-images"},
+    {"model": "kling-4.0", "displayName": "可灵 4.0", "capability": "video", "protocol": "video-generations-json", "baseUrl": "http://10.10.10.45:3000/ysxxai-video"},
+    {"model": "kling-4.0-flash", "displayName": "可灵 4.0 Flash", "capability": "video", "protocol": "video-generations-json", "baseUrl": "http://10.10.10.45:3000/ysxxai-video"},
+    {"model": "wan3.0-video", "displayName": "万相 3.0", "capability": "video", "protocol": "video-generations-json", "baseUrl": "http://10.10.10.45:3000/ysxxai-video"},
     {"model": "gpt-5.5", "capability": "text", "protocol": "chat-completion"}
   ]
 }

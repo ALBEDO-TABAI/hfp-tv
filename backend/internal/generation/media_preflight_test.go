@@ -271,3 +271,22 @@ func TestImageOnlyReferenceStorageStillAsksForVideoLinks(t *testing.T) {
 		t.Fatalf("video reference = %v", err)
 	}
 }
+
+func TestYSXXAIKlingAndWanReferencesGoAsLinks(t *testing.T) {
+	ctx := EnsureOfficialProtocolAdapter(context.Background(), "video-generations-json")
+	for _, name := range []string{"kling-4.0", "kling-4.0-flash", "wan3.0-video"} {
+		input := Input{Mode: "video", Config: Config{InterfaceType: "video-generations-json", Model: name}}
+		policy := MediaHydrationPolicyFor(ctx, input)
+		if !policy.RequireURL || !policy.PreferURL || !mediaPolicyForKind(ctx, input, "image", policy).RequireURL {
+			t.Fatalf("%s: %+v", name, policy)
+		}
+	}
+	other := Input{Mode: "video", Config: Config{InterfaceType: "video-generations-json", Model: "another-video"}}
+	if MediaHydrationPolicyFor(ctx, other).RequireURL {
+		t.Fatal("other video-generations-json models keep the protocol's transport")
+	}
+	explicit := Input{Mode: "video", Config: Config{InterfaceType: "video-generations-json", Model: "wan3.0-video", ReferenceMediaTransport: map[string]string{"image": "inline"}}}
+	if mediaPolicyForKind(ctx, explicit, "image", MediaHydrationPolicyFor(ctx, explicit)).RequireURL {
+		t.Fatal("an explicit model transport wins")
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"infinite-canvas/backend/internal/model"
+	"infinite-canvas/backend/internal/modelcatalog"
 	"infinite-canvas/backend/internal/providerpreset"
 )
 
@@ -37,6 +38,12 @@ func MediaHydrationPolicyFor(ctx context.Context, input Input) MediaHydrationPol
 	if adapter, ok := ProtocolAdapterForContext(ctx, input.Config.InterfaceType); ok {
 		policy.RequireURL = adapter.Metadata().RequiresPublicMediaURLs
 		policy.PreferURL = policy.PreferURL || policy.RequireURL
+	}
+	// YSXXAI Kling only takes links, and the relay's ysxxai-video plugin
+	// forwards Wan material as links too; hosted workspaces get them from the
+	// company reference-image service. A model's explicit transport still wins.
+	if modelcatalog.IsYSXXAIVideoModel(input.Config.InterfaceType, input.Config.Model) {
+		policy.RequireURL, policy.PreferURL = true, true
 	}
 	if input.Mode == "image" && input.Mask != nil {
 		policy.RequireURL = false

@@ -1,6 +1,6 @@
 import type { ModelChannel, ModelCapability } from "@/stores/use-config-store";
 import { buildApiUrl } from "@/stores/use-config-store";
-import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
+import { defaultModelCapabilityConfig, isYSXXAISeedanceModel, isYSXXAIVideoModel } from "@/lib/model-capabilities";
 import { inferProtocolCapabilityFromModel, type ModelProtocolDefinition } from "@/lib/model-protocols";
 import { catalogEndpointCapability, type ChannelModelCatalogItem } from "@/lib/channel-model-catalog";
 
@@ -51,6 +51,9 @@ export function serviceModelProfile(channel: ModelChannel, item: ChannelModelCat
     // Model names identify a family, not a provider's wire protocol. Ask the
     // user to select its contract unless the catalog explicitly declares it.
     if (fullvideoFull && capability === "video" && !inherited) proposed = item.supportedEndpointTypes?.includes("full-video") ? "full-video" : undefined;
+    // The company relay serves YSXXAI Seedance, Kling and Wan through plugin
+    // routes that take the video-generations-json body, whatever its catalog lists.
+    if (channel.id === "company-relay" && capability === "video" && (isYSXXAISeedanceModel("video-generations-json", item.id) || isYSXXAIVideoModel("video-generations-json", item.id))) proposed = "video-generations-json";
     const definition = protocols.find((p) => p.value === proposed && p.capability === capability && p.enabled !== false);
     const protocol = definition?.value;
     return { ...existing, model: item.id, displayName: existing?.displayName || item.displayName, capability, protocol, authType: definition ? definition.authType : existing?.authType, capabilityConfig: existing?.capability === capability && existing.capabilityConfig ? existing.capabilityConfig : (capability === "image" || capability === "video") && protocol ? defaultModelCapabilityConfig(protocol, item.id) : undefined };

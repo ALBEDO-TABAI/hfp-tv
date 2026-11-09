@@ -1,9 +1,9 @@
 import { createModelChannel, type ModelChannel } from "@/stores/use-config-store";
 import type { RelayChannelProfile, RelayChannelTemplate } from "@/services/api/platform";
-import { isYSXXAISeedanceModel } from "@/lib/model-capabilities";
+import { isYSXXAISeedanceModel, isYSXXAIVideoModel } from "@/lib/model-capabilities";
 import type { ModelProtocol } from "@/lib/model-protocols";
 
-export type CompanyRelaySharedEndpoints = { arkBaseUrl: string; referenceAssetService: string };
+export type CompanyRelaySharedEndpoints = { arkBaseUrl: string; referenceAssetService: string; ysxxaiVideoBaseUrl: string };
 
 /**
  * The editor draft for the company relay. `hasApiKey` is whether the admin's own
@@ -30,11 +30,17 @@ function usesReferenceService(profile: RelayChannelProfile) {
     return profile.protocol === "volcengine-ark-video" || isYSXXAISeedanceModel(profile.protocol as ModelProtocol | undefined, profile.model);
 }
 
+// Kling 4.0 / Wan 3.0 behind the relay's "ysxxai-video" plugin route.
+function usesYSXXAIVideoEntry(profile: RelayChannelProfile) {
+    return isYSXXAIVideoModel(profile.protocol as ModelProtocol | undefined, profile.model);
+}
+
 export function companyRelaySharedEndpoints(channel: ModelChannel): CompanyRelaySharedEndpoints {
     const profiles: RelayChannelProfile[] = channel.modelProfiles ?? [];
     return {
         arkBaseUrl: profiles.find(profile => profile.protocol?.startsWith("volcengine-ark-"))?.baseUrl ?? "",
         referenceAssetService: profiles.find(profile => usesReferenceService(profile) && profile.referenceAssetService?.trim())?.referenceAssetService ?? "",
+        ysxxaiVideoBaseUrl: profiles.find(profile => usesYSXXAIVideoEntry(profile) && profile.baseUrl?.trim())?.baseUrl ?? "",
     };
 }
 
@@ -56,6 +62,10 @@ export function companyRelayTemplateFromChannel(channel: ModelChannel, shared: C
         if (usesReferenceService(profile) && follows(profile.referenceAssetService, previous.referenceAssetService)) {
             if (shared.referenceAssetService.trim()) next.referenceAssetService = shared.referenceAssetService.trim();
             else delete next.referenceAssetService;
+        }
+        if (usesYSXXAIVideoEntry(profile) && follows(profile.baseUrl, previous.ysxxaiVideoBaseUrl ?? "")) {
+            if (shared.ysxxaiVideoBaseUrl?.trim()) next.baseUrl = shared.ysxxaiVideoBaseUrl.trim();
+            else delete next.baseUrl;
         }
         return next;
     });

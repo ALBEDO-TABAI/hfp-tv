@@ -99,7 +99,7 @@ read -rs PW; printf '%s\n' "$PW" | docker compose exec -T teamserver teamserver 
 
 ### 公司中转站渠道
 
-管理员可以在网页上维护公司中转站：“模型配置”里公司中转站卡片的“编辑（所有成员）”（还没有公司中转站时是页头的“配置公司中转站”）。编辑器与“添加模型服务”相同，但没有密钥栏，多两个共用设置：火山方舟（豆包）接口地址和参考图服务地址，保存时套用到所有火山方舟协议（参考图服务只套用到 Seedance）的模型。读取模型目录和“高级模型设置与测试”里的生成测试都用管理员本人绑定的中转站密钥，管理员要先在“用户管理”给自己绑定；测试由服务端按已保存的地址发出，新加的火山方舟模型或改过的接口地址要先保存，编辑器会提示。保存后定义存进 `platform.db` 的 `relay_channel_settings`（`internal/relaychannel`），立即改写所有在用成员工作区里的公司中转站渠道，已打开的内核不必重启，成员刷新页面即可看到；保存与恢复都记入操作记录。网页保存的定义存在时优先于下面的渠道文件，“服务状态”页显示当前来源；`DELETE /api/platform/admin/relay-channel` 恢复为文件里的定义。
+管理员可以在网页上维护公司中转站：“模型配置”里公司中转站卡片的“编辑（所有成员）”（还没有公司中转站时是页头的“配置公司中转站”）。编辑器与“添加模型服务”相同，但没有密钥栏，多三个共用设置：火山方舟（豆包）接口地址、参考图服务地址和可灵 / 万相接口地址。保存时，火山方舟地址套用到所有火山方舟协议的模型，参考图服务只套用到 Seedance，可灵 / 万相地址（中转站的 `/ysxxai-video` 入口）只套用到 `kling-4.0`、`kling-4.0-flash`、`wan3.0-video`。读取或手动添加这三个模型和 YSXXAI 的七个 Seedance 模型时，协议默认选“视频生成 JSON”。读取模型目录和“高级模型设置与测试”里的生成测试都用管理员本人绑定的中转站密钥，管理员要先在“用户管理”给自己绑定；测试由服务端按已保存的地址发出，新加的火山方舟模型或改过的接口地址要先保存，编辑器会提示。保存后定义存进 `platform.db` 的 `relay_channel_settings`（`internal/relaychannel`），立即改写所有在用成员工作区里的公司中转站渠道，已打开的内核不必重启，成员刷新页面即可看到；保存与恢复都记入操作记录。网页保存的定义存在时优先于下面的渠道文件，“服务状态”页显示当前来源；`DELETE /api/platform/admin/relay-channel` 恢复为文件里的定义。
 
 `TEAMSERVER_RELAY_CHANNEL_FILE` 指向一个模型渠道 JSON 对象，格式与模型配置里的渠道相同，但不能包含 `apiKey`、`secretKey` 或 `credentialRef`。示例见 `deploy/teamserver/config/relay-channel.example.json`；Compose 把 `deploy/teamserver/config` 挂载到容器的 `/config`，因此可设为 `/config/relay-channel.json`。
 
