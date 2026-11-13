@@ -56,8 +56,13 @@ export function serviceModelProfile(channel: ModelChannel, item: ChannelModelCat
     if (channel.id === "company-relay" && capability === "video" && (isYSXXAISeedanceModel("video-generations-json", item.id) || isYSXXAIVideoModel("video-generations-json", item.id))) proposed = "video-generations-json";
     const definition = protocols.find((p) => p.value === proposed && p.capability === capability && p.enabled !== false);
     const protocol = definition?.value;
-    return { ...existing, model: item.id, displayName: existing?.displayName || item.displayName, capability, protocol, authType: definition ? definition.authType : existing?.authType, capabilityConfig: existing?.capability === capability && existing.capabilityConfig ? existing.capabilityConfig : (capability === "image" || capability === "video") && protocol ? defaultModelCapabilityConfig(protocol, item.id) : undefined };
+    return { ...existing, model: item.id, displayName: existing?.displayName || item.displayName, capability, protocol, authType: definition ? definition.authType : existing?.authType, capabilityConfig: existing?.capability === capability && existing.capabilityConfig ? existing.capabilityConfig : (capability === "image" || capability === "video") && protocol ? defaultModelCapabilityConfig(protocol, item.id) : undefined,
+        // YSXXAI image models on the company relay only read reference images as links.
+        ...(channel.id === "company-relay" && capability === "image" && protocol === "openai-image" && YSXXAI_IMAGE_MODELS.includes(item.id.trim().toLowerCase()) && !existing?.referenceMediaTransport?.image ? { referenceMediaTransport: { ...existing?.referenceMediaTransport, image: "url" as const } } : {}) };
 }
+
+// Served by the relay's "ysxxai-image" plugin (deploy/teamserver/ysxxai-image-task-plugin.js).
+const YSXXAI_IMAGE_MODELS = ["gemini-nano-banana-2.1", "gpt-image-2.5"];
 
 export function channelAllowsEmptyAPIKey(channel: Pick<ModelChannel, "models" | "modelProfiles" | "interfaceType">, protocols?: ModelProtocolDefinition[]) {
     const models = (channel.models || []).map((model) => model.trim()).filter(Boolean);

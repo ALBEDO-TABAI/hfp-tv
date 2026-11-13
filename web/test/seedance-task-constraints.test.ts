@@ -103,3 +103,13 @@ test("polling preserves unavailable code over ambiguous provider prose", async (
         expect(explainGenerationError(failure.message).category).toBe("provider_unavailable");
     }
 });
+
+test("image supplier replies say what to change", () => {
+    const linkOnly = explainGenerationError({ error: { code: "fail_to_fetch_task", message: JSON.stringify({ error: { message: "image_urls is required for image edits", code: "invalid_request" } }) } });
+    expect(linkOnly.category).toBe("invalid_params");
+    expect(linkOnly.reason).toBe("这个模型只接收参考图的链接");
+    expect(explainGenerationError(linkOnly.message).reason).toBe(linkOnly.reason);
+    const nested = (message: string) => ({ error: { code: "fail_to_fetch_task", message: JSON.stringify({ error: { message, code: "invalid_request_error" } }) } });
+    expect(explainGenerationError(nested("size must be auto or one of 1:1, 16:9; pixel sizes are not supported")).reason).toBe("这个模型只接受画面比例，不接受像素尺寸");
+    expect(explainGenerationError(nested("gpt-image-2.5 supports 2k and 4k")).reason).toBe("这个模型不支持所选的分辨率档位");
+});

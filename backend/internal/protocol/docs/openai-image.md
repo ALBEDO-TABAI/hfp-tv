@@ -14,6 +14,8 @@ Content-Type: application/json
 
 官方编辑接口为 `POST /v1/images/edits`、`multipart/form-data`。当前适配器未在有参考图时切换到该路径，这是明确的实现缺口。
 
+模型的“参考素材传输”里图片设为链接方式（`referenceMediaTransport.image` 为 `url` 或 `link`）时，带参考图的请求改为 `POST /v1/images/edits`、`application/json`，参考图以 `image_urls` 字符串数组提交，其余字段与文生图相同。这不是 OpenAI 官方格式，用于只接收图片链接的中转站模型；该模式不支持蒙版。
+
 ## 模型、尺寸与质量
 
 模型、允许尺寸、质量枚举、单次张数和计费会随上游服务变化，插件不维护可能过期的白名单。渠道若是 OpenAI 兼容实现，必须分别验证它是否支持 `n`、`quality`、`background`、`output_format` 和 Base64 响应。

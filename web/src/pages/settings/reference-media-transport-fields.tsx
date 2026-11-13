@@ -11,10 +11,10 @@ export function ReferenceMediaTransportFields({ value, onChange }: { value?: Ref
                 aria-label={`${{ image: "图片", video: "视频", audio: "音频" }[kind]}传输方式`}
                 className="min-w-0 flex-1"
                 value={value?.[kind] || "auto"}
-                options={[{ value: "auto", label: "自动，按协议处理" }, { value: "inline", label: "直接传素材" }, { value: "url", label: "上传到我的对象存储" }, { value: "link", label: "手动填写 HTTPS 链接" }]}
+                options={[{ value: "auto", label: "自动，按协议处理" }, { value: "inline", label: "直接传素材" }, { value: "url", label: "上传后以链接提交" }, { value: "link", label: "手动填写 HTTPS 链接" }]}
                 onChange={(transport) => onChange({ ...value, [kind]: transport })}
             />
         </label>)}
-        <p className="text-xs leading-5 text-foreground/58">直接传素材使用当前协议的文件或 Base64 格式，需服务商支持。需要链接时，自动使用已启用的对象存储；未配置时可手动填写。</p>
+        <p className="text-xs leading-5 text-foreground/58">直接传素材使用当前协议的文件或 Base64 格式，需服务商支持。需要链接时，自动使用已启用的对象存储，团队服务器上使用公司参考图服务；都没有时可手动填写。</p>
     </section>;
 }

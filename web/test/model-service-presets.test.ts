@@ -199,3 +199,15 @@ test("video test uses configured range defaults and ranks K resolutions above or
         return { video: { storageKey: "fixture", dataUrl: "" } };
     });
 });
+
+test("YSXXAI image models on the company relay send reference images as links", () => {
+    const installed = [...protocols, { value: "openai-image", capability: "image", enabled: true } as ModelProtocolDefinition];
+    const relay = createModelChannel({ id: "company-relay", baseUrl: "http://relay.example/v1" });
+    for (const id of ["gpt-image-2.5", "gemini-nano-banana-2.1"]) {
+        expect(serviceModelProfile(relay, { id, modelType: "image" }, installed)).toMatchObject({ protocol: "openai-image", referenceMediaTransport: { image: "url" } });
+    }
+    expect(serviceModelProfile(relay, { id: "gpt-image-2", modelType: "image" }, installed).referenceMediaTransport).toBeUndefined();
+    // The same model name on a member's own channel keeps uploading files.
+    const own = createModelChannel({ id: "custom", baseUrl: "https://api.openai.com/v1" });
+    expect(serviceModelProfile(own, { id: "gpt-image-2.5", modelType: "image" }, installed).referenceMediaTransport).toBeUndefined();
+});

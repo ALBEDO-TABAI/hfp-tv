@@ -1,5 +1,5 @@
 export function persistedTaskConstraintCopy(message: string) {
-    for (const input of ["video_first_frame_ratio_unreadable", "video_first_frame_ratio_unsupported", "video_first_frame_ratio_mismatch", "视频画幅仅支持 当前传入 adaptive", "TaskTypeConstraint ratio first-frame", "TaskTypeConstraint duration", "TaskTypeConstraint ratio", "TaskTypeConstraint"]) {
+    for (const input of ["video_first_frame_ratio_unreadable", "video_first_frame_ratio_unsupported", "video_first_frame_ratio_mismatch", "视频画幅仅支持 当前传入 adaptive", "image_urls is required", "pixel sizes are not supported", "gpt-image supports 2k and 4k", "TaskTypeConstraint ratio first-frame", "TaskTypeConstraint duration", "TaskTypeConstraint ratio", "TaskTypeConstraint"]) {
         const copy = taskConstraintCopy(input)!;
         if (message.trim().startsWith(`${copy.reason}。${copy.action}`)) return copy;
     }
@@ -12,6 +12,10 @@ export function taskConstraintCopy(message: string) {
     if (text.includes("video_first_frame_ratio_unsupported")) return { reason: "当前渠道无法保持这张首帧图的比例", action: "请将首帧调整为 1:1、4:3、3:4、9:16、16:9 或 21:9，或更换模型" };
     if (text.includes("video_first_frame_ratio_mismatch")) return { reason: "输出比例需要与首帧一致", action: "请使用随首帧比例，或先调整首帧图片的尺寸" };
     if (text.includes("视频画幅仅支持") && text.includes("当前传入 adaptive")) return { reason: "当前渠道暂不支持自适应画幅", action: "首帧生成请更换模型；文生视频请指定固定比例后再提交" };
+    // Image models whose supplier differs from OpenAI Images; keep in step with task_constraint_error.go.
+    if (text.includes("image_urls") && (text.includes("required") || text.includes("public links"))) return { reason: "这个模型只接收参考图的链接", action: "请管理员在模型设置的“参考素材传输”里，把图片改为“上传后以链接提交”后重试" };
+    if (text.includes("pixel sizes are not supported") || text.includes("unsupported image aspect ratio")) return { reason: "这个模型只接受画面比例，不接受像素尺寸", action: "请联系管理员更新中转站的图片插件；也可以先把尺寸改为自动再生成" };
+    if (/supports [124]k( and [124]k)*\b/.test(text)) return { reason: "这个模型不支持所选的分辨率档位", action: "请换一个分辨率档位（如 2K 或 4K）后重试" };
     if (!text.includes("tasktypeconstraint")) return undefined;
     if (text.includes("ratio") && /first[-_]frame/.test(text)) return { reason: "首尾帧模式的画面比例需跟随首帧", action: "请选择自适应比例后重新生成；如需指定比例，请改用参考生成模式" };
     if (text.includes("duration")) return { reason: "当前任务模式不支持指定的视频时长", action: "编辑视频时请使用跟随原视频的时长；如需生成指定时长，请改用参考生成模式" };

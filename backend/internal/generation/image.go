@@ -52,7 +52,13 @@ func RunImageTask(ctx context.Context, input Input) (map[string]interface{}, err
 			}
 		}
 	}
-	if _, ok := DeclarativeProtocolAdapterForContext(ctx, input.Config.InterfaceType); ok {
+	links, byLink, err := imageReferenceLinks(input)
+	if err != nil {
+		return nil, err
+	}
+	// The installed OpenAI Images package uploads reference images as files.
+	// A model set to send them as links is submitted by the JSON request below.
+	if _, ok := DeclarativeProtocolAdapterForContext(ctx, input.Config.InterfaceType); ok && !byLink {
 		return RunDeclarativeProtocolTask(ctx, input)
 	}
 	if input.Config.InterfaceType == string(model.ChannelInterfaceGrokImage) {
@@ -77,7 +83,7 @@ func RunImageTask(ctx context.Context, input Input) (map[string]interface{}, err
 			return nil, errors.New("蒙版编辑必须提供与蒙版同尺寸的源图片")
 		}
 	}
-	if len(input.ReferenceImages) > 0 || input.Mask != nil {
+	if (len(input.ReferenceImages) > 0 || input.Mask != nil) && !byLink {
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
 		writeField(writer, "model", input.Config.Model)
@@ -135,7 +141,12 @@ func RunImageTask(ctx context.Context, input Input) (map[string]interface{}, err
 		if key, value := ImageSizeParameter(input.ImageCapability, input.Config.Size); value != "" {
 			body[key] = value
 		}
-		if err := PostJSON(ctx, input.Config, "/images/generations", body, &payload); err != nil {
+		path := "/images/generations"
+		if byLink {
+			body["image_urls"] = links
+			path = "/images/edits"
+		}
+		if err := PostJSON(ctx, input.Config, path, body, &payload); err != nil {
 			return nil, err
 		}
 	}
@@ -144,6 +155,30 @@ func RunImageTask(ctx context.Context, input Input) (map[string]interface{}, err
 		return nil, err
 	}
 	return map[string]interface{}{"mode": "image", "images": images}, nil
+}
+
+// imageReferenceLinks reports whether this model's reference images travel as
+// links (the model's "参考素材传输方式" is 地址): some relays' image models only
+// read public URLs and refuse uploaded files. Hydration has already exchanged
+// owned images for links, so anything else here is a preparation bug to
+// surface, not bytes to upload silently.
+func imageReferenceLinks(input Input) ([]string, bool, error) {
+	transport := input.Config.ReferenceMediaTransport["image"]
+	if strings.TrimSpace(input.Config.InterfaceType) != string(model.ChannelInterfaceOpenAIImage) || input.Config.ChannelID != "" || (transport != "url" && transport != "link") || len(input.ReferenceImages) == 0 {
+		return nil, false, nil
+	}
+	if input.Mask != nil {
+		return nil, false, errors.New("当前模型的参考图以链接方式提交，不支持蒙版编辑，请移除蒙版后重试")
+	}
+	links := make([]string, 0, len(input.ReferenceImages))
+	for index, image := range input.ReferenceImages {
+		link := strings.TrimSpace(image.URL)
+		if !strings.HasPrefix(link, "https://") && !strings.HasPrefix(link, "http://") {
+			return nil, false, fmt.Errorf("参考图 %d 没有可用的公网链接，无法提交给当前模型", index+1)
+		}
+		links = append(links, link)
+	}
+	return links, true, nil
 }
 
 func RunGeminiImageTask(ctx context.Context, input Input) (map[string]interface{}, error) {
