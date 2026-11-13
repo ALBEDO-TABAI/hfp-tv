@@ -2,7 +2,15 @@
 # 团队服务器单镜像：Go 网关与工作区内核、Node 助手宿主、ffmpeg、官方插件与前端静态文件。
 # 构建上下文是仓库根目录：docker build -f deploy/teamserver/Dockerfile .
 
-FROM oven/bun:1.3.13 AS web-build
+# 下载源默认用中国大陆的镜像，都可以在 .env 里改（见 .env.example）：
+#   IMAGE_REGISTRY 基础镜像仓库；NPM_REGISTRY 前端与助手依赖；APT_MIRROR 系统软件包；GOPROXY Go 依赖。
+ARG IMAGE_REGISTRY=docker.io
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+ARG APT_MIRROR=mirrors.aliyun.com
+
+FROM ${IMAGE_REGISTRY}/oven/bun:1.3.13 AS web-build
+ARG NPM_REGISTRY
+ENV BUN_CONFIG_REGISTRY=${NPM_REGISTRY}
 WORKDIR /app/web
 ARG BUILD_VERSION
 ENV CANVAS_BUILD_VERSION=${BUILD_VERSION}
@@ -22,20 +30,24 @@ ENV VITE_BUILD_COMMIT=${BUILD_COMMIT}
 RUN bun --bun ./node_modules/vite/bin/vite.js build
 
 # 助手锁文件是 Bun lockfile v2，Bun 1.3.x 无法解析，版本与本地开发要求的 1.4.4 对齐；前端锁文件仍是 v1，上面的阶段不受影响。
-FROM oven/bun:1.4.4 AS agent-host-deps
+FROM ${IMAGE_REGISTRY}/oven/bun:1.4.4 AS agent-host-deps
+ARG NPM_REGISTRY
+ENV BUN_CONFIG_REGISTRY=${NPM_REGISTRY}
 WORKDIR /app/agent-host
 COPY agent-host/package.json agent-host/bun.lock ./
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --production --backend copyfile --cache-dir=/root/.bun/install/cache
 
-FROM node:24-bookworm-slim AS plugin-build
-RUN apt-get update && apt-get install -y --no-install-recommends zip && rm -rf /var/lib/apt/lists/*
+FROM ${IMAGE_REGISTRY}/library/node:24-bookworm-slim AS plugin-build
+ARG APT_MIRROR
+RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends zip && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY plugin-packages ./plugin-packages
 RUN ./plugin-packages/build-packages.sh
 
-FROM golang:1.25-bookworm AS backend-build
-# 先走国内镜像；它出任何错（含断流、超时）都换官方源再试一次，官方源没有的模块直接从源码仓库取。
-ARG GOPROXY=https://goproxy.cn|https://proxy.golang.org,direct
+FROM ${IMAGE_REGISTRY}/library/golang:1.25-bookworm AS backend-build
+# 只走国内镜像：第一个出任何错（含断流、超时）都换第二个，两个都没有的模块直接从源码仓库取。
+ARG GOPROXY=https://goproxy.cn|https://mirrors.aliyun.com/goproxy/,direct
 ARG BUILD_VERSION
 ARG BUILD_COMMIT=unknown
 ARG BUILD_TIME=unknown
@@ -57,8 +69,10 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     ldflags="-s -w -X infinite-canvas/backend/internal/buildinfo.Version=${version} -X infinite-canvas/backend/internal/buildinfo.Commit=${BUILD_COMMIT} -X infinite-canvas/backend/internal/buildinfo.BuildTime=${BUILD_TIME}"; \
     CGO_ENABLED=1 GOOS=linux go build -trimpath -ldflags="$ldflags" -o /out/teamserver ./cmd/teamserver
 
-FROM node:24-bookworm-slim
-RUN apt-get update \
+FROM ${IMAGE_REGISTRY}/library/node:24-bookworm-slim
+ARG APT_MIRROR
+RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata ffmpeg wget \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --home-dir /data app \

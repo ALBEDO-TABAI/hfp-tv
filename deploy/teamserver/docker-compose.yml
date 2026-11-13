@@ -8,8 +8,11 @@ services:
       context: ../..
       dockerfile: deploy/teamserver/Dockerfile
       args:
-        # Go 依赖源：默认先走国内镜像，出错再换官方源；公司有自己的 Go 代理时在 .env 里设置 GOPROXY。
-        GOPROXY: ${GOPROXY:-https://goproxy.cn|https://proxy.golang.org,direct}
+        # 构建时的下载源，默认都是中国大陆的镜像；要换成公司自己的镜像时在 .env 里设置同名变量。
+        GOPROXY: ${GOPROXY:-https://goproxy.cn|https://mirrors.aliyun.com/goproxy/,direct}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+        APT_MIRROR: ${APT_MIRROR:-mirrors.aliyun.com}
+        IMAGE_REGISTRY: ${IMAGE_REGISTRY:-docker.io}
         # update.sh 填入当前提交和构建时间，排查信息和任务诊断据此显示实际运行的版本。
         BUILD_COMMIT: ${BUILD_COMMIT:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}

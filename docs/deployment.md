@@ -101,7 +101,7 @@ cp config/user-keys.example.txt config/user-keys.txt             # 成员的中�
    docker compose logs -f teamserver
    ```
 
-   第一次构建要下载 Go 和前端依赖，耗时较长；之后的构建复用缓存，只编译改动的代码。Go 依赖默认先走国内镜像 goproxy.cn，公司有自己的 Go 代理时在 `.env` 里设置 `GOPROXY`（示例见 `.env.example`）。
+   第一次构建要下载 Go 和前端依赖，耗时较长；之后的构建复用缓存，只编译改动的代码。构建时的下载源默认都是中国大陆的镜像：Go 依赖走 goproxy.cn 和阿里云，前端与助手依赖走 npmmirror，系统软件包走阿里云 Debian 镜像；要换成公司自己的镜像时在 `.env` 里设置 `GOPROXY`、`NPM_REGISTRY`、`APT_MIRROR`（示例见 `.env.example`）。基础镜像仍从 Docker Hub 拉取，服务器拉不到时在 Docker 的 `registry-mirrors` 里配置镜像，或在 `.env` 里设置 `IMAGE_REGISTRY`。
 
    日志里应该看到：“公司模型服务：<地址>，N 个模型”、“允许访问的内网地址：…”、“账号文件已同步”、“内置技能市场”和 “team server listening”。看到“公司模型服务：未配置”说明 `.env` 里的 `TEAMSERVER_RELAY_CHANNEL_FILE` 没有生效（也可以先不写文件，登录管理员后在“模型配置”里点“配置公司中转站”）。
 
