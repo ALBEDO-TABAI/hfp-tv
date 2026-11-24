@@ -15,7 +15,7 @@
 
 | 改动内容 | 应遵守的规则 |
 | --- | --- |
-| 页面与交互 | 页面协调业务；公共组件、状态与算法各归原目录。先使用已有主题变量，遵守[设计规范](docs/DESIGN.md)。 |
+| 页面与交互 | 页面协调业务；公共组件、状态与算法各归原目录。先使用已有主题变量，遵守[设计规范](docs/DESIGN.md)。动效按设计规范第 4 节：时长和曲线只用 token，弹窗走 `AppModal` / `useAppModal`，不过渡布局属性，直接操作跟手，尊重系统「减少动态效果」和流畅模式。 |
 | HTTP 请求 | 业务 JSON 统一走 `services/api/request.ts` 的 `http`；保留错误码、取消和超时语义。 |
 | 保存 | 浏览器草稿与服务端确认分开。保存失败必须可见；版本冲突保留用户修改。 |
 | Go 业务 | `handler → localapp/领域接口 → app/领域实现 → repository/model`；handler 不直接查库，领域不反向依赖巨型入口。 |
@@ -38,6 +38,7 @@
 | 前端类型与构建 | `cd web && bun run build`；仅类型检查为 `bun run typecheck` |
 | 本地基础合同 | `cd web && bun run pretest` |
 | 画布交互 | `cd web && bun run test:canvas`，另验证实际拖拽、缩放、弹窗和保存 |
+| 动效与界面性能 | 在浏览器里逐帧记录关键过渡或用 Performance 面板量帧率，确认空闲页面没有常驻动画；同时检查系统「减少动态效果」和流畅模式下的表现，以及窄屏和深浅色 |
 | 指定前端模块 | `cd web && bun test test/<相关文件>` |
 | 后端领域 | `cd backend && go test ./internal/<相关包>`；跨领域或发布时按需要扩大范围 |
 | 助手生命周期 | `cd backend && go test ./internal/assistantruntime` |

@@ -38,7 +38,7 @@
 1. **左侧可折叠导航栏 (`WorkspaceSidebarNav`)**：
    - 品牌标识与名称展示，支持桌面端展开/收起 (`desktopSidebarCollapsed`) 与移动端抽屉展开 (`mobileSidebarExpanded`)。
    - 核心入口：`新建项目` (`/canvas?mode=new`)、`首页` (`/`)、`项目` (`/project`)、`资产` (`/assets`)、`技能` (`/skills`)、`模型配置` (`/settings?section=channels`)、`存储设置`（桌面端原生绑定可用时）、`hfp-tv MCP` (`/agents`)。
-   - 底部区域：账号存储容量进度条 (`WorkspaceSidebarStorageMeter`，70% 警告、90% 危险)、首次创作引导入口 (`OnboardingEntry`)、桌面更新状态提示 (`WorkspaceSidebarUpdate`)、社交与文档链接、浅色/深色主题切换按钮 (`AnimatedThemeToggler`)。
+   - 底部区域：账号存储容量进度条 (`WorkspaceSidebarStorageMeter`，70% 警告、90% 危险)、首次创作引导入口 (`OnboardingEntry`)、桌面更新状态提示 (`WorkspaceSidebarUpdate`)、社交与文档链接、流畅模式开关 (`WorkspaceEffectsToggle`，关掉毛玻璃与装饰动画)、浅色/深色主题切换按钮 (`AnimatedThemeToggler`)。
 2. **全局命令与搜索面板 (`WorkspaceCommandPalette`)**：
    - 快捷键 `⌘K` / `Ctrl+K` 呼出，支持跨页面跳转、搜索画布项目、快速执行新建操作。
 3. **全局操作进度浮层 (`WorkspaceOperationProgress`)** 与 **首次创作引导 (`FirstCreationGuide`)**。

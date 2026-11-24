@@ -68,12 +68,12 @@ hfp - all in one 全局严格遵循 **12 列响应式栅格系统** 与 **4pt �
 | `--ok` / `--warn` / `--bad` | `#1fae6b` / `#e2a400` / `#e5484d` | `#1fae6b` / `#e2a400` / `#e5484d` | 状态指示灯与诊断反馈 |
 
 ### 3.2 液态玻璃光学层 (`.lg` & `web/src/lib/hfp-glass.ts`)
-复刻「藏书阁」的五层玻璃合成与指针追光：
+复刻「藏书阁」的五层玻璃合成与指针追光。玻璃运行时只在首页启动（`home-dashboard.tsx` 传入首页根节点），离开首页即停止；流畅模式和系统「减少透明度」下不生成折射贴图，流畅模式和系统「减少动态效果」下高光不随指针转动：
 1. **背景折射与磨砂**：`backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat))`。
 2. **环境色调融合**：`rgb(var(--glass-tint) / var(--glass-alpha))` 叠加微弱的信号橙环境光晕 `--amb`。
 3. **内高光与接触阴影**：顶部 `inset 0 1px 0 var(--glass-inner-hi)` 高光、底部 `inset 0 -1px 0 var(--glass-inner-lo)` 阴影与多级景深投影 `--shadow-1..4`。
-4. **动态高光边缘 (`::before`)**：1px 渐变遮罩边框，其高光角度 `--la` 随鼠标指针位置实时通过 `requestAnimationFrame` 更新。
-5. **程序化斜面焦散贴图 (`::after`)**：由 `hfp-glass.ts` 按元素尺寸与圆角在 Canvas2D 上实时计算的 `overlayMap`（源自 `Glass-HQ/liquid-glass` MIT 光学公式）。
+4. **动态高光边缘 (`::before`)**：1px 渐变遮罩边框，其高光角度 `--la` 随鼠标指针位置通过 `requestAnimationFrame` 更新，按住鼠标拖动时不更新。
+5. **程序化斜面焦散贴图 (`::after`)**：由 `hfp-glass.ts` 按元素尺寸与圆角在 Canvas2D 上计算的 `overlayMap`（源自 `Glass-HQ/liquid-glass` MIT 光学公式）。尺寸变化后防抖 160ms 再重算，切换主题在浏览器空闲时重算，不阻塞主题揭示。
 
 首页采用无点阵、无暗角的纯色页面背景。首页玻璃卡片关闭橙色环境染色（`--amb-alpha: 0`），使用 `--glass-alpha: 0.08` 的轻透明表面，主要通过细边缘、折射高光与阴影区分层次。橙色继续用于操作强调和项目标记；降低透明度偏好仍使用不透明表面。
 

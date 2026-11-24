@@ -9,7 +9,7 @@ hfp - all in one 是基于 BeefTV 的本地视频创作工作台。本页收录�
 3. [本地开发：完整准备、启动、数据与重启](local-development.md)
 4. [排查指南：保存、插件、助手和模型错误](troubleshooting.md)
 5. [部署指引：选择运行方式，部署、升级与备份团队服务器](deployment.md)
-6. [AI 协作约定](../AGENTS.md)与[视觉设计规范](DESIGN.md)
+6. [AI 协作约定](../AGENTS.md)与[视觉与动效设计规范](DESIGN.md)
 
 ## 开始使用
 

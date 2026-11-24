@@ -291,6 +291,26 @@ Windows 安装包自带视频处理工具，无需另外安装 FFmpeg。预览�
 - `web/src/pages/canvas/use-canvas-project-lifecycle.ts`：手动保存与强制保存流程。
 - `web/src/pages/canvas/canvas-project-top-bar.tsx`：菜单入口。
 
+## 界面动效与流畅模式
+
+界面上的变化都交代来去，用同一套时长和曲线：弹窗从点击处轻微放大淡入，关闭时缩小淡出；抽屉滑入，关闭时快一档滑出。弹窗、抽屉和菜单一开始关闭就不再接受点击和键盘，取消删除后即使焦点还停在“删除”上，按回车也不会误删。按下按钮时以指针为中心轻微内收，松手回弹。
+
+项目库和资产库勾选后，底部浮起“已选 N 个”操作胶囊，网格不再挪动；滚到底部时会留出胶囊的位置。技能市场、创意工坊和管理后台的列表在切换筛选或翻页时，旧列表留在原处变淡，新内容淡入；首次加载超过 200 毫秒才显示加载提示。复制、启用和停用的结果直接显示在按钮上。
+
+画布里新建的节点淡入并轻微放大；生成完成时结果淡入、描边亮起一次，失败内容淡入；选中节点时它的连线跑一次光点。“适合屏幕”、定位节点、缩放菜单里的档位和输入的百分比平滑过渡，过程中画面外的节点随视野出现，任何拖动或滚轮立即接管；放大、缩小按钮和 ⌘+ / ⌘− 每次乘或除 1.2。拖动节点、平移和缩放画布始终直接跟手。读屏软件会在节点生成完成或失败时播报。
+
+“流畅模式”（侧栏底部和画布“画布外观”里的开关）关掉毛玻璃、玻璃追光和装饰动画，脚本动画只保留淡入淡出；系统“减少动态效果”打开时，所有过渡瞬时完成，只保留表示进行中的转圈。两者独立生效。完整规则见[设计规范](../../../DESIGN.md)第 4 节。
+
+### 相关实现
+
+- `web/src/styles/globals.css` 第 7 节：时长、曲线和呼吸点等动效 token，以及“减少动态效果”和流畅模式的全局规则；`web/src/lib/motion-tokens.ts` 是脚本侧的同一套数值。
+- `web/src/components/ui/product/app-modal/`、`web/src/components/ui/product/app-drawer/`：弹窗与抽屉的进出场和离场期间的交互拦截；`useAppModal()` 给命令式确认框用同一套动效。
+- `web/src/hooks/use-closing-value.ts`、`web/src/hooks/use-opened-once.ts`、`web/src/components/ui/base/presence-inert/`：关闭后先播完离场再卸载，离场期间不可操作。
+- `web/src/hooks/use-workspace-button-feedback.ts`：全局按下反馈。
+- `web/src/components/ui/product/selection-capsule/`：项目库与资产库的“已选 N 个”胶囊。
+- `web/src/pages/canvas/use-canvas-viewport-transition.ts`、`web/src/lib/canvas/canvas-viewport.ts`：画布程序化镜头的插值、时长和打断。
+- `web/src/lib/announce.ts`：给读屏软件的状态播报。
+
 ## 画布外观
 
 工作区侧栏底部可切换浅色或深色模式，选择会在本机保留。旁边的“流畅模式”开关（画布“画布外观”面板里也有）会关掉毛玻璃、玻璃追光和装饰动画，并减轻大面积阴影，画布和长列表更跟手；开启后画布“自动性能”按性能优先处理，选择同样保留在本机。启动海报幕布只在首次安装或升级后出现一次，可点按或按任意键跳过；开启流畅模式或系统“减少动态效果”时不出现。画布默认“跟随全局”，随工作区当前主题更新；选择浅色、深色或自定义时，则单独保存该画布的外观。已有明确外观设置的画布保留原设置，可手动改为“跟随全局”。新建画布优先使用已保存的默认外观，没有默认值时使用“跟随全局”；没有外观记录的旧画布也默认跟随全局。
@@ -310,6 +330,7 @@ Windows 安装包自带视频处理工具，无需另外安装 FFmpeg。预览�
 - `web/src/components/canvas/canvas-toolbar.tsx`：画布外观面板入口。
 - `web/src/components/canvas/canvas-appearance-controls.tsx`：主题、颜色、明亮度和网格控件。
 - `web/src/components/canvas/infinite-canvas.tsx`：应用主题背景并保持网格渲染参数。
+- `web/src/components/layout/workspace-effects-toggle.tsx`、`web/src/stores/use-theme-store.ts`：流畅模式开关与本机保存的主题、流畅模式偏好。
 
 ## 画布节点自动整理
 

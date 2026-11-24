@@ -39,6 +39,7 @@
    - **个人资产库 (`/assets`)、技能市场 (`/skills`)、模型配置与诊断 (`/settings`)、MCP 外部工具接入 (`/agents`)、插件中心 (`/plugins`)**。
 2. **「Ready Library」艺术指导设计系统**：
    - 详见 [`docs/DESIGN.md`](docs/DESIGN.md) 与全量功能盘点 [`docs/FEATURES.md`](docs/FEATURES.md)。
+   - **统一动效与流畅模式**：全站一套时长和曲线，弹窗、抽屉、列表和画布镜头的出现、消失与移动都交代来去，拖动和缩放直接跟手；侧栏底部可开启「流畅模式」，关掉毛玻璃、玻璃追光和装饰动画，同时遵循系统「减少动态效果」。规则见 [`docs/DESIGN.md`](docs/DESIGN.md) 第 4 节。
 
 ---
 

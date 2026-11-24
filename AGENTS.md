@@ -69,7 +69,7 @@ hfp - all in one（`ALBEDO-TABAI/hfp-tv`）是基于 BeefTV（`glanderness/BeefT
 - 二进制或非信封响应用 `http.raw`（CSV、诊断包 zip）。
 - `apiClient` 只留给拦截器和 `http` 内部；默认 `VITE_CANVAS_BACKEND_URL || "/api"`。
 - `request()` 仍可用于测试信封解包，不是业务模块的调用面。
-- 后端成功响应为 `{ code: 0, data: T, msg: string }`；HTTP 200 不等于业务成功，`code !== 0` 必须抛错。失败时用 `ApiError.reason` / `ApiError.code` 判断类型，不要解析 `msg`。错误码见 `web/src/services/api/error-codes.ts` 与 `docs/content/docs/backend/http-api.mdx`。
+- 后端成功响应为 `{ code: 0, data: T, msg: string }`；HTTP 200 不等于业务成功，`code !== 0` 必须抛错。失败时用 `ApiError.reason` / `ApiError.code` 判断类型，不要解析 `msg`。`ApiError` 定义在 `web/src/services/api/request.ts`，团队登录相关的原因码和提示在 `web/src/lib/platform-account.ts`，完整错误码见 `docs/content/docs/backend/http-api.mdx`。
 - OpenAPI 3.0 在 `GET /api/openapi.yaml`。不要从规范生成 TypeScript 客户端来替换 `http` 模块。
 - API 模块定义并导出接口类型；页面和 React Query 直接接收解包后的 `data`，不重复访问 `.data.data`。
 - 查询参数使用 `compactApiParams` / `serializeApiParams`；取消请求传递 `AbortSignal` 并保留取消语义。
@@ -106,10 +106,11 @@ hfp - all in one（`ALBEDO-TABAI/hfp-tv`）是基于 BeefTV（`glanderness/BeefT
 - 画布组件、状态、算法分别放在 `web/src/components/canvas/`、`web/src/stores/canvas/`、`web/src/lib/canvas/`。事件忽略选择器必须覆盖 modal、popover、dropdown 等浮层。
 - 画布拖拽、连接、缩放和快捷键要考虑 pointer capture、滚轮冒泡、焦点以及 `data-canvas-no-zoom` / `data-canvas-wheel-scroll` 边界。
 - 节点和对象名称要有可发现的铅笔入口并支持单击编辑；双击或右键不能是唯一入口。图片节点保持原始比例，面板不能长期遮挡主要画布空间。
-- Ant Design 共性主题和控件状态集中在 `web/src/lib/app-theme.ts` / `AppProviders`。自带外壳的产品弹窗用 `AppModal flush`，侧栏用 `AppDrawer`；不要再复制 `padding: 0` 的 Modal styles。内容外壳仍是 `.ant-modal-container`。
+- Ant Design 共性主题和控件状态集中在 `web/src/lib/app-theme.ts` / `AppProviders`。弹窗一律用 `AppModal`（自带外壳的用 `AppModal flush`），命令式确认框用 `useAppModal()` 而不是 `App.useApp().modal`，侧栏用 `AppDrawer`；不要再复制 `padding: 0` 的 Modal styles。内容外壳仍是 `.ant-modal-container`。
 - 第三方覆盖限定在具体组件，不新增全局 `.ant-modal-*`、`.dark .ant-switch-*`、`.ant-checkbox-*` 或 Segmented 状态补丁。新增 CSS 前先搜索同名选择器，回到唯一源规则修改。
 - 遵循 `docs/DESIGN.md` 及项目三层 token：Primitive → Semantic → Component。inline style 优先引用 `var(--token-name)`，不要散落颜色、圆角、阴影和层级字面值。
 - 主操作、普通选中、Checkbox/Radio、Switch 是不同颜色角色；持久切换使用 `aria-pressed`，`type="primary"` 只表示当前主要命令。尊重 `prefers-reduced-motion`，键盘导航保留 `:focus-visible`。
+- 动效按 `docs/DESIGN.md` 第 4 节：时长和曲线只用 `globals.css` 第 7 节的 token（脚本侧 `web/src/lib/motion-tokens.ts`），不写裸毫秒数、`transition-all` 或 `duration-200`；只过渡 `opacity` 和 `transform`，拖动、平移、缩放、拉伸等直接操作不加过渡。按下反馈由全局 `use-workspace-button-feedback.ts` 处理，组件不再写 `:active` 缩放或 `whileTap`。「选中才渲染」的弹窗和抽屉用 `useClosingValue`，需要保持挂载的用 `useOpenedOnce`，`AnimatePresence` 里的浮层用 `PresenceInert`；离场期间内容不可操作，提交类回调再核对弹窗是否仍打开。减弱判断用 `useReducedMotionConfig`，脚本里临时起的动画用 `prefersReducedMotionNow()`；流畅模式写在 `<html data-effects="lite">`。
 
 ## 7. 本地开发、部署和数据目录
 

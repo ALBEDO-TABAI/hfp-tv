@@ -19,6 +19,7 @@ The derivative changes the product branding and visual interface while retaining
 - A creative assistant using the official Pi Durable runtime, with skills, tool permissions and explicit generation confirmation.
 - An independent creation workspace, project and asset libraries, model settings, plugins and external Agent connections.
 - Local project data, resources and task history; model generation uses the channels configured by the user.
+- One motion system across the workspace: dialogs, drawers, lists and canvas camera moves show where things come from and go, while dragging and zooming stay direct. A Fluid mode switch in the sidebar turns off glass blur, the glass light and decorative animation, and the system Reduce Motion setting is respected (see section 4 of [DESIGN.md](docs/DESIGN.md)).
 
 See the [repository map](docs/repository-map.md) for actual page routes and ownership of each capability.
 
