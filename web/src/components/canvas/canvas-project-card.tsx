@@ -193,9 +193,9 @@ export function ProjectPreview({ project, preferLatestImage = false, emptyVarian
         <div className="relative size-full overflow-hidden">
             {content}
             {isSyncing && syncProgress ? (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-stone-950/75 p-3 text-center backdrop-blur-sm transition-all duration-300 pointer-events-none select-none" onClick={(e) => e.stopPropagation()}>
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-stone-950/75 p-3 text-center backdrop-blur-sm transition-opacity duration-(--motion-state) pointer-events-none select-none" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1.5 text-amber-400">
-                        {isLocalSave ? <HardDriveUpload className="size-4 animate-bounce" /> : <CloudUpload className="size-4 animate-bounce" />}
+                        {isLocalSave ? <HardDriveUpload className="size-4" /> : <CloudUpload className="size-4" />}
                         <span className="text-xs font-medium tracking-wide">{isLocalSave ? "本地保存中" : "云端同步中"}</span>
                     </div>
                     <div className="w-full max-w-[150px] space-y-1">
@@ -209,9 +209,9 @@ export function ProjectPreview({ project, preferLatestImage = false, emptyVarian
                                 </div>
                                 <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
                                     <div
-                                        className="h-full bg-gradient-to-r from-amber-400 to-orange-400 transition-all duration-200"
+                                        className="h-full w-full origin-left bg-gradient-to-r from-amber-400 to-orange-400 transition-transform duration-(--motion-panel) ease-linear"
                                         style={{
-                                            width: `${Math.max(8, Math.round((syncProgress.completed / syncProgress.total) * 100))}%`,
+                                            transform: `scaleX(${Math.max(8, Math.round((syncProgress.completed / syncProgress.total) * 100)) / 100})`,
                                         }}
                                     />
                                 </div>

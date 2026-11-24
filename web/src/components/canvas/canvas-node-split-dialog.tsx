@@ -1,5 +1,6 @@
+import { AppModal } from "@/components/ui/product/app-modal";
 import { useEffect, useState } from "react";
-import { Button, InputNumber, Modal } from "antd";
+import { Button, InputNumber } from "antd";
 import { Grid2x2 } from "lucide-react";
 
 import { readImageMeta } from "@/lib/image-utils";
@@ -32,7 +33,7 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
     };
 
     return (
-        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={780} centered destroyOnHidden>
+        <AppModal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={780} centered destroyOnHidden>
             <div className="space-y-5">
                 <div>
                     <h2 className="text-xl font-semibold">宫格切分</h2>
@@ -70,7 +71,7 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
                     </div>
                 </div>
             </div>
-        </Modal>
+        </AppModal>
     );
 }
 

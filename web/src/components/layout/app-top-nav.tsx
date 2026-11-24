@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { isSpatialWorkbenchPath } from "@/lib/workspace-routes";
 import { useUserStore } from "@/stores/use-user-store";
 import { isLocalWorkspaceMode } from "@/services/workspace-mode";
+import { useOpenedOnce } from "@/hooks/use-opened-once";
 
 const WorkspaceCommandPalette = lazy(() => import("@/components/layout/workspace-command-palette").then((module) => ({ default: module.WorkspaceCommandPalette })));
 
@@ -19,6 +20,8 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
     const [mobileSidebarExpanded, setMobileSidebarExpanded] = useState(false);
     const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(readWorkspaceSidebarCollapsed);
     const [paletteOpen, setPaletteOpen] = useState(false);
+    // 命令面板第一次打开后保持挂载，关闭时才能播完离场。
+    const paletteMounted = useOpenedOnce(paletteOpen);
     const sessionHydrated = useUserStore((state) => state.hydrated);
     const storageMode = useUserStore((state) => state.storageMode);
     const user = useUserStore((state) => state.user);
@@ -26,6 +29,8 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
     useDesktopUpdateBootstrap();
 
     const hideChrome = /^\/canvas\/[^/]+/.test(pathname);
+    // 换到另一个栏目时内容区重新挂载并淡入；同一栏目里换参数或子路径不重播。
+    const routeSection = hideChrome ? "canvas-project" : pathname.split("/")[1] || "home";
     const spatialWorkbench = isSpatialWorkbenchPath(pathname);
     const creationWorkspace = pathname === "/create";
 
@@ -110,11 +115,11 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
                                 <PanelLeftOpen className="size-4" strokeWidth={1.7} />
                             </button>
                         ) : null}
-                        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">{children}</div>
+                        <div key={routeSection} className="app-route-stage relative min-h-0 min-w-0 flex-1 overflow-hidden">{children}</div>
                     </div>
                 </div>
 
-                {paletteOpen ? <Suspense fallback={null}><WorkspaceCommandPalette open onClose={() => setPaletteOpen(false)} /></Suspense> : null}
+                {paletteMounted ? <Suspense fallback={null}><WorkspaceCommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} /></Suspense> : null}
             </div>
             <ModelSetupGuide hidden={!sessionHydrated || localMode || pathname === "/login" || pathname === "/register" || pathname.startsWith("/admin") || pathname.startsWith("/assets")} />
         </>

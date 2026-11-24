@@ -96,7 +96,7 @@ export function CanvasAudioPlayer({ node, theme }: CanvasAudioPlayerProps) {
                 {waveform.map((height, index) => (
                     <span
                         key={`${node.id}-${index}`}
-                        className="min-w-0 flex-1 rounded-full transition-opacity duration-150"
+                        className="min-w-0 flex-1 rounded-full transition-opacity duration-(--motion-instant)"
                         style={{ height: `${Math.max(18, Math.round(height * 100))}%`, background: theme.node.activeStroke, opacity: index / waveform.length <= progress ? 0.9 : 0.22 }}
                     />
                 ))}

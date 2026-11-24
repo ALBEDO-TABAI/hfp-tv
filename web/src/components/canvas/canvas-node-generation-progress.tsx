@@ -48,7 +48,7 @@ export function CanvasNodeGenerationProgress({ node, theme, operation, onOpenTas
         {hasTaskIdentity || operation ? <div className="flex w-full max-w-[260px] flex-col items-center gap-2">
             {percent !== null ? <span className="text-[var(--fs-label)] font-medium tabular-nums" style={{ color: theme.node.text }}>{percent}%</span> : null}
             {bar !== "none" ? <div role="progressbar" aria-label={title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined} className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: theme.node.stroke }}>
-                <div className={bar === "indeterminate" ? "canvas-node-progress-indeterminate h-full rounded-full" : "h-full rounded-full transition-[width]"} style={{ width: percent === null ? undefined : `${percent}%`, background: theme.node.activeStroke }} />
+                <div className={bar === "indeterminate" ? "canvas-node-progress-indeterminate h-full rounded-full" : "h-full w-full origin-left rounded-full transition-transform duration-(--motion-panel) ease-linear"} style={{ transform: bar === "indeterminate" || percent === null ? undefined : `scaleX(${percent / 100})`, background: theme.node.activeStroke }} />
             </div> : null}
             {metrics?.size ? <span className="whitespace-nowrap text-xs tabular-nums" style={{ color: theme.node.text }}>{metrics.size}</span> : null}
             {metrics?.speed || fileMetrics?.count ? <div className="flex max-w-full flex-wrap justify-center gap-x-3 gap-y-1 text-[var(--fs-tiny)] tabular-nums" style={{ color: theme.node.muted }}>

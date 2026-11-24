@@ -5,11 +5,12 @@ import { useRef, useState } from "react";
 import { AppDrawer } from "@/components/ui/product/app-drawer";
 import { platformErrorMessage } from "@/lib/platform-account";
 import { listPlatformErrors, listPlatformUsers, type PlatformErrorEvent } from "@/services/api/platform";
+import { useClosingValue } from "@/hooks/use-closing-value";
 
 const sourceLabels = { task: "任务失败", workspace: "工作区无法打开" };
 const time = (value?: string) => value ? dayjs(value).format("YYYY-MM-DD HH:mm:ss") : "—";
 
-function ErrorDetail({ event, onClose }: { event: PlatformErrorEvent; onClose: () => void }) {
+function ErrorDetail({ event, open, onClose, afterClose }: { event: PlatformErrorEvent; open: boolean; onClose: () => void; afterClose: () => void }) {
     const [copyStatus, setCopyStatus] = useState("");
     const detailRef = useRef<HTMLDivElement>(null);
     const copyTaskId = async () => {
@@ -53,7 +54,7 @@ function ErrorDetail({ event, onClose }: { event: PlatformErrorEvent; onClose: (
         ["耗时", duration === undefined ? "—" : `${duration} 秒`],
     ];
 
-    return <AppDrawer open title="错误详情" size="min(640px, 100vw)" onClose={onClose}>
+    return <AppDrawer open={open} afterOpenChange={(next) => { if (!next) afterClose(); }} title="错误详情" size="min(640px, 100vw)" onClose={onClose}>
         <div ref={detailRef} className="min-w-0 space-y-5" style={{ color: "var(--ink)", overflowWrap: "anywhere" }}>
             <dl className="space-y-3">
                 {fields.map(([label, value]) => <div key={label}>
@@ -79,6 +80,7 @@ export default function AdminErrorsPage() {
     const [member, setMember] = useState("");
     const [source, setSource] = useState<PlatformErrorEvent["source"] | "">("");
     const [selected, setSelected] = useState<PlatformErrorEvent | null>(null);
+    const detail = useClosingValue(selected);
     const users = useQuery({ queryKey: ["platform", "users"], queryFn: listPlatformUsers });
     const queryKey = ["platform", "errors", member, source];
     const errors = useInfiniteQuery({
@@ -129,6 +131,6 @@ export default function AdminErrorsPage() {
             </ul> : <div className="py-12 text-center"><p>暂无错误记录</p><p className="mt-2 text-sm" style={{ color: "var(--ink-2)" }}>当前筛选下没有记录，可调整筛选或稍后刷新。</p></div>}
             {errors.hasNextPage && <div className="mt-4 text-center"><Button loading={errors.isFetchingNextPage} disabled={errors.isFetching && !errors.isFetchingNextPage} onClick={() => void errors.fetchNextPage()}>加载更多</Button></div>}
         </>}
-        {selected && <ErrorDetail key={selected.id} event={selected} onClose={() => setSelected(null)} />}
+        {detail.shown && <ErrorDetail key={detail.shown.id} event={detail.shown} open={detail.open} afterClose={detail.afterClose} onClose={() => setSelected(null)} />}
     </main>;
 }

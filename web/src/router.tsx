@@ -59,13 +59,13 @@ function deferred(element: ReactNode) {
 }
 
 function fullScreenDeferred(element: ReactNode) {
-    return <Suspense fallback={<FullScreenLoader label="正在打开创作空间" detail="准备当前页面" />}>{element}</Suspense>;
+    return <Suspense fallback={<FullScreenLoader label="正在打开工作区" detail="准备当前页面" />}>{element}</Suspense>;
 }
 
 function WorkspaceLayout() {
     const { pathname } = useLocation();
     const isCanvasProjectRoute = pathname.startsWith("/canvas/");
-    const fallback = isCanvasProjectRoute ? <CanvasRefreshShell /> : <FullScreenLoader label="正在打开创作空间" detail="准备当前页面" />;
+    const fallback = isCanvasProjectRoute ? <CanvasRefreshShell /> : <FullScreenLoader label="正在打开工作区" detail="准备当前页面" />;
     return <PlatformRoute><Suspense fallback={fallback}><UserLayout><Outlet /></UserLayout></Suspense></PlatformRoute>;
 }
 

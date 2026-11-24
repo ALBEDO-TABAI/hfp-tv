@@ -101,7 +101,7 @@ export function MetricTile({ label, value, detail, accent = false }: { label: st
 
 export function UnitProgress({ unit }: { unit: ProjectUnit }) {
     const progress = unit.status === "completed" ? 100 : unit.status === "ready" ? 66 : 24;
-    return <div className="h-1.5 w-20 overflow-hidden rounded-full bg-foreground/10"><div className="h-full rounded-full bg-[var(--workspace-accent)] transition-[width] duration-200" style={{ width: `${progress}%` }} /></div>;
+    return <div className="h-1.5 w-20 overflow-hidden rounded-full bg-foreground/10"><div className="h-full w-full origin-left rounded-full bg-[var(--workspace-accent)] transition-transform duration-(--motion-state) ease-(--ease-out)" style={{ transform: `scaleX(${progress / 100})` }} /></div>;
 }
 
 export function formatTime(value?: string) {

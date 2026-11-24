@@ -1,8 +1,8 @@
-import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, type MotionValue } from "motion/react";
-import { forwardRef, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { forwardRef, useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionPreset, motionSpring } from "@/lib/motion-tokens";
 
 export type FloatingDockCommand = {
     kind?: "command";
@@ -52,56 +52,24 @@ type FloatingDockProps = {
 
 type DockMetrics = {
     base: number;
-    magnified: number;
     icon: number;
-    iconMagnified: number;
-    distance: number;
 };
 
-// magnification 收敛：base 略增以适配圆角方块，magnified 幅度从 +14 降到 +8，
-// 避免 dock 整体跳动，同时保留 Aceternity 接近放大身份。
 const DOCK_METRICS: Record<NonNullable<FloatingDockProps["size"]>, DockMetrics> = {
-    default: { base: 30, magnified: 38, icon: 15, iconMagnified: 18, distance: 100 },
-    compact: { base: 26, magnified: 32, icon: 13, iconMagnified: 16, distance: 84 },
-    // LibTV uses a calm, fixed-size rail rather than macOS-style proximity
-    // magnification. Keeping every slot equal also prevents the mixed visual
-    // weights that previously made the local dock look pieced together.
-    libtv: { base: 32, magnified: 32, icon: 18, iconMagnified: 18, distance: 0 },
+    default: { base: 30, icon: 15 },
+    compact: { base: 26, icon: 13 },
+    libtv: { base: 32, icon: 18 },
 };
 
 const TOUCH_DOCK_METRICS: Record<NonNullable<FloatingDockProps["size"]>, DockMetrics> = {
-    default: { base: 40, magnified: 40, icon: 18, iconMagnified: 18, distance: 0 },
-    compact: { base: 36, magnified: 36, icon: 16, iconMagnified: 16, distance: 0 },
-    libtv: { base: 32, magnified: 32, icon: 18, iconMagnified: 18, distance: 0 },
+    default: { base: 40, icon: 18 },
+    compact: { base: 36, icon: 16 },
+    libtv: { base: 32, icon: 18 },
 };
 
-function useSafeReducedMotion() {
-    const [reduced, setReduced] = useState(() => {
-        if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-        return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    });
-    useEffect(() => {
-        if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-        const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-        const update = () => setReduced(media.matches);
-        update();
-        if (typeof media.addEventListener === "function") {
-            media.addEventListener("change", update);
-            return () => media.removeEventListener("change", update);
-        }
-        if (typeof media.addListener === "function") {
-            media.addListener(update);
-            return () => media.removeListener(update);
-        }
-    }, []);
-    return reduced;
-}
-
 export const FloatingDock = forwardRef<HTMLDivElement, FloatingDockProps>(function FloatingDock({ items, size = "default", embedded = false, className, style, ariaLabel = "画布工具", showLabels = false }, forwardedRef) {
-    const mouseX = useMotionValue(Number.POSITIVE_INFINITY);
-    const reducedMotion = useSafeReducedMotion();
     const [coarsePointer, setCoarsePointer] = useState(() => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches);
-    // 窄屏下 dock 按钮总宽易超出可用宽度：此时允许横向滚动并禁用放大（放大依赖 overflow-visible，与滚动互斥）
+    // 窄屏或触屏时允许横向滚动，保证所有按钮可达。
     const [narrow, setNarrow] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 768 : false));
 
     useEffect(() => {
@@ -119,13 +87,11 @@ export const FloatingDock = forwardRef<HTMLDivElement, FloatingDockProps>(functi
         return () => window.removeEventListener("resize", update);
     }, []);
 
-    // scrollable 场景（触屏或窄屏）禁用放大并允许横向滚动，保证按钮始终可达
     const scrollable = coarsePointer || narrow;
-    const motionEnabled = !reducedMotion && !scrollable;
     const metrics = coarsePointer ? TOUCH_DOCK_METRICS[size] : DOCK_METRICS[size];
 
     return (
-        <motion.div
+        <div
             ref={forwardedRef}
             role="toolbar"
             aria-label={ariaLabel}
@@ -160,20 +126,15 @@ export const FloatingDock = forwardRef<HTMLDivElement, FloatingDockProps>(functi
                 className,
             )}
             style={style}
-            onPointerMove={(event) => {
-                if (motionEnabled) mouseX.set(event.clientX);
-            }}
-            onPointerLeave={() => mouseX.set(Number.POSITIVE_INFINITY)}
         >
-            {renderDockItems(items, { mouseX, metrics, motionEnabled: motionEnabled && !showLabels, compact: size === "compact", showLabel: showLabels })}
-        </motion.div>
+            {renderDockItems(items, { metrics, scrollable, compact: size === "compact", showLabel: showLabels })}
+        </div>
     );
 });
 
 type DockItemRenderProps = {
-    mouseX: MotionValue<number>;
     metrics: DockMetrics;
-    motionEnabled: boolean;
+    scrollable: boolean;
     compact: boolean;
     showLabel: boolean;
 };
@@ -193,7 +154,7 @@ function renderDockItems(items: FloatingDockEntry[], props: DockItemRenderProps)
         result.push(
             <span key={groupKey} className="aceternity-dock-danger-group flex shrink-0 items-end gap-0.5 rounded-[calc(var(--dock-item-radius)+2px)] px-0.5">
                 {dangerGroup.map((command) => (
-                    <DockCommandButton key={command.id} command={command} mouseX={props.mouseX} metrics={props.metrics} motionEnabled={props.motionEnabled} compact={props.compact} showLabel={props.showLabel} />
+                    <DockCommandButton key={command.id} command={command} {...props} />
                 ))}
             </span>,
         );
@@ -208,7 +169,7 @@ function renderDockItems(items: FloatingDockEntry[], props: DockItemRenderProps)
         }
         if (item.kind === "switch") {
             flushDangerGroup();
-            result.push(<DockSwitch key={item.id} entry={item} compact={props.compact} showLabel={props.showLabel} motionEnabled={props.motionEnabled} metrics={props.metrics} />);
+            result.push(<DockSwitch key={item.id} entry={item} {...props} />);
             index += 1;
             continue;
         }
@@ -218,36 +179,25 @@ function renderDockItems(items: FloatingDockEntry[], props: DockItemRenderProps)
             continue;
         }
         flushDangerGroup();
-        result.push(<DockCommandButton key={item.id} command={item} mouseX={props.mouseX} metrics={props.metrics} motionEnabled={props.motionEnabled} compact={props.compact} showLabel={props.showLabel} />);
+        result.push(<DockCommandButton key={item.id} command={item} {...props} />);
         index += 1;
     }
     flushDangerGroup();
     return result;
 }
 
-function DockCommandButton({ command, mouseX, metrics, motionEnabled, compact, showLabel }: { command: FloatingDockCommand; mouseX: MotionValue<number>; metrics: DockMetrics; motionEnabled: boolean; compact: boolean; showLabel: boolean }) {
-    const ref = useRef<HTMLSpanElement>(null);
+function DockCommandButton({ command, metrics, scrollable, compact, showLabel }: DockItemRenderProps & { command: FloatingDockCommand }) {
     const [focused, setFocused] = useState(false);
     const [hovered, setHovered] = useState(false);
-    const distance = useTransform(mouseX, (value) => {
-        if (!motionEnabled || !Number.isFinite(value)) return Number.POSITIVE_INFINITY;
-        const bounds = ref.current?.getBoundingClientRect();
-        if (!bounds) return Number.POSITIVE_INFINITY;
-        return value - bounds.left - bounds.width / 2;
-    });
-    const itemTarget = useTransform(distance, (value) => proximitySize(value, metrics.base, metrics.magnified, metrics.distance, motionEnabled));
-    const iconTarget = useTransform(distance, (value) => proximitySize(value, metrics.icon, metrics.iconMagnified, metrics.distance, motionEnabled));
-    const itemSize = useSpring(itemTarget, aceternityMotion.spring.dock);
-    const iconSize = useSpring(iconTarget, aceternityMotion.spring.dock);
     // 鼠标点击产生的 focus 不能阻塞提示收起，只有键盘可见焦点才持续显示提示。
-    const showTooltip = !showLabel && (hovered || focused) && !command.disabled && !(command.expands && command.active);
+    const showTooltip = !scrollable && (hovered || focused) && !command.disabled && !(command.expands && command.active);
     // scrollable 场景自定义 tooltip 会被 overflow 裁剪，用原生 title 兜底
-    const nativeTitle = !motionEnabled ? command.label : undefined;
+    const nativeTitle = scrollable ? command.label : undefined;
 
     if (showLabel) {
         return (
-            <motion.span ref={ref} className="relative block h-8 shrink-0">
-                <motion.button
+            <span className="relative block h-8 shrink-0">
+                <button
                     type="button"
                     aria-label={command.label}
                     aria-expanded={command.expands ? command.active || undefined : undefined}
@@ -258,25 +208,18 @@ function DockCommandButton({ command, mouseX, metrics, motionEnabled, compact, s
                         command.active && "is-active",
                         command.danger && "is-danger",
                     )}
-                    whileTap={!command.disabled ? { scale: 0.96 } : undefined}
-                    transition={aceternityMotion.spring.dock}
-                    onMouseEnter={() => setHovered(true)}
-                    onMouseLeave={() => setHovered(false)}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => setFocused(false)}
                     onClick={command.onClick}
                 >
                     <span className="grid size-3.5 shrink-0 place-items-center">{command.icon}</span>
                     <span className="inline-flex h-4 items-center text-[var(--fs-label)] font-medium leading-none">{command.displayLabel || command.label}</span>
-                </motion.button>
-            </motion.span>
+                </button>
+            </span>
         );
     }
 
     return (
-        <motion.span ref={ref} className={cn("relative block shrink-0", command.wide && "min-w-[var(--dock-precision-width)]")} style={{ width: itemSize, height: itemSize }}>
-            {/* 放大项留在 Flex 流内，由布局推开邻项，保持 Aceternity Floating Dock 的空间关系。 */}
-            <motion.button
+        <span className={cn("relative block shrink-0", command.wide && "min-w-[var(--dock-precision-width)]")} style={{ width: metrics.base, height: metrics.base }}>
+            <button
                 type="button"
                 aria-label={command.label}
                 title={nativeTitle}
@@ -284,8 +227,6 @@ function DockCommandButton({ command, mouseX, metrics, motionEnabled, compact, s
                 aria-pressed={command.expands ? undefined : command.active || undefined}
                 disabled={command.disabled}
                     className={cn("aceternity-dock-command group relative grid size-full place-items-center rounded-[var(--dock-item-radius)] border outline-none", command.quiet && "is-quiet", command.active && "is-active", command.prominent && "is-prominent", command.danger && "is-danger")}
-                whileTap={motionEnabled && !command.disabled ? { scale: 0.92 } : undefined}
-                transition={aceternityMotion.spring.dock}
                 onMouseEnter={() => setHovered(true)}
                 onMouseLeave={() => setHovered(false)}
                 onFocus={(event) => setFocused(event.currentTarget.matches(":focus-visible"))}
@@ -293,16 +234,14 @@ function DockCommandButton({ command, mouseX, metrics, motionEnabled, compact, s
                 onMouseDown={() => setFocused(false)}
                 onClick={command.onClick}
             >
-                <motion.span className={cn("grid place-items-center", command.wide && "w-full")} style={command.wide ? { height: iconSize } : { width: iconSize, height: iconSize }}>
+                <span className={cn("grid place-items-center", command.wide && "w-full")} style={{ width: command.wide ? undefined : metrics.icon, height: metrics.icon }}>
                     {command.icon}
-                </motion.span>
+                </span>
                 <AnimatePresence>
                     {showTooltip ? (
                         <motion.span
-                            initial={{ opacity: 0, y: 7, scale: 0.94 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 4, scale: 0.96, transition: { duration: 0 } }}
-                            transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }}
+                            {...motionPreset.fade}
+                            aria-hidden
                             className={cn(
                                 "aceternity-dock-tooltip pointer-events-none absolute left-1/2 z-[var(--dock-tooltip-z)] -translate-x-1/2 whitespace-nowrap border font-medium shadow-xl backdrop-blur-xl",
                                 compact ? "-top-7 rounded-md px-1.5 py-0.5 text-[var(--fs-micro)]" : "-top-8 rounded-md px-2 py-1 text-[var(--fs-tiny)]",
@@ -312,13 +251,12 @@ function DockCommandButton({ command, mouseX, metrics, motionEnabled, compact, s
                         </motion.span>
                     ) : null}
                 </AnimatePresence>
-            </motion.button>
-        </motion.span>
+            </button>
+        </span>
     );
 }
 
-function DockSwitch({ entry, compact, showLabel, motionEnabled, metrics }: { entry: FloatingDockSwitch; compact: boolean; showLabel: boolean; motionEnabled: boolean; metrics: DockMetrics }) {
-    const reducedMotion = useSafeReducedMotion();
+function DockSwitch({ entry, compact, showLabel, scrollable, metrics }: DockItemRenderProps & { entry: FloatingDockSwitch }) {
     const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [focusedId, setFocusedId] = useState<string | null>(null);
     const selectedIndex = Math.max(0, entry.options.findIndex((option) => option.value === entry.value));
@@ -346,15 +284,15 @@ function DockSwitch({ entry, compact, showLabel, motionEnabled, metrics }: { ent
             >
                 <motion.span
                     aria-hidden
-                    className="aceternity-dock-switch-thumb pointer-events-none absolute top-1/2 rounded-full"
+                    className="aceternity-dock-switch-thumb pointer-events-none absolute top-1/2 -translate-y-1/2 rounded-full"
                     initial={false}
-                    animate={{ x: selectedIndex * (slot + gap), y: "-50%" }}
-                    transition={reducedMotion || !motionEnabled ? { duration: 0 } : aceternityMotion.spring.dock}
+                    animate={{ x: selectedIndex * (slot + gap) }}
+                    transition={motionSpring.snappy}
                     style={{ width: slot, height: slot, left: padX }}
                 />
                 {entry.options.map((option) => {
                     const checked = option.value === entry.value;
-                    const showTooltip = !showLabel && (hoveredId === option.id || focusedId === option.id);
+                    const showTooltip = !showLabel && !scrollable && (hoveredId === option.id || focusedId === option.id);
                     return (
                         <span key={option.id} className="relative">
                             <button
@@ -362,7 +300,7 @@ function DockSwitch({ entry, compact, showLabel, motionEnabled, metrics }: { ent
                                 role="radio"
                                 aria-checked={checked}
                                 aria-label={option.label}
-                                title={!motionEnabled ? option.label : undefined}
+                                title={scrollable ? option.label : undefined}
                                 className="aceternity-dock-switch-option relative z-[1] grid place-items-center rounded-full border-0 outline-none"
                                 style={{ width: slot, height: slot }}
                                 onMouseEnter={() => setHoveredId(option.id)}
@@ -381,10 +319,8 @@ function DockSwitch({ entry, compact, showLabel, motionEnabled, metrics }: { ent
                             <AnimatePresence>
                                 {showTooltip ? (
                                     <motion.span
-                                        initial={{ opacity: 0, y: 7, scale: 0.94 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={{ opacity: 0, y: 4, scale: 0.96, transition: { duration: 0 } }}
-                                        transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }}
+                                        {...motionPreset.fade}
+                                        aria-hidden
                                         className={cn(
                                             "aceternity-dock-tooltip pointer-events-none absolute left-1/2 z-[var(--dock-tooltip-z)] -translate-x-1/2 whitespace-nowrap border font-medium shadow-xl backdrop-blur-xl",
                                             compact ? "-top-7 rounded-md px-1.5 py-0.5 text-[var(--fs-micro)]" : "-top-8 rounded-md px-2 py-1 text-[var(--fs-tiny)]",
@@ -404,10 +340,4 @@ function DockSwitch({ entry, compact, showLabel, motionEnabled, metrics }: { ent
 
 function DockSeparator({ compact, labeled }: { compact: boolean; labeled: boolean }) {
     return <span aria-hidden className={cn("aceternity-dock-separator shrink-0 self-center", labeled ? "mx-1.5 h-6 w-px" : compact ? "mx-0.5 mb-0.5 h-3.5 w-px" : "mx-0.5 mb-0.5 h-4 w-px")} />;
-}
-
-function proximitySize(distance: number, base: number, magnified: number, range: number, enabled: boolean) {
-    if (!enabled || !Number.isFinite(distance)) return base;
-    const proximity = 1 - Math.min(Math.abs(distance) / range, 1);
-    return base + (magnified - base) * proximity * proximity;
 }

@@ -10,7 +10,7 @@ import { useCanvasCreateCommands } from "@/components/canvas/use-canvas-create-c
 import { ToolbarSettingsModal } from "@/components/canvas/toolbars/toolbar-settings-modal";
 import { CanvasAppearanceControls } from "@/components/canvas/canvas-appearance-controls";
 import { CanvasShortcutsPopover } from "@/components/canvas/canvas-shortcuts-popover";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionPreset } from "@/lib/motion-tokens";
 import { canvasDockStyle } from "@/lib/canvas/canvas-aceternity-style";
 import type { CanvasAppearance } from "@/lib/canvas/canvas-appearance";
 import type { CanvasWheelBehavior } from "@/lib/canvas/canvas-wheel";
@@ -18,6 +18,7 @@ import { canvasThemes, type CanvasBackgroundMode, type CanvasTheme } from "@/lib
 import { defaultToolbarPrefs, readToolbarPrefs, resolveToolbarEntries, type ToolContext, type ToolbarHandlers, type ToolbarPrefs } from "@/lib/canvas/tool-registry";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import type { CanvasNodeTypeId, CanvasToolMode, CanvasWorkspaceMode } from "@/types/canvas";
+import { PresenceInert } from "@/components/ui/base/presence-inert";
 
 export function CanvasToolbar({
     selectedCount,
@@ -323,12 +324,23 @@ export function CanvasToolbar({
                 ) : null}
             </AnimatePresence>
 
-            {appearanceOpen ? (
-                <div role="dialog" aria-label="画布外观" className="pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] w-[288px] max-w-[calc(100vw-24px)] max-h-[70vh] overflow-y-auto rounded-[18px] border p-4 shadow-xl" style={{ left: "50%", transform: "translateX(-50%)", background: theme.node.fill, borderColor: theme.toolbar.border, color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
-                    <div className="text-sm font-semibold">画布外观</div>
-                    <CanvasAppearanceControls appearance={appearance} backgroundMode={backgroundMode} colorTheme={colorTheme} theme={theme} onAppearanceChange={onAppearanceChange} onSaveAppearanceDefault={onSaveAppearanceDefault} onBackgroundModeChange={onBackgroundModeChange} snapToGrid={snapToGrid} onSnapToGridChange={onSnapToGridChange} showConnections={showConnections} onShowConnectionsChange={onShowConnectionsChange} wheelBehavior={wheelBehavior} onWheelBehaviorChange={onWheelBehaviorChange} />
-                </div>
-            ) : null}
+            <AnimatePresence>
+                {appearanceOpen ? (
+                    <PresenceInert key="canvas-appearance">
+                        <motion.div
+                            {...motionPreset.popover("above")}
+                            role="dialog"
+                            aria-label="画布外观"
+                            className="pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] left-1/2 max-h-[70vh] w-[288px] max-w-[calc(100vw-24px)] origin-bottom -translate-x-1/2 overflow-y-auto rounded-[18px] border p-4 shadow-xl"
+                            style={{ background: theme.node.fill, borderColor: theme.toolbar.border, color: theme.node.text }}
+                            onWheel={(event) => event.stopPropagation()}
+                        >
+                            <div className="text-sm font-semibold">画布外观</div>
+                            <CanvasAppearanceControls appearance={appearance} backgroundMode={backgroundMode} colorTheme={colorTheme} theme={theme} onAppearanceChange={onAppearanceChange} onSaveAppearanceDefault={onSaveAppearanceDefault} onBackgroundModeChange={onBackgroundModeChange} snapToGrid={snapToGrid} onSnapToGridChange={onSnapToGridChange} showConnections={showConnections} onShowConnectionsChange={onShowConnectionsChange} wheelBehavior={wheelBehavior} onWheelBehaviorChange={onWheelBehaviorChange} />
+                        </motion.div>
+                    </PresenceInert>
+                ) : null}
+            </AnimatePresence>
 
             <FloatingDock
                 ref={dockRef}
@@ -380,12 +392,9 @@ export function CanvasModeMenu({ canvasTool, x, onSelect }: {
         <motion.div
             role="menu"
             aria-label="画布操作工具"
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 6, transition: { duration: 0.08 } }}
-            transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }}
-            className="canvas-mode-menu pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] z-[var(--dock-z-popover)] w-[224px] rounded-[18px] border p-2"
-            style={{ left: x || "50%", x: "-50%", transformOrigin: "bottom center" }}
+            {...motionPreset.popover("above")}
+            className="canvas-mode-menu pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] z-[var(--dock-z-popover)] w-[224px] origin-bottom -translate-x-1/2 rounded-[18px] border p-2"
+            style={{ left: x || "50%" }}
         >
             {options.map((option) => {
                 const active = option.tool === canvasTool;
@@ -415,8 +424,8 @@ function AddNodeMenu({ x, theme, commands }: {
     commands: CanvasCreateCommand[];
 }) {
     return (
-        <motion.div initial={{ opacity: 0, scaleY: 0.9, y: 8 }} animate={{ opacity: 1, scaleY: 1, y: 0 }} exit={{ opacity: 0, scaleY: 0.92, y: 6 }} transition={{ duration: aceternityMotion.duration.panel, ease: aceternityMotion.easing.enter }} className="pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] z-[var(--dock-z-popover)] w-[232px] max-w-[calc(100vw-24px)]" style={{ left: x || "50%", transformOrigin: "bottom center", x: "-50%" }}>
-            <SpotlightSurface spotlightColor={theme.toolbar.itemHover} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97, transition: { duration: 0 } }} transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }} className="canvas-create-menu-surface aceternity-floating-panel overflow-hidden rounded-[18px] border p-2 backdrop-blur-2xl" style={{ background: theme.node.fill, borderColor: theme.toolbar.border, color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
+        <motion.div {...motionPreset.popover("above")} className="pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] z-[var(--dock-z-popover)] w-[232px] max-w-[calc(100vw-24px)] origin-bottom -translate-x-1/2" style={{ left: x || "50%" }}>
+            <SpotlightSurface spotlightColor={theme.toolbar.itemHover} className="canvas-create-menu-surface aceternity-floating-panel overflow-hidden rounded-[18px] border p-2 backdrop-blur-2xl" style={{ background: theme.node.fill, borderColor: theme.toolbar.border, color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
                 <CanvasCreateMenu commands={commands} layout="list" />
             </SpotlightSurface>
         </motion.div>

@@ -8,7 +8,7 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode }
  *   不写死任何色值；明暗自适应随主题 token。
  * - 选中项 thumb 走 bg-surface-strong（light #fff / dark #2a2a2a 抬升面）。
  * - 键盘：radio 组 roving tabindex（←/→/Home/End，自动跳过禁用项）。
- * - thumb 位置 useLayoutEffect 测量 + ResizeObserver 兜底；motion-reduce 下不播动画。
+ * - thumb 位置 useLayoutEffect 测量 + ResizeObserver 兜底；用 translateX 滑到选中项并带轻回弹，motion-reduce 下不播动画。
  * - API 对齐 AntD Segmented（value/onChange/options/block/size/disabled），
  *   可直接置于 antd Form.Item（Form 注入 value/onChange，props 同名兼容）。
  * - icon 节点尺寸由调用方控制（与 AntD options.icon 行为一致），用 currentColor 跟随文字色。
@@ -120,8 +120,8 @@ export function SegmentedControl<V extends string = string>({ value, onChange, o
             {thumb !== null && !disabled && (
                 <span
                     aria-hidden="true"
-                    className={["pointer-events-none absolute inset-y-0.5 z-0 bg-surface-strong transition-[left,width] duration-200 ease-out motion-reduce:transition-none", SIZE_CLASS[size].thumb].join(" ")}
-                    style={{ left: thumb.left, width: thumb.width }}
+                    className={["pointer-events-none absolute inset-y-0.5 left-0 z-0 bg-surface-strong transition-[transform,width] duration-(--motion-panel) ease-(--ease-spring) motion-reduce:transition-none", SIZE_CLASS[size].thumb].join(" ")}
+                    style={{ transform: `translateX(${thumb.left}px)`, width: thumb.width }}
                 />
             )}
             {options.map((option, index) => {

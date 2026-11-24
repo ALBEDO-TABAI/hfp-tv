@@ -9,6 +9,7 @@ import { Download, FolderPlus, Image as ImageIcon, MoreHorizontal, Pencil, Plus,
 import { CollectionGrid, PageHeader, WorkspacePage } from "@/components/layout/workspace-page";
 import { ExpandableSearch } from "@/components/layout/expandable-search";
 import { WorkspaceLoadingState, WorkspaceState } from "@/components/layout/workspace-state";
+import { SelectionCapsule, SelectionCapsuleSpacer } from "@/components/ui/product/selection-capsule";
 
 import { CanvasFolderCard } from "@/components/canvas/canvas-folder-card";
 import { WorkshopSubmitDialog } from "./workshop-submit-dialog";
@@ -37,6 +38,8 @@ import { cn } from "@/lib/utils";
 import { assertUserScope, captureUserScope, type CapturedUserScope } from "@/lib/user-scope-guard";
 import { recordDiagnosticEvent } from "@/services/diagnostics/client-diagnostics";
 import { canvasIdsForWorkspaceProjects, canvasWorkspaceProjectId, listCanvasWorkspaceProjectRoots, previewNodesForWorkspaceProject } from "@/lib/canvas/canvas-workspace-project";
+import { useClosingValue } from "@/hooks/use-closing-value";
+import { useOpenedOnce } from "@/hooks/use-opened-once";
 
 const CanvasDeleteProjectsDialog = lazy(() => import("@/components/canvas/canvas-delete-projects-dialog").then((module) => ({ default: module.CanvasDeleteProjectsDialog })));
 
@@ -50,6 +53,7 @@ export default function CanvasPage() {
     const autoOpenRef = useRef(false);
     const [keyword, setKeyword] = useState("");
     const [submissionProjectId, setSubmissionProjectId] = useState<string | null>(null);
+    const submitDialog = useClosingValue(submissionProjectId);
     const [sort, setSort] = useState<"updated" | "name" | "nodes">("updated");
     const [projectFilter, setProjectFilter] = useState("all");
     const [folderFilter, setFolderFilter] = useState("all");
@@ -57,6 +61,8 @@ export default function CanvasPage() {
     const [folderName, setFolderName] = useState("");
     const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
     const [deletingFolder, setDeletingFolder] = useState<{ id: string; name: string; scope: CapturedUserScope } | null>(null);
+    const folderDeletion = useClosingValue(deletingFolder);
+    const shownFolderDeletion = folderDeletion.shown;
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const [loadedProjectCount, setLoadedProjectCount] = useState(50);
     const [creationError, setCreationError] = useState(false);
@@ -102,6 +108,8 @@ export default function CanvasPage() {
     const totalProjects = remoteMode ? libraryQuery.data?.pages[0]?.total || 0 : projects.length;
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const deleteDialogOpen = useCanvasUiStore((state) => state.deleteProjectIds.length > 0);
+    // 懒加载的批量删除确认首次打开后保持挂载，关闭时才能播完离场。
+    const deleteDialogMounted = useOpenedOnce(deleteDialogOpen);
     const setDeleteIds = useCanvasUiStore((state) => state.setDeleteProjectIds);
     const deleteSelectedProjects = () => {
         setDeleteIds(selectedCanvasIds);
@@ -295,7 +303,7 @@ export default function CanvasPage() {
 
     if (!creationError && !libraryQuery.isError && !(canvasHealth.error && !remoteMode) && (mode === "new" || mode === "recent" || mode === "handoff")) return <main className="flex h-full items-center justify-center bg-background text-sm text-stone-500">正在打开画布...</main>;
 
-    return (
+    const workspace = (
         <WorkspacePage className="studio-collection-page lib-tv-project-page">
             <PageHeader
                 title={activeFolder?.name || "全部项目"}
@@ -315,46 +323,6 @@ export default function CanvasPage() {
             />
 
             <div className="collection-content">
-                {selectedIds.length || exportProgress ? (
-                    <div className="collection-selection-bar">
-                        <strong className="mr-auto font-medium">{exportProgress ? "正在导出画布" : `已选 ${selectedIds.length} 个项目`}</strong>
-                        {remoteMode ? <>
-                            <Button
-                                size="small"
-                                disabled={!hydrated || projectQuery.isLoading}
-                                onClick={() => {
-                                    setAssociationProjectId(selectedProjects[0]?.projectId || "");
-                                    setAssociationOpen(true);
-                                }}
-                            >
-                                加入项目
-                            </Button>
-                            {selectedProjects.some((project) => project.projectId) ? (
-                                <Button
-                                    size="small"
-                                    disabled={!hydrated}
-                                    onClick={() => {
-                                        setAssociationProjectId("");
-                                        void associateSelected("");
-                                    }}
-                                >
-                                    移出项目
-                                </Button>
-                            ) : null}
-                        </> : null}
-                        <Button size="small" aria-label="导出" disabled={!hydrated} loading={Boolean(exportProgress)} icon={<Download className="size-3.5" />} onClick={() => void exportSelected()}>
-                            导出
-                        </Button>
-                        {exportProgress ? <>
-                            <span className="text-sm text-foreground/65" role="status" aria-live="polite">{canvasExportProgressLabel(exportProgress)}</span>
-                            <Button size="small" disabled={exportProgress.phase === "saving"} onClick={() => exportController.current?.abort()}>取消导出</Button>
-                        </> : null}
-                        <Button size="small" danger disabled={!hydrated || Boolean(exportProgress)} onClick={deleteSelectedProjects}>
-                            删除
-                        </Button>
-                    </div>
-                ) : null}
-
                 {exportError ? <p role="alert" className="mb-4 whitespace-pre-wrap break-words text-sm text-destructive">{exportError}</p> : null}
 
                 {!remoteMode && canvasHealth.error ? <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 text-sm"><span>{canvasHealth.error}</span><Button loading={canvasHealth.loading} onClick={()=>void hydrateLocalCanvasProjectsFromBackend()}>重试加载</Button></div> : null}
@@ -428,6 +396,7 @@ export default function CanvasPage() {
                         {libraryQuery.isFetchNextPageError ? <Button onClick={() => void libraryQuery.fetchNextPage()}>加载失败，重试</Button> : hasMore ? "继续下滑加载更多" : `已加载全部 ${filteredProjects.length} 个画布`}
                     </div>
                 ) : null}
+                <SelectionCapsuleSpacer active={selectedIds.length > 0 || Boolean(exportProgress)} />
             </div>
 
             <input ref={inputRef} type="file" accept="application/zip,.zip" className="hidden" onChange={(event) => void importCanvas(event.target.files?.[0])} />
@@ -463,11 +432,11 @@ export default function CanvasPage() {
                 />
             </Modal>
             <RecycleBinDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
-            {submissionProjectId && <WorkshopSubmitDialog projectId={submissionProjectId} onClose={() => setSubmissionProjectId(null)} />}
-            {deletingFolder ? <CanvasDeleteConfirmation scope={deletingFolder.scope} title={`删除文件夹「${deletingFolder.name}」？`}
-                description={`将删除此文件夹及其中 ${localProjects.filter((project) => project.folderId === deletingFolder.id).length} 个画布，画布里的节点和连线也会一起移除。`}
+            {submitDialog.shown && <WorkshopSubmitDialog key={submitDialog.key} projectId={submitDialog.shown} open={submitDialog.open} afterClose={submitDialog.afterClose} onClose={() => setSubmissionProjectId(null)} />}
+            {shownFolderDeletion ? <CanvasDeleteConfirmation key={folderDeletion.key} open={folderDeletion.open} afterClose={folderDeletion.afterClose} scope={shownFolderDeletion.scope} title={`删除文件夹「${shownFolderDeletion.name}」？`}
+                description={`将删除此文件夹及其中 ${localProjects.filter((project) => project.folderId === shownFolderDeletion.id).length} 个画布，画布里的节点和连线也会一起移除。`}
                 onCancel={() => setDeletingFolder(null)} onConfirm={async (assertCurrent) => {
-                    const folderId = deletingFolder.id;
+                    const folderId = shownFolderDeletion.id;
                     const ids = useCanvasStore.getState().projects.filter((project) => project.folderId === folderId).map((project) => project.id);
                     if (ids.length) await deleteLocalCanvasProjects(ids);
                     assertCurrent();
@@ -475,8 +444,55 @@ export default function CanvasPage() {
                     assertCurrent();
                     message.success(ids.length ? `已删除文件夹及其中 ${ids.length} 个画布` : "文件夹已删除");
                 }} /> : null}
-            {deleteDialogOpen ? <Suspense fallback={null}><CanvasDeleteProjectsDialog /></Suspense> : null}
+            {deleteDialogMounted ? <Suspense fallback={null}><CanvasDeleteProjectsDialog /></Suspense> : null}
         </WorkspacePage>
+    );
+
+    return (
+        <>
+            {workspace}
+            <SelectionCapsule
+                open={selectedIds.length > 0 || Boolean(exportProgress)}
+                label="项目批量操作"
+                summary={exportProgress ? "正在导出画布" : `已选 ${selectedIds.length} 个项目`}
+                onClear={selectedIds.length ? () => useCanvasUiStore.getState().removeSelectedProjectIds(selectedIds) : undefined}
+            >
+                {remoteMode ? <>
+                    <Button
+                        size="small"
+                        disabled={!hydrated || projectQuery.isLoading}
+                        onClick={() => {
+                            setAssociationProjectId(selectedProjects[0]?.projectId || "");
+                            setAssociationOpen(true);
+                        }}
+                    >
+                        加入项目
+                    </Button>
+                    {selectedProjects.some((project) => project.projectId) ? (
+                        <Button
+                            size="small"
+                            disabled={!hydrated}
+                            onClick={() => {
+                                setAssociationProjectId("");
+                                void associateSelected("");
+                            }}
+                        >
+                            移出项目
+                        </Button>
+                    ) : null}
+                </> : null}
+                <Button size="small" aria-label="导出" disabled={!hydrated} loading={Boolean(exportProgress)} icon={<Download className="size-3.5" />} onClick={() => void exportSelected()}>
+                    导出
+                </Button>
+                {exportProgress ? <>
+                    <span className="text-sm text-foreground/65" role="status" aria-live="polite">{canvasExportProgressLabel(exportProgress)}</span>
+                    <Button size="small" disabled={exportProgress.phase === "saving"} onClick={() => exportController.current?.abort()}>取消导出</Button>
+                </> : null}
+                <Button size="small" danger disabled={!hydrated || Boolean(exportProgress)} onClick={deleteSelectedProjects}>
+                    删除
+                </Button>
+            </SelectionCapsule>
+        </>
     );
 }
 

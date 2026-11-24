@@ -1,11 +1,14 @@
 import { createClientId } from "@/lib/client-id";
 import { Button, Dropdown, Tooltip } from "antd";
 import { History, MessageSquarePlus, X, ArrowUpRight } from "lucide-react";
+import { motion, usePresence, useReducedMotionConfig } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { AppDrawer } from "@/components/ui/product/app-drawer";
+import { WorkingDots } from "@/components/ai/working-indicator";
 import { assetLibraryQueryKey, assetPickerQueryKey } from "@/components/assets/asset-view-session";
 import { appQueryClient } from "@/lib/query-client";
+import { motionDuration, motionEase, motionTransition } from "@/lib/motion-tokens";
 import { referencedAssetIdsInPrompt, type CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import type { AssistantAttachment, AssistantGenerationProposal, AssistantSkillSelection, AssistantPlan } from "@/services/api/agent-assistant";
 import type { CanvasNodeData } from "@/types/canvas";
@@ -71,6 +74,8 @@ export function CanvasAssistantPlan({ plan }: { plan: AssistantPlan | null | und
 
 export function CanvasAssistantSidebar(props: Props) {
     const { assistant, dockable, readOnly, selectedNodeIds, references, onLocateNodes, onRunProposal, onOpenModelSettings } = props;
+    const [isPresent, finishExit] = usePresence(!dockable);
+    const reducedMotion = useReducedMotionConfig();
     const [draft, setDraft] = useState("");
     const [attachments, setAttachments] = useState<AssistantAttachment[]>([]);
     const [selectedSkills, setSelectedSkills] = useState<AssistantSkillSelection[]>([]);
@@ -97,7 +102,7 @@ export function CanvasAssistantSidebar(props: Props) {
     const [resultSelection, setResultSelection] = useState<AssistantInputDraft["resultSelection"]>(null);
     const resultNodeIds = assistant.sessionId && resultSelection?.sessionId === assistant.sessionId ? resultSelection.nodeIds : [];
     const logRef = useRef<HTMLDivElement | null>(null);
-    const sidebarRef = useRef<HTMLDivElement | null>(null);
+    const sidebarRef = useRef<HTMLElement | null>(null);
     const followLatestRef = useRef(true);
     const mediaReferences = references.filter(item => ["image", "video", "audio"].includes(item.kind));
 
@@ -304,11 +309,7 @@ export function CanvasAssistantSidebar(props: Props) {
                         </div>)}
                         {assistant.streaming ? (
                             <div className="canvas-assistant-working" role="status" aria-live="polite">
-                                <span className="canvas-assistant-working-dots" aria-hidden="true">
-                                    <span />
-                                    <span />
-                                    <span />
-                                </span>
+                                <span className="canvas-assistant-working-dots"><WorkingDots /></span>
                                 <span className="canvas-assistant-working-text">{assistant.lifecycleNotice || "助手正在处理…"}{quietSeconds >= QUIET_SECONDS_SHOWN ? <span aria-hidden="true">（已等待 {quietSeconds} 秒）</span> : null}</span>
                             </div>
                         ) : null}
@@ -385,7 +386,8 @@ export function CanvasAssistantSidebar(props: Props) {
         return (
             <AppDrawer
                 flush
-                open={assistant.open}
+                open={assistant.open && isPresent}
+                afterOpenChange={(open) => { if (!open) finishExit?.(); }}
                 placement="right"
                 title={null}
                 closable={false}
@@ -399,7 +401,16 @@ export function CanvasAssistantSidebar(props: Props) {
     }
 
     return (
-        <aside ref={sidebarRef} className="canvas-assistant-sidebar" aria-label="hfp - all in one Agent" style={{ width: assistant.width, flexBasis: assistant.width }}>
+        <motion.aside
+            ref={sidebarRef}
+            inert={!isPresent}
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0, transition: { duration: motionDuration.stage, ease: motionEase.out } }}
+            exit={{ opacity: 0, x: reducedMotion ? 0 : 8, transition: { ...motionTransition.panelExit, ease: reducedMotion ? motionEase.out : motionEase.in } }}
+            className="canvas-assistant-sidebar"
+            aria-label="hfp - all in one Agent"
+            style={{ width: assistant.width, flexBasis: assistant.width }}
+        >
             <button
                 type="button"
                 className="canvas-assistant-resize"
@@ -411,6 +422,6 @@ export function CanvasAssistantSidebar(props: Props) {
                 }}
             />
             {content}
-        </aside>
+        </motion.aside>
     );
 }

@@ -34,6 +34,7 @@ import { useCanvasGenerationBatches } from "./use-canvas-generation-batches";
 import { useCanvasGenerationExecutor } from "./use-canvas-generation-executor";
 import { useCanvasGenerationRetry } from "./use-canvas-generation-retry";
 import { useCanvasStoryboard } from "./use-canvas-storyboard";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 type UseCanvasGenerationOrchestrationOptions = {
     projectId: string;
@@ -78,7 +79,8 @@ export function useCanvasGenerationOrchestration({
     setGenerationHistoryOpen,
     getCanvasCenter,
 }: UseCanvasGenerationOrchestrationOptions) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const queryClient = useQueryClient();
     const effectiveConfig = useEffectiveConfig();
     const insertingHistory = useRef(createInsertingHistoryGate());

@@ -1,4 +1,5 @@
-import type { CanvasNodeData, ViewportTransform } from "@/types/canvas";
+import { motionDuration } from "@/lib/motion-tokens";
+import type { CanvasNodeData, Position, ViewportTransform } from "@/types/canvas";
 
 export type CanvasBounds = {
     left: number;
@@ -48,22 +49,49 @@ export function viewportForBounds(bounds: CanvasBounds, viewportSize: CanvasView
     };
 }
 
+/** 镜头能否参与插值：坐标都是有限数、缩放为正。窄视口算出的负缩放或 NaN 不能进对数插值。 */
+export function isUsableViewport(viewport: ViewportTransform): boolean {
+    return Number.isFinite(viewport.x) && Number.isFinite(viewport.y) && Number.isFinite(viewport.k) && viewport.k > 0;
+}
+
 export function viewportAtScale(viewport: ViewportTransform, viewportSize: CanvasViewportSize, scale: number): ViewportTransform {
     const k = Math.min(8, Math.max(0.05, scale));
-    const centerWorldX = (viewportSize.width / 2 - viewport.x) / viewport.k;
-    const centerWorldY = (viewportSize.height / 2 - viewport.y) / viewport.k;
+    const center = { x: viewportSize.width / 2, y: viewportSize.height / 2 };
+    const world = worldPointAt(viewport, center);
     return {
-        x: viewportSize.width / 2 - centerWorldX * k,
-        y: viewportSize.height / 2 - centerWorldY * k,
+        x: center.x - world.x * k,
+        y: center.y - world.y * k,
         k,
     };
 }
 
-export function interpolateViewport(from: ViewportTransform, to: ViewportTransform, progress: number): ViewportTransform {
-    const t = 1 - Math.pow(1 - Math.min(1, Math.max(0, progress)), 3);
+export function interpolateViewport(from: ViewportTransform, to: ViewportTransform, progress: number, focus: Position): ViewportTransform {
+    if (progress <= 0) return from;
+    if (progress >= 1) return to;
+    const k = from.k * Math.pow(to.k / from.k, progress);
+    const start = worldPointAt(from, focus);
+    const end = worldPointAt(to, focus);
     return {
-        x: from.x + (to.x - from.x) * t,
-        y: from.y + (to.y - from.y) * t,
-        k: from.k + (to.k - from.k) * t,
+        x: focus.x - (start.x + (end.x - start.x) * progress) * k,
+        y: focus.y - (start.y + (end.y - start.y) * progress) * k,
+        k,
+    };
+}
+
+export function viewportTransitionDuration(from: ViewportTransform, to: ViewportTransform, size: CanvasViewportSize, focus: Position): number {
+    const start = worldPointAt(from, focus);
+    const end = worldPointAt(to, focus);
+    const screenDistance = Math.hypot(end.x - start.x, end.y - start.y) * Math.sqrt(from.k * to.k);
+    const panDistance = screenDistance / Math.max(1, Math.hypot(size.width, size.height));
+    const zoomDistance = Math.log2(to.k / from.k);
+    // 一次倍增或一个视口对角线的平移用 stage，最远加一档 panel 到 stage 的差值。
+    const distance = Math.hypot(zoomDistance, panDistance);
+    return motionDuration.panel + Math.min(distance, 2) * (motionDuration.stage - motionDuration.panel);
+}
+
+function worldPointAt(viewport: ViewportTransform, focus: Position): Position {
+    return {
+        x: (focus.x - viewport.x) / viewport.k,
+        y: (focus.y - viewport.y) / viewport.k,
     };
 }

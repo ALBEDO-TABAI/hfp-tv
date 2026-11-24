@@ -3,6 +3,7 @@ import { Moon, Sun } from "lucide-react";
 import { flushSync } from "react-dom";
 
 import { cn } from "@/lib/utils";
+import { motionDuration, motionEase } from "@/lib/motion-tokens";
 
 export type TransitionVariant = "circle" | "square" | "triangle" | "diamond" | "hexagon" | "rectangle" | "star";
 
@@ -17,6 +18,11 @@ interface AnimatedThemeTogglerProps extends React.ComponentPropsWithoutRef<"butt
 }
 
 let themeTransitionInFlight = false;
+
+/** 新主题先按无过渡画出一帧，再恢复过渡；只等一帧时恢复和换色落在同一次样式计算里，过渡照样会跑。 */
+function releaseThemeSwitching(root: HTMLElement) {
+    requestAnimationFrame(() => requestAnimationFrame(() => delete root.dataset.themeSwitching));
+}
 let themeClipAnimation: Animation | null = null;
 
 function polygonCollapsed(cx: number, cy: number, vertexCount: number): string {
@@ -84,7 +90,7 @@ function getThemeTransitionClipPaths(variant: TransitionVariant, cx: number, cy:
     }
 }
 
-export const AnimatedThemeToggler = ({ children, className, duration = 400, variant, fromCenter = false, theme, targetTheme, onThemeChange, ...props }: AnimatedThemeTogglerProps) => {
+export const AnimatedThemeToggler = ({ children, className, duration = motionDuration.stage * 1000, variant, fromCenter = false, theme, targetTheme, onThemeChange, ...props }: AnimatedThemeTogglerProps) => {
     const shape = variant ?? "circle";
     const [isDark, setIsDark] = useState(false);
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -143,10 +149,12 @@ export const AnimatedThemeToggler = ({ children, className, duration = 400, vari
         const root = document.documentElement;
         const canvasMounted = Boolean(document.querySelector("[data-canvas-world-layer]"));
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (canvasMounted || reducedMotion || typeof document.startViewTransition !== "function") {
+        // 流畅模式下不做整页快照揭示，直接换主题。
+        const effectsLite = root.dataset.effects === "lite";
+        if (canvasMounted || reducedMotion || effectsLite || typeof document.startViewTransition !== "function") {
             root.dataset.themeSwitching = "true";
             flushSync(applyTheme);
-            requestAnimationFrame(() => delete root.dataset.themeSwitching);
+            releaseThemeSwitching(root);
             return;
         }
         if (themeTransitionInFlight) return;
@@ -154,6 +162,8 @@ export const AnimatedThemeToggler = ({ children, className, duration = 400, vari
 
         const clipPath = getThemeTransitionClipPaths(shape, x, y, maxRadius, viewportWidth, viewportHeight);
 
+        // 揭示过程中新画面是活的：带颜色过渡的元素会在圈里慢慢变色、显得发脏，所以整个过程关掉过渡。
+        root.dataset.themeSwitching = "true";
         root.dataset.magicuiThemeVt = "active";
         root.style.setProperty("--magicui-theme-toggle-vt-duration", `${duration}ms`);
         // Pin the collapsed clip-path via CSS so Firefox does not paint the new
@@ -167,6 +177,7 @@ export const AnimatedThemeToggler = ({ children, className, duration = 400, vari
             themeClipAnimation = null;
             themeTransitionInFlight = false;
             delete root.dataset.magicuiThemeVt;
+            delete root.dataset.themeSwitching;
             root.style.removeProperty("--magicui-theme-toggle-vt-duration");
             root.style.removeProperty("--magicui-theme-vt-clip-from");
         };
@@ -180,7 +191,7 @@ export const AnimatedThemeToggler = ({ children, className, duration = 400, vari
             cleanup();
             root.dataset.themeSwitching = "true";
             flushSync(applyTheme);
-            requestAnimationFrame(() => delete root.dataset.themeSwitching);
+            releaseThemeSwitching(root);
             return;
         }
         if (typeof transition?.finished?.finally === "function") {
@@ -201,7 +212,7 @@ export const AnimatedThemeToggler = ({ children, className, duration = 400, vari
                     {
                         duration,
                         // Star: linear avoids easing overshoot that fights polygon interpolation at t→1; VT group duration is synced above.
-                        easing: shape === "star" ? "linear" : "ease-in-out",
+                        easing: shape === "star" ? "linear" : `cubic-bezier(${motionEase.inOut.join(", ")})`,
                         fill: "forwards",
                         pseudoElement: "::view-transition-new(root)",
                     },

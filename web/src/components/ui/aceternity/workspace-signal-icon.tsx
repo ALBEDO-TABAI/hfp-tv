@@ -1,6 +1,7 @@
 import { useId } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 
+import { motionPreset } from "@/lib/motion-tokens";
 import { cn } from "@/lib/utils";
 
 export type WorkspaceSignalIconVariant = "home" | "canvas" | "projects" | "assets" | "skills" | "tasks" | "wallet" | "settings" | "empty" | "error" | "loading";
@@ -19,20 +20,15 @@ const palettes: Record<WorkspaceSignalIconVariant, [string, string, string]> = {
     loading: ["#2563eb", "#06b6d4", "#14b8a6"],
 };
 
-export function WorkspaceSignalIcon({ variant, size = "md", className }: { variant: WorkspaceSignalIconVariant; size?: "sm" | "md" | "lg"; className?: string }) {
+export function WorkspaceSignalIcon({ variant, size = "md", className, fadeIn = true }: { variant: WorkspaceSignalIconVariant; size?: "sm" | "md" | "lg"; className?: string; fadeIn?: boolean }) {
     const instanceId = useId().replace(/:/g, "");
-    const reducedMotion = useReducedMotion();
     const [primary, secondary, accent] = palettes[variant];
     const gradientId = `workspace-signal-${variant}-${instanceId}`;
     const dimension = size === "sm" ? 32 : size === "lg" ? 56 : 42;
-    const initial = reducedMotion ? false : { opacity: 0, scale: 0.86, rotate: -4 };
-
     return (
         <motion.span
-            initial={initial}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-            className={cn("workspace-signal-icon group/signal relative grid shrink-0 place-items-center", className)}
+            {...(fadeIn ? motionPreset.fade : undefined)}
+            className={cn("workspace-signal-icon relative grid shrink-0 place-items-center", className)}
             style={{ width: dimension, height: dimension }}
             aria-hidden="true"
         >
@@ -45,26 +41,18 @@ export function WorkspaceSignalIcon({ variant, size = "md", className }: { varia
                     </linearGradient>
                 </defs>
                 <rect x="3.5" y="3.5" width="41" height="41" rx="11.5" className="fill-background/92 stroke-border" />
-                <motion.path
+                <path
                     d={signalPath(variant)}
                     stroke={`url(#${gradientId})`}
                     strokeWidth="2.4"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    initial={reducedMotion ? false : { pathLength: 0, opacity: 0 }}
-                    animate={{ pathLength: 1, opacity: 1 }}
-                    transition={{ duration: 0.48, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-                    className="origin-center transition-transform duration-200 ease-out group-hover/signal:scale-[1.04]"
                 />
-                <motion.circle
+                <circle
                     cx={signalDot(variant)[0]}
                     cy={signalDot(variant)[1]}
                     r="2.7"
                     fill={accent}
-                    initial={reducedMotion ? false : { scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.24, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                    className="origin-center transition-transform duration-150 group-hover/signal:scale-125"
                 />
             </svg>
         </motion.span>

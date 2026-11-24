@@ -1,9 +1,10 @@
+import { AppModal, useAppModal } from "@/components/ui/product/app-modal";
 import { CollectionToolbar } from "@/components/layout/collection-toolbar";
 import { CachedResourceImage } from "@/components/cached-resource-image";
 import { MediaPlaceholder } from "@/components/ui/product/media-placeholder";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Dropdown, Form, Input, Modal, Select } from "antd";
+import { App, Button, Dropdown, Form, Input, Select } from "antd";
 import { ArrowRight, Archive, BookOpenText, FileText, FolderKanban, Images, LayoutGrid, MoreHorizontal, Palette, Pencil, Plus, Search, Sparkles } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
@@ -27,7 +28,8 @@ type ProjectForm = { name: string; aspectRatio: string; sourceType: string };
 export default function ProjectsPage() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const effectiveConfig = useEffectiveConfig();
     const [createForm] = Form.useForm<ProjectForm>();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -285,7 +287,7 @@ export default function ProjectsPage() {
                 />
             ) : null}
 
-            <Modal className="library-modal" title="创建短剧项目" open={createOpen} footer={null} destroyOnHidden onCancel={() => setCreateOpen(false)} width={560} styles={{ body: { paddingTop: 12 } }}>
+            <AppModal className="library-modal" title="创建短剧项目" open={createOpen} footer={null} destroyOnHidden onCancel={() => setCreateOpen(false)} width={560} styles={{ body: { paddingTop: 12 } }}>
                 <Form<ProjectForm> form={createForm} layout="vertical" initialValues={{ aspectRatio: "9:16", sourceType: "blank" }} onFinish={(values) => mutation.mutate({ ...values, type: "short-drama", ...(selectedStyle ? { stylePresetId: selectedStyle.id, styleProfileJson: serializeStyleProfile(selectedStyle.profile || createStyleProfileSnapshot(selectedStyle)) } : {}) })}>
                     <div className="mb-4 grid grid-cols-3 gap-2">
                         <button type="button" className={createSource === "blank" ? "app-story-source is-active" : "app-story-source"} onClick={() => { setCreateSource("blank"); createForm.setFieldValue("sourceType", "blank"); }}><FolderKanban className="size-4" /><span>空白开始</span></button>
@@ -301,17 +303,17 @@ export default function ProjectsPage() {
                     <p className="-mt-1 mb-5 text-xs leading-5 text-foreground/48">创建后先进入项目概览。章节、画风和参考资产可以逐步补充。</p>
                     <div className="flex justify-end gap-2"><Button onClick={() => setCreateOpen(false)}>取消</Button><Button type="primary" htmlType="submit" loading={mutation.isPending}>创建项目</Button></div>
                 </Form>
-            </Modal>
-            <Modal className="library-modal" title="重命名项目" open={Boolean(renamingProject)} okText="保存" cancelText="取消" confirmLoading={renameMutation.isPending} onCancel={() => setRenamingProject(null)} onOk={() => { const name = renameValue.trim(); if (!renamingProject || !name) return; renameMutation.mutate({ id: renamingProject.id, name }); }}>
+            </AppModal>
+            <AppModal destroyOnHidden={false} className="library-modal" title="重命名项目" open={Boolean(renamingProject)} okText="保存" cancelText="取消" confirmLoading={renameMutation.isPending} onCancel={() => setRenamingProject(null)} onOk={() => { const name = renameValue.trim(); if (!renamingProject || !name) return; renameMutation.mutate({ id: renamingProject.id, name }); }}>
                 <Input autoFocus value={renameValue} maxLength={80} placeholder="请输入项目名称" onChange={(event) => setRenameValue(event.target.value)} onPressEnter={() => { const name = renameValue.trim(); if (renamingProject && name) renameMutation.mutate({ id: renamingProject.id, name }); }} />
-            </Modal>
+            </AppModal>
             <CanvasStylePickerModal
                 open={stylePickerOpen}
                 value={selectedStyle?.id}
                 onClose={() => setStylePickerOpen(false)}
                 onSelect={(preset) => { setSelectedStyle(preset); setStylePickerOpen(false); }}
             />
-            <Modal className="library-modal" title="AI 生成章节" open={generating} footer={null} closable={false} mask={{ closable: false }} keyboard={false} width={760}>
+            <AppModal destroyOnHidden={false} className="library-modal" title="AI 生成章节" open={generating} footer={null} closable={false} mask={{ closable: false }} keyboard={false} width={760}>
                 <div className="app-story-generating">
                     <div className="app-story-generating-head">
                         <span className="app-story-generating-mark"><Sparkles className="size-4" /></span>
@@ -341,7 +343,7 @@ export default function ProjectsPage() {
                         <pre>{generationPreview}</pre>
                     </div>
                 </div>
-            </Modal>
+            </AppModal>
         </WorkspacePage>
     );
 }

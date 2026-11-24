@@ -18,18 +18,23 @@
 .workspace-operation-title { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
 .workspace-operation-title strong { min-width: 0; flex: 1; overflow-wrap: anywhere; line-height: 1.5; }
 .workspace-operation-title button { flex-shrink: 0; padding: 3px; }
+.workspace-operation-icon { display: grid; flex-shrink: 0; }
+.workspace-operation-icon > span { grid-area: 1 / 1; opacity: 0; transition: opacity var(--motion-state) var(--ease-out); }
+.workspace-operation-icon > [data-visible] { opacity: 1; }
+.workspace-operation-icon > :not([data-visible]) .animate-spin { animation-play-state: paused; }
 .file-operation-stage { display: flex; justify-content: space-between; gap: 12px; line-height: 1.6; }
 .file-operation-stage span { min-width: 0; overflow-wrap: anywhere; }
 .file-operation-stage strong { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .file-operation-bar { height: 4px; margin: 8px 0; overflow: hidden; border-radius: 4px; background: var(--muted); }
-.file-operation-bar i { display: block; height: 100%; background: var(--foreground); border-radius: inherit; transition: width 180ms linear; }
-.file-operation-bar[data-indeterminate] i { width: 30%; animation: file-operation-scan 1.6s ease-in-out infinite; }
+.file-operation-bar i { display: block; height: 100%; background: var(--foreground); border-radius: inherit; transform-origin: left; transition: transform var(--motion-panel) linear; }
+.file-operation-bar[data-indeterminate] i { width: 30%; animation: file-operation-scan var(--motion-sweep) var(--ease-in-out) infinite; }
 .file-operation-metrics { display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 4px; font-variant-numeric: tabular-nums; color: var(--muted-foreground); line-height: 1.6; }
 .file-operation-metrics span { white-space: nowrap; }
 .file-operation-time { color: var(--muted-foreground); line-height: 1.6; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .workspace-operation-item[data-phase="error"] { color: var(--destructive); }
-.file-operation-spin { animation: file-operation-spin 1.4s linear infinite; flex-shrink: 0; }
-@keyframes file-operation-spin { to { transform: rotate(360deg); } }
 @keyframes file-operation-scan { from { transform: translateX(-100%); } to { transform: translateX(430%); } }
 @media (max-width: 480px) { .workspace-operation-tray { right: 12px; bottom: 12px; } }
-@media (prefers-reduced-motion: reduce) { .file-operation-spin, .file-operation-bar[data-indeterminate] i { animation: none; } .file-operation-bar i { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+    .file-operation-bar[data-indeterminate] i { width: 100%; opacity: var(--opa-muted); animation: none; }
+    .file-operation-bar i { transition: none; }
+}

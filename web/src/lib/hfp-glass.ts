@@ -99,8 +99,12 @@ function overlayFor(w: number, h: number, r: number, dark: boolean): string {
     return ovCache.get(key) || "";
 }
 
+/** 「流畅模式」：不画折射贴图，也不跟随指针改高光角度。 */
+const effectsLite = () => document.documentElement.dataset.effects === "lite";
+
 function applyRefraction(el: HTMLElement) {
     const off =
+        effectsLite() ||
         document.documentElement.classList.contains("reduce-transparency") ||
         window.matchMedia?.("(prefers-reduced-transparency: reduce)").matches;
     const w = el.offsetWidth;
@@ -121,92 +125,80 @@ function applyRefraction(el: HTMLElement) {
     void mat;
 }
 
-let initialized = false;
-
 // The rim highlight follows the pointer in coarse steps; finer steps are not
 // visible but each one restyles every glass element.
 const LIGHT_ANGLE_STEP = 15;
+const GLASS_SELECTOR = "[data-refract], .lg";
 
-export function initHfpGlassRuntime() {
-    if (typeof window === "undefined" || initialized) return;
-    initialized = true;
+/**
+ * 首页玻璃卡片的运行时：指针改变高光角度、按元素尺寸生成折射贴图、记录按压原点。
+ * 玻璃卡片只在首页，所以只在首页挂载期间运行，并且只观察首页这棵子树；流畅模式下不启动。
+ * 返回清理函数：移除监听、断开观察，并去掉已经画上的贴图和高光角度。
+ */
+export function initHfpGlassRuntime(scope: HTMLElement) {
+    if (typeof window === "undefined") return () => undefined;
 
     let lx = 0.3;
     let ly = 0.2;
     let raf = 0;
     let lightAngle = "";
-    const glass = document.getElementsByClassName("lg");
+    const glass = scope.getElementsByClassName("lg");
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
-    window.addEventListener(
-        "pointermove",
-        (e) => {
-            // Drags and canvas pans move the pointer every frame; skip the highlight then.
-            if (e.buttons !== 0 || reducedMotion?.matches || glass.length === 0) return;
-            lx = e.clientX / Math.max(1, window.innerWidth) - 0.5;
-            ly = e.clientY / Math.max(1, window.innerHeight) - 0.5;
-            if (!raf) {
-                raf = requestAnimationFrame(() => {
-                    raf = 0;
-                    const raw = (Math.atan2(ly, lx) * 180) / Math.PI + 270;
-                    const angle = `${Math.round(raw / LIGHT_ANGLE_STEP) * LIGHT_ANGLE_STEP}deg`;
-                    if (angle === lightAngle) return;
-                    lightAngle = angle;
-                    // --la is registered as non-inheriting: writing it on each glass element
-                    // restyles only those elements, not the whole document as on <html>.
-                    for (const element of glass) (element as HTMLElement).style.setProperty("--la", angle);
-                });
-            }
-        },
-        { passive: true },
-    );
+    const onPointerMove = (e: PointerEvent) => {
+        // Drags and canvas pans move the pointer every frame; skip the highlight then.
+        if (e.buttons !== 0 || reducedMotion?.matches || glass.length === 0 || effectsLite()) return;
+        lx = e.clientX / Math.max(1, window.innerWidth) - 0.5;
+        ly = e.clientY / Math.max(1, window.innerHeight) - 0.5;
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+            raf = 0;
+            const raw = (Math.atan2(ly, lx) * 180) / Math.PI + 270;
+            const angle = `${Math.round(raw / LIGHT_ANGLE_STEP) * LIGHT_ANGLE_STEP}deg`;
+            if (angle === lightAngle) return;
+            lightAngle = angle;
+            // --la is registered as non-inheriting: writing it on each glass element
+            // restyles only those elements, not the whole document as on <html>.
+            for (const element of glass) (element as HTMLElement).style.setProperty("--la", angle);
+        });
+    };
 
-    document.addEventListener(
-        "pointermove",
-        (e) => {
-            const target = e.target instanceof Element ? e.target.closest<HTMLElement>(".hl") : null;
-            if (!target) return;
-            const r = target.getBoundingClientRect();
-            target.style.setProperty("--hx", `${e.clientX - r.left}px`);
-            target.style.setProperty("--hy", `${e.clientY - r.top}px`);
-        },
-        { passive: true },
-    );
-
-    document.addEventListener(
-        "pointerdown",
-        (e) => {
-            const target = e.target instanceof Element ? e.target.closest<HTMLElement>(".press, .hfp-press") : null;
-            if (!target) return;
-            const r = target.getBoundingClientRect();
-            if (r.width > 0 && r.height > 0) {
-                target.style.setProperty("--ox", `${(((e.clientX - r.left) / r.width) * 100).toFixed(1)}%`);
-                target.style.setProperty("--oy", `${(((e.clientY - r.top) / r.height) * 100).toFixed(1)}%`);
-            }
-            const up = () => {
-                target.classList.remove("jelly");
-                void target.offsetWidth;
-                target.classList.add("jelly");
-                window.setTimeout(() => target.classList.remove("jelly"), 580);
-                window.removeEventListener("pointerup", up);
-            };
-            window.addEventListener("pointerup", up);
-        },
-        { passive: true },
-    );
+    // 按压从指针所在的位置内收（.press 的 transform-origin）。
+    const onPointerDown = (e: PointerEvent) => {
+        const target = e.target instanceof Element ? e.target.closest<HTMLElement>(".press, .hfp-press") : null;
+        if (!target) return;
+        const r = target.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+            target.style.setProperty("--ox", `${(((e.clientX - r.left) / r.width) * 100).toFixed(1)}%`);
+            target.style.setProperty("--oy", `${(((e.clientY - r.top) / r.height) * 100).toFixed(1)}%`);
+        }
+    };
 
     // ResizeObserver reports every observed element once on observe and again on
-    // each size change, so it alone keeps the refraction overlay current.
+    // each size change, so it alone keeps the refraction overlay current. The first
+    // report paints at once; later ones wait until the size settles, because a
+    // sidebar or window resize changes the size every frame and each new size
+    // costs a full per-pixel overlay plus a PNG encode. The old overlay is drawn
+    // at 100% × 100%, so it stretches cleanly while the resize is in progress.
+    const resized = new Set<HTMLElement>();
+    let settleTimer = 0;
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
-            if (entry.target instanceof HTMLElement) applyRefraction(entry.target);
+            if (!(entry.target instanceof HTMLElement)) continue;
+            if (entry.target.style.getPropertyValue("--lg-ov")) resized.add(entry.target);
+            else applyRefraction(entry.target);
         }
+        if (!resized.size) return;
+        window.clearTimeout(settleTimer);
+        settleTimer = window.setTimeout(() => {
+            for (const element of resized) if (element.isConnected) applyRefraction(element);
+            resized.clear();
+        }, 160);
     });
-    const GLASS_SELECTOR = "[data-refract], .lg";
+    const observed = new WeakSet<HTMLElement>();
     const prepare = (el: HTMLElement) => {
-        const tracked = el as HTMLElement & { __lgObserved?: boolean };
-        if (!tracked.__lgObserved) {
-            tracked.__lgObserved = true;
+        if (!observed.has(el)) {
+            observed.add(el);
             ro.observe(el);
         }
         if (lightAngle && el.classList.contains("lg")) el.style.setProperty("--la", lightAngle);
@@ -216,8 +208,8 @@ export function initHfpGlassRuntime() {
         root.querySelectorAll<HTMLElement>(GLASS_SELECTOR).forEach(prepare);
     };
 
-    // Only newly added subtrees are scanned. Re-measuring every glass element on any
-    // DOM change forced a layout per frame while the canvas mounted nodes during a pan.
+    // Only newly added subtrees are scanned; re-measuring every glass element on any
+    // DOM change would force a layout per frame.
     const added = new Set<Element>();
     let scanFrame = 0;
     const mo = new MutationObserver((records) => {
@@ -234,13 +226,41 @@ export function initHfpGlassRuntime() {
             });
         }
     });
-    // Theme and transparency changes alter the overlay without resizing anything.
+    // Theme, transparency and effects-level changes alter the overlay without resizing anything.
+    // 逐像素重算折射贴图很重，放到空闲时做，不卡住主题揭示的开头。
+    let themeRecompute = 0;
+    const idle = typeof window.requestIdleCallback === "function";
     const themeObserver = new MutationObserver(() => {
-        document.querySelectorAll<HTMLElement>(GLASS_SELECTOR).forEach(applyRefraction);
+        if (themeRecompute) return;
+        const run = () => {
+            themeRecompute = 0;
+            scope.querySelectorAll<HTMLElement>(GLASS_SELECTOR).forEach(applyRefraction);
+        };
+        themeRecompute = idle ? window.requestIdleCallback(run, { timeout: 600 }) : window.setTimeout(run, 360);
     });
-    if (document.body) {
-        mo.observe(document.body, { childList: true, subtree: true });
-        themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] });
-        scanTree(document.body);
-    }
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    scope.addEventListener("pointerdown", onPointerDown, { passive: true });
+    mo.observe(scope, { childList: true, subtree: true });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "data-effects"] });
+    scanTree(scope);
+
+    return () => {
+        window.removeEventListener("pointermove", onPointerMove);
+        scope.removeEventListener("pointerdown", onPointerDown);
+        ro.disconnect();
+        mo.disconnect();
+        themeObserver.disconnect();
+        cancelAnimationFrame(raf);
+        cancelAnimationFrame(scanFrame);
+        window.clearTimeout(settleTimer);
+        if (themeRecompute) {
+            if (idle) window.cancelIdleCallback(themeRecompute);
+            else window.clearTimeout(themeRecompute);
+        }
+        scope.querySelectorAll<HTMLElement>(GLASS_SELECTOR).forEach((element) => {
+            element.style.removeProperty("--lg-ov");
+            element.style.removeProperty("--la");
+        });
+    };
 }

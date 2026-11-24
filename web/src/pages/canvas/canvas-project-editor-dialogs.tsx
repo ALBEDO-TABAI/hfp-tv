@@ -43,6 +43,7 @@ import { LibTVImportDialog } from "./components/libtv-import-dialog";
 import { TapNowImportDialog } from "./components/tapnow-import-dialog";
 import { CanvasProjectMediaDialogs } from "./canvas-project-media-dialogs";
 import { CanvasProjectStatusDialogs } from "./canvas-project-status-dialogs";
+import { useClosingValue } from "@/hooks/use-closing-value";
 
 const CanvasDirectorWorkbench = lazy(() => import("@/components/canvas/director/canvas-director-workbench").then((module) => ({ default: module.CanvasDirectorWorkbench })));
 const CanvasDrawingEditorModal = lazy(() => import("@/components/canvas/canvas-drawing-editor-modal").then((module) => ({ default: module.CanvasDrawingEditorModal })));
@@ -231,6 +232,8 @@ export function CanvasProjectEditorDialogs({
     status,
     assets,
 }: CanvasProjectEditorDialogsProps) {
+    const subtitleDialog = useClosingValue(subtitle.node);
+    const frameDialog = useClosingValue(frame.node);
     return (
         <>
             <CanvasNodeSearchModal open={search.open} nodes={nodes} onClose={search.onClose} onFocus={search.onFocus} />
@@ -239,8 +242,8 @@ export function CanvasProjectEditorDialogs({
             <TapNowImportDialog open={imports.tapNowOpen} projectId={projectId} viewport={viewport} viewportSize={viewportSize} onClose={imports.onCloseTapNow} onApply={imports.onApplyTapNow} />
             <CanvasStylePickerModal open={style.open} value={style.value} applying={style.applying} onClose={style.onClose} onSelect={style.onSelect} />
             <CanvasNodeInfoModal node={info.node} open={Boolean(info.node)} onClose={info.onClose} onMetadataChange={info.onMetadataChange} />
-            {subtitle.node ? <CanvasSubtitleDialog node={subtitle.node} open={Boolean(subtitle.node)} projectId={projectId} config={config} onClose={subtitle.onClose} onSave={subtitle.onSave} /> : null}
-            {frame.node ? <CanvasVideoFrameDialog node={frame.node} open={Boolean(frame.node)} onClose={frame.onClose} onConfirm={frame.onConfirm} /> : null}
+            {subtitleDialog.shown ? <CanvasSubtitleDialog node={subtitleDialog.shown} open={subtitleDialog.open} afterClose={subtitleDialog.afterClose} projectId={projectId} config={config} onClose={subtitle.onClose} onSave={subtitle.onSave} /> : null}
+            {frameDialog.shown ? <CanvasVideoFrameDialog node={frameDialog.shown} open={frameDialog.open} afterClose={frameDialog.afterClose} onClose={frame.onClose} onConfirm={frame.onConfirm} /> : null}
             {timeline.node ? (
                 <CanvasTimelineDialog
                     node={timeline.node}

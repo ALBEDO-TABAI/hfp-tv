@@ -199,11 +199,12 @@
     -webkit-mask-repeat: no-repeat;
     mask-repeat: no-repeat;
     opacity: 0;
-    animation: beeftv-dot-ripple 3.8s linear infinite;
+    /* 进入首页时扩散一轮后静止（约 1.6 秒，缓出）；常驻的循环会让空闲页面每帧重绘。 */
+    animation: beeftv-dot-ripple 1.6s var(--ease-out) 1;
 }
 
 .beeftv-home-dot-flow-delay {
-    animation-delay: -1.9s;
+    animation-delay: -0.8s;
 }
 
 .hfp-stage-frame-marks {
@@ -321,7 +322,7 @@
     font-size: 12.5px;
     font-weight: 500;
     text-decoration: none;
-    transition: background var(--d-2), color var(--d-2), transform var(--d-2);
+    transition: background var(--motion-instant) var(--ease-out), color var(--motion-instant) var(--ease-out), transform var(--motion-state) var(--ease-out);
 }
 
 .hfp-section-link:hover {
@@ -378,7 +379,7 @@
     box-shadow: inset 0 0 0 0.5px var(--hair-2);
     color: var(--ink);
     margin-bottom: auto;
-    transition: background var(--d-2), color var(--d-2), transform var(--d-2);
+    transition: background var(--motion-instant) var(--ease-out), color var(--motion-instant) var(--ease-out), transform var(--motion-state) var(--ease-out);
 }
 
 .beeftv-capability.hfp-capability-card .beeftv-capability-icon svg {
@@ -412,7 +413,7 @@
 }
 
 .beeftv-capability.hfp-capability-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-2px);
 }
 
 .beeftv-capability.hfp-capability-card:hover .beeftv-capability-icon {
@@ -568,7 +569,7 @@
     height: 15px;
     color: var(--ink-3);
     opacity: 0.65;
-    transition: opacity var(--d-2), transform var(--d-2), color var(--d-2);
+    transition: opacity var(--motion-state) var(--ease-out), transform var(--motion-state) var(--ease-out), color var(--motion-instant) var(--ease-out);
 }
 
 .beeftv-recent-card:hover .beeftv-recent-arrow {
@@ -578,7 +579,7 @@
 }
 
 .beeftv-recent-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
 }
 
 @keyframes beeftv-dot-ripple {
@@ -643,4 +644,9 @@
     .hfp-stage-frame-marks {
         display: none;
     }
+}
+
+/* 指针移到新建按钮上、或键盘聚焦到它时，信号灯扩散一次，表示「点这里开始」；停留期间不再循环。 */
+.hfp-hero-draw-btn:is(:hover, :focus-visible) .led::after {
+    animation: hfp-led-ping var(--motion-emphasis) var(--ease-out) 1;
 }

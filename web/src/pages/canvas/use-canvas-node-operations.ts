@@ -26,6 +26,7 @@ import { cancelGenerationTask } from "@/services/api/task-center";
 import { canvasTaskConfirmation } from "./canvas-task-confirmation";
 import { subscribeUserScope } from "@/lib/user-scope";
 import { captureUserScope, userScopeMatches } from "@/lib/user-scope-guard";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 type CanvasClipboard = {
     nodes: CanvasNodeData[];
@@ -70,7 +71,8 @@ export function useCanvasNodeOperations({
     setDialogNodeId,
     onNodesDeleted,
 }: UseCanvasNodeOperationsOptions) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const deletionContext = useRef({ projectId });
     if (deletionContext.current.projectId !== projectId) deletionContext.current = { projectId };
     const mounted = useRef(true);

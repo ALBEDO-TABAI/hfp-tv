@@ -1,7 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Button, ColorPicker, Input, Segmented, Slider } from "antd";
 import { Switch } from "@/components/ui/base/switch";
-import { CircleDot, Grid2x2, Link2, Moon, Move, Sun, Paintbrush, RotateCcw, Save, Square, Wand2, ZoomIn } from "lucide-react";
+import { CircleDot, Gauge, Grid2x2, Link2, Moon, Move, Sun, Paintbrush, RotateCcw, Save, Square, Wand2, ZoomIn } from "lucide-react";
+
+import { FLUID_MODE_COPY } from "@/components/layout/workspace-effects-toggle";
+import { useThemeStore } from "@/stores/use-theme-store";
 
 import {
     canvasAppearanceForTheme,
@@ -48,6 +51,8 @@ export function CanvasAppearanceControls({
     onWheelBehaviorChange: (behavior: CanvasWheelBehavior) => void;
 }) {
     const [draft, setDraft] = useState(appearance);
+    const fluidMode = useThemeStore((state) => state.effects === "lite");
+    const setEffects = useThemeStore((state) => state.setEffects);
 
     useEffect(() => setDraft(appearance), [appearance]);
 
@@ -129,6 +134,10 @@ export function CanvasAppearanceControls({
             <div className="mt-2 flex items-center justify-between rounded-[var(--dock-item-radius-labeled)] border px-2.5 py-2 text-[var(--fs-tiny)]" style={{ background: theme.spatial.surface, borderColor: theme.toolbar.border }}>
                 <span className="inline-flex items-center gap-1.5 font-medium"><Link2 className="size-3.5 opacity-65" />显示连线</span>
                 <Switch size="sm" checked={showConnections} onChange={onShowConnectionsChange} aria-label="显示连线" />
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-[var(--dock-item-radius-labeled)] border px-2.5 py-2 text-[var(--fs-tiny)]" style={{ background: theme.spatial.surface, borderColor: theme.toolbar.border }}>
+                <span className="inline-flex min-w-0 items-center gap-1.5 font-medium"><Gauge className="size-3.5 shrink-0 opacity-65" />{FLUID_MODE_COPY.name}<span className="truncate opacity-45">{FLUID_MODE_COPY.short}</span></span>
+                <Switch size="sm" checked={fluidMode} onChange={(checked) => setEffects(checked ? "lite" : "full")} aria-label={FLUID_MODE_COPY.name} />
             </div>
 
             <div className="mt-3 text-[var(--fs-micro)] font-semibold uppercase opacity-45">滚轮操作</div>

@@ -1,11 +1,11 @@
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useIsPresent } from "motion/react";
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { useMemo } from "react";
 
 import { CanvasCreateMenu, type CanvasCreateCommand } from "@/components/canvas/canvas-create-menu";
 import { useCanvasOverlayLayer } from "@/components/canvas/canvas-overlay-layer";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionDuration, motionEase, motionTransition } from "@/lib/motion-tokens";
 import { subscribeCanvasGraphicsViewportPreview, subscribeCanvasNodeDragPreview, subscribeCanvasViewportPreview } from "@/lib/canvas/canvas-live-viewport";
 import { getNodeIcon } from "@/lib/canvas/node-registry";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
@@ -20,7 +20,7 @@ export type PendingConnectionCreate = {
 
 export function CanvasSelectionToolbar({ anchorRef, containerRef, count, children }: { anchorRef: RefObject<HTMLDivElement | null>; containerRef: RefObject<HTMLDivElement | null>; count: number; children: ReactNode }) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
+    const isPresent = useIsPresent();
     const toolbarRef = useRef<HTMLDivElement>(null);
     const [anchor, setAnchor] = useState<{ left: number; top: number; placement: "above" | "below" } | null>(null);
 
@@ -33,6 +33,8 @@ export function CanvasSelectionToolbar({ anchorRef, containerRef, count, childre
         }
 
         const update = () => {
+            // 选区边框已经卸载（快速重选时旧工具条还在淡出）：停在最后的位置，不按零尺寸重新定位。
+            if (container.dataset.canvasNodeDragging === "true" || !element.isConnected) return;
             const bounds = element.getBoundingClientRect();
             const containerBounds = container.getBoundingClientRect();
             const toolbarWidth = toolbarRef.current?.offsetWidth || 320;
@@ -47,6 +49,7 @@ export function CanvasSelectionToolbar({ anchorRef, containerRef, count, childre
             if (toolbarRef.current) {
                 toolbarRef.current.style.left = `${left}px`;
                 toolbarRef.current.style.top = `${top}px`;
+                toolbarRef.current.style.transformOrigin = placement === "above" ? "bottom center" : "top center";
                 toolbarRef.current.classList.toggle("-translate-y-full", placement === "above");
                 return;
             }
@@ -60,6 +63,8 @@ export function CanvasSelectionToolbar({ anchorRef, containerRef, count, childre
         if (toolbarRef.current) resizeObserver.observe(toolbarRef.current);
         const viewportLayer = element.parentElement;
         const mutationObserver = new MutationObserver(update);
+        mutationObserver.observe(element, { attributes: true, attributeFilter: ["style"] });
+        mutationObserver.observe(container, { attributes: true, attributeFilter: ["data-canvas-node-dragging"] });
         if (viewportLayer) mutationObserver.observe(viewportLayer, { attributes: true, attributeFilter: ["style"] });
         const unsubscribeViewport = subscribeCanvasViewportPreview(container, update);
         window.addEventListener("resize", update);
@@ -76,12 +81,19 @@ export function CanvasSelectionToolbar({ anchorRef, containerRef, count, childre
         <div
             ref={toolbarRef}
             data-canvas-no-zoom
-            className={`absolute z-[var(--z-panel-floating)] max-w-[calc(100%_-_24px)] -translate-x-1/2 ${anchor.placement === "above" ? "-translate-y-full" : ""}`}
+            inert={!isPresent}
+            className={`pointer-events-auto absolute z-[var(--z-panel-floating)] max-w-[calc(100%_-_24px)] -translate-x-1/2 ${anchor.placement === "above" ? "-translate-y-full" : ""}`}
             style={{ left: anchor.left, top: anchor.top, color: theme.node.text, transformOrigin: anchor.placement === "above" ? "bottom center" : "top center" }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
         >
-            <motion.div initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: anchor.placement === "above" ? 8 : -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={aceternityMotion.spring.panel} className="flex items-center gap-2">
+            <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, transition: motionTransition.exit }}
+                transition={motionTransition.enter}
+                className="flex origin-[inherit] items-center gap-2"
+            >
                 <span className="aceternity-floating-panel shrink-0 rounded-full border px-2.5 py-1.5 text-[var(--fs-tiny)] font-semibold tabular-nums backdrop-blur-2xl" style={{ background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.accent.primary }}>已选 {count}</span>
                 <div className="max-w-[min(560px,calc(100vw-90px))]">{children}</div>
             </motion.div>
@@ -205,7 +217,7 @@ export function CanvasConnectionCreateMenu({ pending, viewport, viewportSize, co
             ref={menuRef}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }}
+            transition={{ duration: motionDuration.instant, ease: motionEase.out }}
             className="thin-scrollbar absolute origin-top-left overflow-x-hidden overflow-y-auto rounded-[var(--r-2xl)] border p-2"
             data-canvas-no-zoom
             data-connection-create-menu

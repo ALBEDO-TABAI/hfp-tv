@@ -9,6 +9,7 @@ import { getResource, resourceFileUrl } from "@/services/api/resources";
 import { submissionAcceptanceUnknown } from "@/services/api/generation-submission";
 import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
 import type { CanvasConnection, CanvasNodeData, Position } from "@/types/canvas";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 export function useCanvasWorkflowInstances({ canvasId, domainProjectId, readOnly, nodes, nodesRef, setNodes, connectionsRef, setConnections, getCanvasCenter, focusNode, persist, onError }: {
     canvasId: string; domainProjectId?: string; readOnly: boolean; nodes: CanvasNodeData[];
@@ -16,7 +17,8 @@ export function useCanvasWorkflowInstances({ canvasId, domainProjectId, readOnly
     connectionsRef: MutableRefObject<CanvasConnection[]>; setConnections: Dispatch<SetStateAction<CanvasConnection[]>>;
     getCanvasCenter(): Position; focusNode(node: CanvasNodeData): void; persist(): Promise<boolean>; onError(message: string): void;
 }) {
-    const { modal, message } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const [scope] = useState(captureUserScope);
     const alive = useRef(true);
     const identity = useRef(canvasId);

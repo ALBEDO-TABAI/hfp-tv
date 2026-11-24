@@ -1,5 +1,5 @@
-import { Copy, Eye, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { Check, Copy, Eye, RefreshCw, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { formatGenerationDiagnostics, type GenerationFailureContext, type GenerationFailureExplanation } from "@/lib/generation-error";
 import { getDiagnosticTraceId } from "@/services/diagnostics/client-diagnostics";
@@ -15,11 +15,25 @@ type GenerationFailureNoticeProps = {
     summaryOnly?: boolean;
 };
 
+const copyFeedback = {
+    idle: { label: "复制排查信息", Icon: Copy },
+    copied: { label: "已复制", Icon: Check },
+    failed: { label: "复制失败", Icon: TriangleAlert },
+};
+
 export function GenerationFailureNotice({ explanation, context, compact, onRetry, retryLabel, onOpenDetails, retryDisabled, summaryOnly }: GenerationFailureNoticeProps) {
-    const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+    const [copyState, setCopyState] = useState<keyof typeof copyFeedback>("idle");
+    const copyTimer = useRef<number | undefined>(undefined);
+    const copyAttempt = useRef(0);
     const diagnostics = formatGenerationDiagnostics(explanation, { ...context, traceId: context?.traceId || getDiagnosticTraceId(context?.taskId || explanation.taskId) });
     const showRetry = Boolean(onRetry) && !explanation.blockManualRetry && !retryDisabled;
+    useEffect(() => () => {
+        copyAttempt.current++;
+        window.clearTimeout(copyTimer.current);
+    }, []);
     const copyDiagnostics = async () => {
+        const attempt = ++copyAttempt.current;
+        let result: "copied" | "failed" = "copied";
         try {
             if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(diagnostics);
@@ -27,12 +41,13 @@ export function GenerationFailureNotice({ explanation, context, compact, onRetry
                 const copied = fallbackCopy(diagnostics);
                 if (!copied) throw new Error("copy failed");
             }
-            setCopyState("copied");
-            window.setTimeout(() => setCopyState("idle"), 1600);
         } catch {
-            setCopyState("failed");
-            window.setTimeout(() => setCopyState("idle"), 2200);
+            result = "failed";
         }
+        if (attempt !== copyAttempt.current) return;
+        window.clearTimeout(copyTimer.current);
+        setCopyState(result);
+        copyTimer.current = window.setTimeout(() => setCopyState("idle"), 1500);
     };
     return (
         <div className={`generation-failure-notice${compact ? " is-compact" : ""}`}>
@@ -53,20 +68,27 @@ export function GenerationFailureNotice({ explanation, context, compact, onRetry
                         {explanation.uncertain ? "查看原任务" : "查看详情"}
                     </button>
                 ) : null}
-                {!summaryOnly && diagnostics ? (
+                {!summaryOnly && diagnostics ? <>
                     <button
                         type="button"
                         className="generation-failure-button"
+                        aria-label={copyFeedback[copyState].label}
                         onClick={(event) => {
                             event.stopPropagation();
                             void copyDiagnostics();
                         }}
                         onMouseDown={(event) => event.stopPropagation()}
                     >
-                        <Copy className="size-3.5" />
-                        {copyState === "copied" ? "已复制" : copyState === "failed" ? "复制失败" : "复制排查信息"}
+                        <span className="inline-grid" aria-hidden="true">
+                            {Object.entries(copyFeedback).map(([state, { label, Icon }]) => (
+                                <span key={state} className={`col-start-1 row-start-1 grid grid-cols-[auto_1fr] items-center gap-1.5 whitespace-nowrap text-center transition-opacity duration-(--motion-state) ease-(--ease-out) ${state === copyState ? "opacity-100" : "opacity-0"}`}>
+                                    <Icon className="size-3.5" />{label}
+                                </span>
+                            ))}
+                        </span>
                     </button>
-                ) : null}
+                    <span role="status" className="sr-only">{copyState === "idle" ? "" : copyFeedback[copyState].label}</span>
+                </> : null}
                 {showRetry ? (
                     <button
                         type="button"
@@ -94,7 +116,9 @@ function fallbackCopy(value: string) {
     area.style.opacity = "0";
     document.body.appendChild(area);
     area.select();
-    const copied = document.execCommand("copy");
-    area.remove();
-    return copied;
+    try {
+        return document.execCommand("copy");
+    } finally {
+        area.remove();
+    }
 }

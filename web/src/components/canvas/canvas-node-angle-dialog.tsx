@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Slider } from "antd";
 import { Tooltip } from "@/components/ui/base/tooltip";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotionConfig } from "motion/react";
 import { Camera, RotateCcw, Send, X } from "lucide-react";
 
 import { CanvasAngleScene } from "@/components/canvas/canvas-angle-scene";
 import { SpotlightSurface } from "@/components/ui/aceternity/spotlight-surface";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionSpring } from "@/lib/motion-tokens";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 
@@ -37,7 +37,7 @@ function distanceLabel(value: number) {
 
 export function CanvasNodeAnglePanel({ dataUrl, onClose, onConfirm }: { dataUrl: string; onClose: () => void; onConfirm: (params: CanvasImageAngleParams) => void }) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     const [params, setParams] = useState(defaultParams);
     const [mode, setMode] = useState<"camera" | "skybox">("camera");
     const update = <Key extends keyof CanvasImageAngleParams>(key: Key, value: CanvasImageAngleParams[Key]) => setParams((current) => ({ ...current, [key]: value }));
@@ -50,7 +50,7 @@ export function CanvasNodeAnglePanel({ dataUrl, onClose, onConfirm }: { dataUrl:
             spotlightColor={theme.toolbar.itemHover}
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.panel}
+            transition={reducedMotion ? { duration: 0 } : motionSpring.smooth}
             className="aceternity-floating-panel canvas-angle-panel w-full overflow-hidden rounded-[var(--r-2xl)] border backdrop-blur-2xl"
             style={{ background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.node.text, boxShadow: `0 28px 80px ${theme.spatial.shadow}` }}
             onMouseDown={(event) => event.stopPropagation()}
@@ -129,7 +129,7 @@ export function CanvasNodeAnglePanel({ dataUrl, onClose, onConfirm }: { dataUrl:
                 <span className="text-[var(--fs-tiny)] opacity-60">{params.horizontalAngle}° / {params.pitchAngle}° · {params.cameraDistance.toFixed(1)} {distanceLabel(params.cameraDistance)}</span>
                 <span className="flex-1" />
                 <button type="button" className="flex h-8 items-center gap-1.5 rounded-[var(--dock-item-radius)] px-2 text-[var(--fs-label)] font-medium transition hover:bg-black/5 dark:hover:bg-white/10" onClick={() => setParams(defaultParams)}><RotateCcw className="size-3.5" />重置</button>
-                <motion.button type="button" whileHover={reducedMotion ? undefined : { y: -1 }} whileTap={reducedMotion ? undefined : { scale: 0.97 }} className="canvas-angle-generate flex h-8 items-center gap-1.5 rounded-[var(--dock-item-radius)] px-3 text-[var(--fs-label)] font-semibold" style={{ background: theme.node.activeStroke, color: theme.node.panel }} onClick={() => onConfirm(params)}><Send className="size-3.5" />生成新角度</motion.button>
+                <motion.button type="button" className="canvas-angle-generate flex h-8 items-center gap-1.5 rounded-[var(--dock-item-radius)] px-3 text-[var(--fs-label)] font-semibold" style={{ background: theme.node.activeStroke, color: theme.node.panel }} onClick={() => onConfirm(params)}><Send className="size-3.5" />生成新角度</motion.button>
             </div>
         </SpotlightSurface>
     );

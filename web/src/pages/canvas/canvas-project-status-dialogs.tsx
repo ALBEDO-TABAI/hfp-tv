@@ -1,4 +1,4 @@
-import { Button, Modal } from "antd";
+import { Button } from "antd";
 import { XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -36,7 +36,7 @@ export function CanvasProjectStatusDialogs({ theme, task, taskLogs, taskLoading,
     const previewSource = useResolvedPreviewSource(previewNode);
     return (
         <>
-            <Modal title="任务详情" open={Boolean(task)} footer={null} width="min(920px, calc(100vw - 32px))" onCancel={onCloseTask}>
+            <AppModal destroyOnHidden={false} title="任务详情" open={Boolean(task)} footer={null} width="min(920px, calc(100vw - 32px))" onCancel={onCloseTask}>
                 {task ? (
                     <div className="space-y-4 text-sm">
                         {taskError ? <p role="status">任务详情暂时无法刷新，正在重试。</p> : null}
@@ -83,7 +83,7 @@ export function CanvasProjectStatusDialogs({ theme, task, taskLogs, taskLoading,
                         </div>
                     </div>
                 ) : null}
-            </Modal>
+            </AppModal>
 
 
             <AppModal
@@ -109,7 +109,7 @@ export function CanvasProjectStatusDialogs({ theme, task, taskLogs, taskLoading,
                 />
             ) : null}
 
-            <Modal
+            <AppModal destroyOnHidden={false}
                 title="清空画布？"
                 open={clearConfirmOpen}
                 centered
@@ -124,7 +124,7 @@ export function CanvasProjectStatusDialogs({ theme, task, taskLogs, taskLoading,
                 }
             >
                 <p className="text-sm opacity-60">这会删除当前画布上的所有节点和连线。</p>
-            </Modal>
+            </AppModal>
         </>
     );
 }

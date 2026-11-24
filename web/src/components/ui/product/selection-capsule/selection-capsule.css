@@ -1,0 +1,54 @@
+.selection-capsule-dock {
+    position: absolute;
+    inset-inline: 0;
+    bottom: calc(var(--s4) + var(--selection-capsule-clearance, 0px));
+    z-index: var(--z-toolbar);
+    width: max-content;
+    max-width: calc(100% - var(--s8));
+    margin-inline: auto;
+    pointer-events: none;
+}
+
+.selection-capsule {
+    display: flex;
+    align-items: center;
+    gap: var(--s1);
+    padding: var(--s1) var(--s2);
+    border: var(--stroke-1) solid var(--border);
+    border-radius: var(--r-pill);
+    background: var(--popover);
+    color: var(--popover-foreground);
+    box-shadow: var(--shadow-3);
+    pointer-events: auto;
+}
+
+.selection-capsule-summary {
+    flex: none;
+    padding-inline-start: var(--s1);
+    font-size: var(--fs-caption);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.selection-capsule-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--s1);
+    min-width: 0;
+    padding: var(--s1);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    white-space: nowrap;
+}
+
+.selection-capsule-actions > * {
+    flex: none;
+}
+
+/* 胶囊约 48px 高、离底 --s4，再留 --s4 的呼吸距离。 */
+.selection-capsule-spacer {
+    flex: none;
+    height: calc(48px + var(--s4) * 2 + var(--selection-capsule-clearance, 0px));
+}

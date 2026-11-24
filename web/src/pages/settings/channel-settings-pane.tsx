@@ -1,10 +1,11 @@
 import { Alert, App, Button, Form, Input, Popconfirm, Segmented, Select } from "antd";
 import { Bug, Pencil, Plus, RefreshCw, Trash2, Workflow } from "lucide-react";
+import { useReducedMotionConfig } from "motion/react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { ModelEditorModal } from "@/components/model-editor-modal";
 import { ChannelHeadersEditor, validateChannelHeaders } from "@/components/channel-headers-editor";
-import { WorkspaceState } from "@/components/layout/workspace-state";
+import { useSaveIndicator, WorkspaceState } from "@/components/layout/workspace-state";
 import { PageHeader } from "@/components/layout/workspace-page";
 import { mergeFetchedChannelModelProfiles } from "@/lib/channel-model-catalog";
 import { seedancePortraitModel } from "@/lib/seedance-portrait";
@@ -39,12 +40,15 @@ type ChannelSettingsPaneProps = {
 
 export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRunningHub }: ChannelSettingsPaneProps) {
     const { message } = App.useApp();
+    const reducedMotion = useReducedMotionConfig();
     const config = useConfigStore((state) => state.config);
     const replaceConfig = useConfigStore((state) => state.replaceConfig);
     const localMode = workspaceCapabilities().local;
     const hosted = usePlatformSession((state) => state.mode === "hosted");
     const userAdmin = usePlatformSession((state) => state.me?.capabilities.userAdmin === true);
     const persistence = useSyncExternalStore(subscribeModelConfigPersistence, getModelConfigPersistenceState, getModelConfigPersistenceState);
+    const { showSaving, settled } = useSaveIndicator(persistence.status === "saving" ? null : persistence.status, (status) => status === "error");
+    const displayedPersistence: ModelConfigPersistenceState = { ...persistence, status: showSaving ? "saving" : settled ?? "idle" };
     const [loadingChannelIds, setLoadingChannelIds] = useState<string[]>([]);
     const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
     const [newChannelId, setNewChannelId] = useState<string | null>(null);
@@ -441,7 +445,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                             ) : (
                                                 <span>{channelProtocolLabel(channel)} · 已保存 {channel.models.length} 个模型</span>
                                             )}
-                                            <ChannelStatus channel={channel} persistence={persistence} connection={builtinBeefAPI ? beefConnection : null} />
+                                            <ChannelStatus channel={channel} persistence={displayedPersistence} connection={builtinBeefAPI ? beefConnection : null} />
                                         </div>
                                         {topazUpscale ? <p className="mt-1 text-xs text-foreground/55">从图片或视频节点上方的「AI超分」使用</p> : null}
                                         {platformManaged ? <p className="mt-1 text-xs text-foreground/55">{channel.hasApiKey !== true ? "由管理员维护，绑定密钥后即可使用" : "由管理员维护，按你的个人密钥计量"}</p> : null}
@@ -522,7 +526,7 @@ export function ChannelSettingsPane({ onOpenDiagnostics, onOpenModels, onOpenRun
                                             </div>
                                         }
                                     >
-                                        <div className="model-editor-panel">
+                                        <div className="model-editor-panel" data-channel-reduced-motion={reducedMotion ? "" : undefined}>
                                             <section className="model-editor-section">
                                                 <div>
                                                     <h2>连接信息</h2>
@@ -695,7 +699,8 @@ export function focusInvalidChannelField(channel: ModelChannel) {
     const field = baseUrlError ? "base-url" : !channelHasGenerationCredential(channel) && !channelAllowsEmptyAPIKey(channel) ? "api-key" : requiresSecretKey(channel) && !channel.secretKey?.trim() ? "secret-key" : "models";
     requestAnimationFrame(() => {
         const element = document.getElementById(`channel-${channel.id}-${field}`);
-        element?.scrollIntoView({ behavior: "smooth", block: "center" });
+        const behavior = element?.closest("[data-channel-reduced-motion]") ? "auto" : "smooth";
+        element?.scrollIntoView({ behavior, block: "center" });
         element?.focus({ preventScroll: true });
     });
 }
@@ -705,13 +710,14 @@ function ChannelStatus({ channel, persistence, connection }: { channel: ModelCha
     const tested = channel.models.map((model) => currentModelConnectionReceipt(receipts, channel, model));
     const passed = tested.filter((result) => result?.success).length;
     const failed = tested.filter((result) => result && !result.success).length;
+    const builtin = isBuiltinBeefAPIChannel(channel);
     const error = channelValidationError(channel, connection);
     const label = modelConfigChannelStatusLabel(channel, persistence, connection);
     const testLabel = isPlatformManagedChannel(channel) && channel.hasApiKey !== true ? label : failed ? `${failed} 个模型测试失败` : passed ? `${passed}/${channel.models.length} 个模型测试通过` : label;
     return (
-        <span className={`settings-channel-status ${error || failed ? "is-warning" : "is-ready"}`}>
+        <span className={`settings-channel-status ${builtin ? "" : "w-[12em] max-w-full"} ${error || failed ? "is-warning" : "is-ready"}`}>
             <i aria-hidden="true" />
-            {isBuiltinBeefAPIChannel(channel) ? label : error || (persistence.status === "saving" || persistence.status === "error" ? label : testLabel)}
+            {builtin ? label : error || (persistence.status === "saving" || persistence.status === "error" ? label : testLabel)}
         </span>
     );
 }
@@ -763,7 +769,7 @@ export function modelConfigChannelStatusLabel(channel: ModelChannel, persistence
         return "未连接";
     }
     if (!channelHasGenerationCredential(channel) && !channelAllowsEmptyAPIKey(channel)) return "待配置";
-    if (persistence.status === "saving") return "保存中";
+    if (persistence.status === "saving") return "正在保存";
     if (persistence.status === "error") return "保存失败";
     if (persistence.status === "saved") return "已保存 · 尚未测试";
     return "尚未测试";

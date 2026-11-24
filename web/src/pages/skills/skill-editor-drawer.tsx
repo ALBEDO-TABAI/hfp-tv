@@ -11,11 +11,13 @@ import { navigateToSettings } from "@/lib/settings-navigation";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { createSkill, updateSkill, type Skill, type SkillMutationInput, type SkillShowcaseMedia } from "@/services/api/skills";
 import { isHostedMode } from "@/stores/use-platform-session";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 type SkillFormValues = Omit<SkillMutationInput, "isPrivate"> & { is_public: boolean };
 
 export function SkillEditorDrawer({ open, skill, onClose, onSaved }: { open: boolean; skill: Skill | null; onClose: () => void; onSaved: (skill: Skill) => void }) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const [form] = Form.useForm<SkillFormValues>();
     const [saving, setSaving] = useState(false);
     const [dirty, setDirty] = useState(false);

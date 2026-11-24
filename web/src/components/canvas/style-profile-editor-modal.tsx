@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { App, Button, Input, Segmented, Select } from "antd";
-import { AppModal } from "@/components/ui/product/app-modal";
+import { AppModal, useAppModal } from "@/components/ui/product/app-modal";
 import { Braces, Image, Layers3, Save, Sparkles } from "lucide-react";
 
 import { StyleAssetBindingModal } from "@/components/canvas/style-asset-binding-modal";
@@ -17,7 +17,8 @@ type StyleProfileEditorModalProps = {
 };
 
 export function StyleProfileEditorModal({ open, initialProfile, saving = false, onClose, onSave }: StyleProfileEditorModalProps) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const [section, setSection] = useState<EditorSection>("identity");
     const [draft, setDraft] = useState<StyleProfileSnapshot | null>(initialProfile);
     const [baseline, setBaseline] = useState("");

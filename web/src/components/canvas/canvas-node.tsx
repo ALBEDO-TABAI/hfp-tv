@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AlertCircle, BookOpenCheck, CheckCircle2, ChevronRight, Clapperboard, Copy, Download, FileText, GripVertical, Image as ImageIcon, Lock, Maximize2, Move3d, Music2, Pencil, RefreshCw, ScanSearch, Settings2, Star, Trash2, Video, WandSparkles } from "lucide-react";
 
 import { useCanvasNodeActions } from "./canvas-node-action-context";
+import { announce } from "@/lib/announce";
 import { shouldBlockManualRetry } from "@/lib/generation-error";
 
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -87,6 +88,15 @@ type CanvasNodeProps = {
     onContextMenu: (event: React.MouseEvent, nodeId: string) => void;
 };
 
+/** 创建后这段时间内挂载的节点视为「刚出现」，播放一次入场。 */
+const FRESH_NODE_WINDOW_MS = 1500;
+
+function isFreshCanvasNode(createdAt: string | undefined) {
+    const created = createdAt ? Date.parse(createdAt) : Number.NaN;
+    const age = Date.now() - created;
+    return Number.isFinite(created) && age >= 0 && age < FRESH_NODE_WINDOW_MS;
+}
+
 export const CanvasNode = React.memo(function CanvasNode({
     data,
     dragOffset,
@@ -147,6 +157,23 @@ export const CanvasNode = React.memo(function CanvasNode({
 }: CanvasNodeProps) {
     const theme = canvasThemes[useActiveTheme()];
     const [hovered, setHovered] = useState(false);
+    // 刚创建的节点（手动新建、粘贴、生成结果落到画布）挂载时放大淡入一次，交代它从哪出现；
+    // 平移时进入视野而重新挂载的旧节点不播，否则一拖画布满屏都在动。
+    const [fresh] = useState(() => isFreshCanvasNode(data.createdAt));
+    // 生成从进行中变成完成或失败的那一刻：描边亮一下、结果淡入，并播报给读屏。只认这一次状态切换，
+    // 平移时重新挂载的节点状态本来就是完成，不会再播。
+    const status = data.metadata?.status;
+    const previousStatus = useRef(status);
+    const [settled, setSettled] = useState<"completed" | "failed" | null>(null);
+    useEffect(() => {
+        const previous = previousStatus.current;
+        previousStatus.current = status;
+        if (previous !== "loading" || (status !== "success" && status !== "error")) return;
+        setSettled(status === "success" ? "completed" : "failed");
+        announce(status === "success" ? `${data.title}已生成` : `${data.title}生成失败`);
+        const timer = window.setTimeout(() => setSettled(null), 2400);
+        return () => window.clearTimeout(timer);
+    }, [status]);
     const [isEditingContent, setIsEditingContent] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [titleDraft, setTitleDraft] = useState(data.title);
@@ -306,6 +333,8 @@ export const CanvasNode = React.memo(function CanvasNode({
             data-canvas-node-type={data.type}
             data-canvas-parent-id={data.parentId || undefined}
             data-node-selected={isSelected ? "true" : "false"}
+            data-node-fresh={fresh ? "true" : undefined}
+            data-node-dragging={dragOffset ? "true" : undefined}
             data-node-state={nodeState}
             data-node-status={data.metadata?.status || "idle"}
             data-media-role={canvasMediaNodeRole(data) || undefined}
@@ -371,6 +400,7 @@ export const CanvasNode = React.memo(function CanvasNode({
             <div
                 className="canvas-node-shell relative h-full w-full overflow-visible rounded-[var(--node-radius)]"
                 data-node-selected={isSelected ? "true" : "false"}
+                data-node-settled={settled ?? undefined}
                 data-node-state={nodeState}
                 data-connection-tilt={connectionTilt ? "true" : undefined}
                 data-state={data.metadata?.status || (isActive ? "active" : isRelated ? "related" : "idle")}
@@ -379,6 +409,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                     // 固定占位但不绘制描边，避免聚焦切换时边框宽度变化造成白边跳动。
                     border: isComposerNode || isDirectorNode ? "0" : `1px solid ${isSelected || isFocusRelated || isConnectionTarget ? theme.node.activeStroke : "transparent"}`,
                     boxShadow: isComposerNode || isDirectorNode ? "none" : isSelected || isFocusRelated ? theme.node.hoverShadow : theme.node.shadow,
+                    "--node-accent": theme.accent.primary,
                     "--connection-tilt-x": `${connectionTilt?.rotateX || 0}deg`,
                     "--connection-tilt-y": `${connectionTilt?.rotateY || 0}deg`,
                     transformOrigin: connectionTilt?.origin,
@@ -422,8 +453,9 @@ export const CanvasNode = React.memo(function CanvasNode({
                             "--batch-from-x": `${batchMotion?.x || 0}px`,
                             "--batch-from-y": `${batchMotion?.y || 0}px`,
                             "--batch-from-rotate": `${6 + (batchMotion?.index || 0) * 4}deg`,
-                            animation: isBatchChild && (batchClosing || batchOpening) ? (batchClosing ? `canvas-batch-child-out var(--motion-dur-base-calc) var(--motion-ease-in-out) both` : `canvas-batch-child-in var(--motion-dur-slow-calc) var(--motion-ease-out) both`) : undefined,
-                            animationDelay: isBatchChild && (batchClosing || batchOpening) ? `${batchClosing ? 0 : 45 + (batchMotion?.index || 0) * 24}ms` : undefined,
+                            animation: isBatchChild && (batchClosing || batchOpening) ? (batchClosing ? `canvas-batch-child-out var(--motion-panel) var(--ease-in) both` : `canvas-batch-child-in var(--motion-stage) var(--ease-spring) both`) : undefined,
+                            // 错峰总长不超过 120ms，后面的子项不再越排越晚。
+                            animationDelay: isBatchChild && (batchClosing || batchOpening) ? `${batchClosing ? 0 : Math.min(120, (batchMotion?.index || 0) * 24)}ms` : undefined,
                         } as React.CSSProperties
                     }
                 >
@@ -498,7 +530,7 @@ export const CanvasNode = React.memo(function CanvasNode({
 
                 {data.type === CanvasNodeType.Text && data.metadata?.workflowKind !== "character" && !readOnly ? (
                     <div
-                        className={`canvas-node-inline-edit absolute bottom-[10%] left-1/2 z-[var(--node-z-overlay)] -translate-x-1/2 motion-safe:transition motion-safe:duration-200 ${isSelected ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}
+                        className={`canvas-node-inline-edit absolute bottom-[10%] left-1/2 z-[var(--node-z-overlay)] -translate-x-1/2 motion-safe:transition motion-safe:duration-(--motion-state) ${isSelected ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}
                         aria-hidden={!isSelected}
                         onMouseDown={(event) => event.stopPropagation()}
                         onPointerDown={(event) => event.stopPropagation()}
@@ -887,7 +919,7 @@ function ConnectionSideRail({ side, scale, theme, visible = false, onPointerDown
         <button
             type="button"
             data-canvas-connection-rail={side}
-            className={`group pointer-events-auto absolute top-1/2 z-[var(--node-z-overlay)] flex -translate-y-1/2 items-center justify-center touch-none cursor-crosshair rounded-full outline-none transition-opacity duration-150 ${visible || railHovered ? "opacity-100" : "opacity-0"}`}
+            className={`group pointer-events-auto absolute top-1/2 z-[var(--node-z-overlay)] flex -translate-y-1/2 items-center justify-center touch-none cursor-crosshair rounded-full outline-none transition-opacity duration-(--motion-instant) ${visible || railHovered ? "opacity-100" : "opacity-0"}`}
             style={{ width: railSize, height: `min(100%, ${railSize}px)`, cursor: "crosshair", ...(side === "left" ? { right: "100%" } : { left: "100%" }) }}
             onPointerEnter={(event) => {
                 setRailHovered(true);
@@ -905,7 +937,7 @@ function ConnectionSideRail({ side, scale, theme, visible = false, onPointerDown
         >
             <span
                 ref={handleRef}
-                className="absolute left-1/2 top-1/2 block transition-transform duration-[80ms] ease-out group-hover:brightness-125 group-focus-visible:brightness-125"
+                className="absolute left-1/2 top-1/2 block transition-transform duration-(--motion-press) ease-(--ease-out) group-hover:brightness-125 group-focus-visible:brightness-125"
                 style={{
                     display: visible || railHovered ? undefined : "none",
                     width: handleSize,

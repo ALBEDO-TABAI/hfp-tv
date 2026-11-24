@@ -9,7 +9,7 @@ import { ApiError } from "@/services/api/request";
 import { resourceFileUrl } from "@/services/api/resources";
 import { getWorkshopOrigin, preflightWorkshop, submitWorkshop, workshopQueryKey } from "@/services/api/workshop";
 
-export function WorkshopSubmitDialog({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+export function WorkshopSubmitDialog({ projectId, open = true, onClose, afterClose }: { projectId: string; open?: boolean; onClose: () => void; afterClose?: () => void }) {
     const { message } = App.useApp();
     const client = useQueryClient();
     const [step, setStep] = useState(0);
@@ -41,7 +41,7 @@ export function WorkshopSubmitDialog({ projectId, onClose }: { projectId: string
         },
     });
     const blocked = !preflight.data || preflight.isError || preflight.isFetching || preflight.data.issues.some((issue) => issue.level === "error");
-    return <AppModal flush open width={720} footer={null} onCancel={() => { if (!submit.isPending) onClose(); }} maskClosable={!submit.isPending} keyboard={!submit.isPending} closable={!submit.isPending}>
+    return <AppModal flush open={open} afterClose={afterClose} width={720} footer={null} onCancel={() => { if (!submit.isPending) onClose(); }} maskClosable={!submit.isPending} keyboard={!submit.isPending} closable={!submit.isPending}>
         <div className="space-y-5 p-6">
             <h2 className="text-lg font-medium">投稿到创意工坊</h2>
             {submit.isSuccess ? <div className="space-y-4"><p role="status">已提交，等待审核</p><Space><Link to="/workshop?tab=mine" onClick={onClose}>查看我的投稿 →</Link><Button onClick={onClose}>完成</Button></Space></div> : <>

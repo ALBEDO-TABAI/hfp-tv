@@ -232,7 +232,7 @@ const PanoramaSetupForm = memo(
                         ref={trackImageReady(image.id)}
                         onLoad={() => markImageLoaded(image.id)}
                         onError={() => markImageFailed(image.id)}
-                        className={`h-full w-full object-cover transition-opacity duration-300 ${loaded && !failed ? "opacity-100" : "opacity-0"}`}
+                        className={`h-full w-full object-cover transition-opacity duration-(--motion-stage) ${loaded && !failed ? "opacity-100" : "opacity-0"}`}
                     />
                     {!failed && !loaded && <div className="absolute inset-0 animate-pulse bg-foreground/5" />}
                     {failed && (
@@ -298,7 +298,7 @@ const PanoramaSetupForm = memo(
                                         type="button"
                                         aria-pressed={sourceMode === "ai"}
                                         onClick={() => setSourceMode("ai")}
-                                        className={`flex items-center gap-2 rounded-[var(--r-md)] px-2.5 py-2 text-left transition-all ${
+                                        className={`flex items-center gap-2 rounded-[var(--r-md)] px-2.5 py-2 text-left transition-colors ${
                                             sourceMode === "ai"
                                                 ? "bg-accent text-white"
                                                 : "bg-foreground/5 text-foreground hover:bg-foreground/10"
@@ -314,7 +314,7 @@ const PanoramaSetupForm = memo(
                                         type="button"
                                         aria-pressed={sourceMode === "image"}
                                         onClick={() => setSourceMode("image")}
-                                        className={`flex items-center gap-2 rounded-[var(--r-md)] px-2.5 py-2 text-left transition-all ${
+                                        className={`flex items-center gap-2 rounded-[var(--r-md)] px-2.5 py-2 text-left transition-colors ${
                                             sourceMode === "image"
                                                 ? "bg-accent text-white"
                                                 : "bg-foreground/5 text-foreground hover:bg-foreground/10"
@@ -375,7 +375,7 @@ const PanoramaSetupForm = memo(
                                                 type="button"
                                                 aria-pressed={selected}
                                                 onClick={() => setProjection(option.value)}
-                                                className={`flex items-center gap-2 rounded-[var(--r-md)] px-2.5 py-2 text-left transition-all ${
+                                                className={`flex items-center gap-2 rounded-[var(--r-md)] px-2.5 py-2 text-left transition-colors ${
                                                     selected
                                                         ? "bg-accent text-white"
                                                         : "bg-foreground/5 text-foreground hover:bg-foreground/10"

@@ -9,7 +9,7 @@ type FullScreenLoaderProps = {
     className?: string;
 };
 
-export function FullScreenLoader({ label = "正在恢复工作区", detail = "同步账号、模型和项目数据", className }: FullScreenLoaderProps) {
+export function FullScreenLoader({ label = "正在打开工作区", detail = "同步账号、模型和项目数据", className }: FullScreenLoaderProps) {
     return (
         <div
             data-full-screen-loader
@@ -31,7 +31,8 @@ export function WorkspaceRouteLoader({ label = "正在打开页面" }: { label?:
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
-        const timer = window.setTimeout(() => setVisible(true), 140);
+        // 加载很快时不闪：200ms 内到达的页面不出现加载画面。
+        const timer = window.setTimeout(() => setVisible(true), 200);
         return () => window.clearTimeout(timer);
     }, []);
 

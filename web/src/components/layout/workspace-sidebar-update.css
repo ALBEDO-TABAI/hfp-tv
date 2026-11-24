@@ -28,19 +28,19 @@
 }
 
 .app-workspace-sidebar-utility-row:not(.is-collapsed) > .app-workspace-update {
-    grid-column: 1 / span 4;
+    grid-column: 1 / span 3;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0;
 }
 
 .app-workspace-sidebar-utility-row:not(.is-collapsed) .app-workspace-update-version {
-    grid-column: 1 / span 3;
+    grid-column: 1 / span 2;
     padding-left: 10px;
 }
 
 .app-workspace-sidebar-utility-row:not(.is-collapsed) .app-workspace-update-progress {
-    grid-column: 4;
+    grid-column: 3;
     justify-self: center;
     margin-left: 0;
 }
@@ -69,6 +69,16 @@
     justify-self: center;
     align-self: start;
     margin-top: 2px;
+}
+
+.app-workspace-sidebar-utility-row:not(.is-collapsed) > .app-workspace-effects-action {
+    grid-column: 4;
+}
+
+/* 流畅模式开着时保持选中底色，和悬停区分开：悬停是临时的，这里是持久状态。 */
+.app-workspace-effects-action[aria-pressed="true"] {
+    background: var(--user-surface-muted, color-mix(in srgb, var(--foreground) 6%, transparent));
+    color: var(--user-ink, var(--foreground));
 }
 
 .app-workspace-update {
@@ -204,10 +214,12 @@
 
 .app-workspace-update-progress-bar > span {
     display: block;
+    width: 100%;
     height: 100%;
     border-radius: inherit;
     background: var(--user-accent, var(--primary));
-    transition: width 160ms ease;
+    transform-origin: left;
+    transition: transform var(--motion-state) var(--ease-out);
 }
 
 .app-workspace-update-progress-bar.is-paused > span {

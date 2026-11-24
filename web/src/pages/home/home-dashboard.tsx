@@ -1,10 +1,13 @@
 import { ArrowRight, Plus, RefreshCw } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import type { CanvasLibrarySummary } from "@/services/api/workspace-data";
 import { ProjectPreview } from "@/components/canvas/canvas-project-card";
 import { beefTVCapabilityItems } from "./home-data";
 import { HomeWorkshop } from "./home-workshop";
 import { usePlatformSession } from "@/stores/use-platform-session";
+import { useThemeStore } from "@/stores/use-theme-store";
+import { initHfpGlassRuntime } from "@/lib/hfp-glass";
 
 function formatDate(value: string) {
     const date = new Date(value);
@@ -16,9 +19,16 @@ export function HomeDashboard({ projects, loading, error, onRetry }: { projects:
     const navigate = useNavigate();
     const latestProject = projects[0];
     const { mode, me } = usePlatformSession();
+    // 玻璃卡片只在首页：在这里启动玻璃运行时，离开首页或开启流畅模式时清理。
+    const homeRef = useRef<HTMLElement>(null);
+    const lite = useThemeStore((state) => state.effects === "lite");
+    useEffect(() => {
+        if (lite || !homeRef.current) return;
+        return initHfpGlassRuntime(homeRef.current);
+    }, [lite]);
 
     return (
-        <main className="beeftv-home hfp-home" aria-label="hfp - all in one 首页">
+        <main ref={homeRef} className="beeftv-home hfp-home" aria-label="hfp - all in one 首页">
             <div className="hfp-home-container">
                 {/* Editorial Masthead — Ready Library Hero Grammar */}
                 <header className="hfp-hero-masthead">
@@ -70,7 +80,7 @@ export function HomeDashboard({ projects, loading, error, onRetry }: { projects:
                     </div>
 
                     <button type="button" className="beeftv-home-create hfp-hero-draw-btn lg ink draw press" onClick={() => navigate("/canvas?mode=new")} aria-label="新建画布创作">
-                        <span className="led busy" aria-hidden="true" />
+                        <span className="led" aria-hidden="true" />
                         <span className="beeftv-home-create-icon hfp-draw-plus"><Plus /></span>
                         <span className="beeftv-home-create-title">新建画布创作</span>
                         <kbd className="kbd">↵</kbd>

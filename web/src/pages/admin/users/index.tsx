@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Alert, App, Button, Form, Input, InputNumber, Popconfirm, Select, Space, Table, Tabs, Tag, Typography } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { platformErrorMessage, platformPasswordRules, platformUsernameRules } from "@/lib/platform-account";
 import {
@@ -36,6 +37,7 @@ export default function AdminUsersPage() {
     const [form] = Form.useForm<FormValues>();
     const users = useQuery({ queryKey: usersKey, queryFn: listPlatformUsers });
     const audit = useQuery({ queryKey: auditKey, queryFn: listPlatformAudit, enabled: tab === "audit" });
+    const activeList = tab === "audit" ? audit : users;
     const refresh = async () => {
         await Promise.all([client.invalidateQueries({ queryKey: usersKey }), client.invalidateQueries({ queryKey: auditKey })]);
     };
@@ -90,12 +92,12 @@ export default function AdminUsersPage() {
     return <main className="app-workspace-page flex h-full min-h-0 flex-col overflow-y-auto p-6" style={{ color: "var(--ink)" }}>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-medium">用户管理</h1>
-            <Space><Button onClick={() => openEditor({ kind: "invite" })} disabled={busy}>创建邀请</Button><Button type="primary" onClick={() => openEditor({ kind: "create" })} disabled={busy}>创建用户</Button></Space>
+            <Space><Button icon={<RefreshCw className="size-[1em]" />} loading={activeList.isRefetching} onClick={() => void activeList.refetch()}>刷新</Button><Button onClick={() => openEditor({ kind: "invite" })} disabled={busy}>创建邀请</Button><Button type="primary" onClick={() => openEditor({ kind: "create" })} disabled={busy}>创建用户</Button></Space>
         </div>
         <Tabs activeKey={tab} onChange={setTab} items={[
             { key: "users", label: "用户", children: <>
                 {users.isError && <Alert type="error" showIcon title={platformErrorMessage(users.error)} action={<Button onClick={() => void users.refetch()}>重试</Button>} className="mb-4" />}
-                <Table<AdminUser> rowKey="id" dataSource={users.data?.items} loading={users.isFetching} scroll={{ x: 1050 }} pagination={{ pageSize: 20 }} columns={[
+                <Table<AdminUser> rowKey="id" dataSource={users.data?.items} loading={{ spinning: users.isPending, delay: 200 }} scroll={{ x: 1050 }} pagination={{ pageSize: 20 }} columns={[
                     { title: "用户名", key: "username", render: (_, user) => <Space size={6}>{user.username}{user.source === "file" && <Tag title="密码、密钥和启停由服务器上的账号文件管理">账号文件</Tag>}</Space> },
                     { title: "显示名称", dataIndex: "displayName" },
                     { title: "角色", key: "role", render: (_, user) => user.role === "admin" ? "管理员" : "成员" },
@@ -121,7 +123,7 @@ export default function AdminUsersPage() {
             </> },
             { key: "audit", label: "操作记录", children: <>
                 {audit.isError && <Alert type="error" showIcon title={platformErrorMessage(audit.error)} action={<Button onClick={() => void audit.refetch()}>重试</Button>} className="mb-4" />}
-                <Table rowKey="id" dataSource={audit.data?.items} loading={audit.isFetching} scroll={{ x: 700 }} pagination={{ pageSize: 20 }} columns={[
+                <Table rowKey="id" dataSource={audit.data?.items} loading={{ spinning: audit.isPending, delay: 200 }} scroll={{ x: 700 }} pagination={{ pageSize: 20 }} columns={[
                     { title: "时间", dataIndex: "createdAt", render: time },
                     { title: "操作人", dataIndex: "actorUsername" },
                     { title: "操作", dataIndex: "action", render: (action: string) => auditActions[action] ?? action },

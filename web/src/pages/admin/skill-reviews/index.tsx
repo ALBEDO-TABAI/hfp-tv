@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, App, Button, Form, Input, Popconfirm, Select, Skeleton, Space, Table, Tabs } from "antd";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 import { AppDrawer } from "@/components/ui/product/app-drawer";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { platformErrorMessage } from "@/lib/platform-account";
@@ -12,6 +13,7 @@ import {
     listSkillSubmissions, rejectSkillSubmission, relistMarketSkill, unlistMarketSkill,
     type MarketSkillSummary, type SkillSubmissionSummary,
 } from "@/services/api/platform";
+import { useClosingValue } from "@/hooks/use-closing-value";
 
 const submissionsKey = ["platform", "skill-submissions"];
 const skillsKey = ["platform", "market-skills"];
@@ -25,9 +27,11 @@ export default function AdminSkillReviewsPage() {
     const client = useQueryClient();
     const [tab, setTab] = useState("pending");
     const [selected, setSelected] = useState<string | null>(null);
+    const drawer = useClosingValue(selected);
     const status = tab === "processed" ? "processed" : "pending";
-    const submissions = useQuery({ queryKey: [...submissionsKey, status], queryFn: ({ signal }) => listSkillSubmissions(status, signal), enabled: tab !== "skills" });
+    const submissions = useQuery({ queryKey: [...submissionsKey, status], queryFn: ({ signal }) => listSkillSubmissions(status, signal), enabled: tab !== "skills", placeholderData: keepPreviousData });
     const skills = useQuery({ queryKey: skillsKey, queryFn: ({ signal }) => listAdminMarketSkills(signal), enabled: tab === "skills" });
+    const activeList = tab === "skills" ? skills : submissions;
     const listing = useMutation({
         mutationFn: (skill: MarketSkillSummary) => skill.listed ? unlistMarketSkill(skill.skillId) : relistMarketSkill(skill.skillId),
         onSuccess: async () => { message.success("已保存"); await client.invalidateQueries({ queryKey: skillsKey }); },
@@ -36,12 +40,12 @@ export default function AdminSkillReviewsPage() {
     return <main className="app-workspace-page flex h-full min-h-0 flex-col overflow-y-auto p-6" style={{ color: "var(--ink)" }}>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-medium">技能审核</h1>
-            <Button onClick={() => void (tab === "skills" ? skills.refetch() : submissions.refetch())}>刷新</Button>
+            <Button icon={<RefreshCw className="size-[1em]" />} loading={activeList.isRefetching} onClick={() => void activeList.refetch()}>刷新</Button>
         </div>
         <Tabs activeKey={tab} onChange={setTab} items={[{ key: "pending", label: "待审核" }, { key: "processed", label: "已处理" }, { key: "skills", label: "已发布技能" }]} />
         {tab === "skills" ? <>
             {skills.isError && <Alert type="error" showIcon title={platformErrorMessage(skills.error)} className="mb-4" />}
-            <Table<MarketSkillSummary> rowKey="skillId" dataSource={skills.data?.items} loading={skills.isFetching} scroll={{ x: 900 }} pagination={{ pageSize: 20 }} columns={[
+            <Table<MarketSkillSummary> rowKey="skillId" dataSource={skills.data?.items} loading={{ spinning: skills.isPending, delay: 200 }} scroll={{ x: 900 }} pagination={{ pageSize: 20 }} columns={[
                 { title: "名称", dataIndex: "name" },
                 { title: "作者", dataIndex: "ownerUsername" },
                 { title: "版本", dataIndex: "versionLabel" },
@@ -54,21 +58,23 @@ export default function AdminSkillReviewsPage() {
             ]} />
         </> : <>
             {submissions.isError && <Alert type="error" showIcon title={platformErrorMessage(submissions.error)} className="mb-4" />}
-            <Table<SkillSubmissionSummary> rowKey="id" dataSource={submissions.data?.items} loading={submissions.isFetching} scroll={{ x: 1000 }} pagination={{ pageSize: 20 }} onRow={(submission) => ({ onClick: () => setSelected(submission.id) })} columns={[
-                { title: "标题", key: "name", render: (_, submission) => <Button type="link" onClick={() => setSelected(submission.id)}>{submission.metadata.name}</Button> },
-                { title: "作者", key: "author", render: (_, submission) => `${submission.author.displayName} (${submission.author.username})` },
-                { title: "投稿目标", key: "target", render: (_, submission) => submission.target === "new" ? "新技能" : `更新 · ${submission.currentSkillName || submission.skillId}` },
-                { title: "版本", key: "version", render: (_, submission) => submission.metadata.versionLabel },
-                { title: "投稿时间", dataIndex: "submittedAt", render: time },
-                { title: "状态", key: "status", render: (_, submission) => statuses[submission.status] },
-                { title: "审核意见", dataIndex: "reviewReason" },
-            ]} />
+            <div inert={submissions.isPlaceholderData} aria-busy={submissions.isPlaceholderData} className={`transition-opacity duration-(--motion-instant) ease-(--ease-out) ${submissions.isPlaceholderData ? "opacity-60" : "opacity-100"}`}>
+                <Table<SkillSubmissionSummary> rowKey="id" dataSource={submissions.data?.items} loading={{ spinning: submissions.isPending, delay: 200 }} scroll={{ x: 1000 }} pagination={{ pageSize: 20 }} onRow={(submission) => ({ onClick: () => setSelected(submission.id) })} columns={[
+                    { title: "标题", key: "name", render: (_, submission) => <Button type="link" onClick={() => setSelected(submission.id)}>{submission.metadata.name}</Button> },
+                    { title: "作者", key: "author", render: (_, submission) => `${submission.author.displayName} (${submission.author.username})` },
+                    { title: "投稿目标", key: "target", render: (_, submission) => submission.target === "new" ? "新技能" : `更新 · ${submission.currentSkillName || submission.skillId}` },
+                    { title: "版本", key: "version", render: (_, submission) => submission.metadata.versionLabel },
+                    { title: "投稿时间", dataIndex: "submittedAt", render: time },
+                    { title: "状态", key: "status", render: (_, submission) => statuses[submission.status] },
+                    { title: "审核意见", dataIndex: "reviewReason" },
+                ]} />
+            </div>
         </>}
-        {selected && <SubmissionDrawer key={selected} id={selected} onClose={() => setSelected(null)} />}
+        {drawer.shown && <SubmissionDrawer key={drawer.shown} id={drawer.shown} open={drawer.open} afterClose={drawer.afterClose} onClose={() => setSelected(null)} />}
     </main>;
 }
 
-function SubmissionDrawer({ id, onClose }: { id: string; onClose: () => void }) {
+function SubmissionDrawer({ id, open, onClose, afterClose }: { id: string; open: boolean; onClose: () => void; afterClose: () => void }) {
     const { message } = App.useApp();
     const client = useQueryClient();
     const [path, setPath] = useState<string | null>(null);
@@ -108,7 +114,7 @@ function SubmissionDrawer({ id, onClose }: { id: string; onClose: () => void }) 
     const busy = review.isPending || detail.isFetching;
     const metadata = submission?.metadata;
     const files = detail.data ? diffMarketFiles(detail.data.files, detail.data.previousRelease?.files || []) : [];
-    return <AppDrawer open title="稿件详情" width={760} onClose={() => { if (!review.isPending) onClose(); }}>
+    return <AppDrawer open={open} afterOpenChange={(next) => { if (!next) afterClose(); }} title="稿件详情" width={760} onClose={() => { if (!review.isPending) onClose(); }}>
         {conflict && <Alert type="warning" title="作者已更新稿件，请刷新后重新审核" className="mb-4" />}
         {detail.isError ? <Alert type="error" title={platformErrorMessage(detail.error)} action={<Button onClick={() => void detail.refetch()}>刷新</Button>} /> : detail.isPending ? <Skeleton active /> : submission && metadata && <div className="space-y-4" style={{ overflowWrap: "anywhere" }}>
             <h2 className="text-lg font-medium">{metadata.name}</h2>

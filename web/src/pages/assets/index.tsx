@@ -3,11 +3,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Drawer, Dropdown, Form, Input, Modal, Popover, Progress, Select, Space, Tag, Typography } from "antd";
 import type { MenuProps } from "antd";
+import { nanoid } from "nanoid";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { CollectionGrid, PageHeader, PaginationBar, WorkspacePage } from "@/components/layout/workspace-page";
 import { ExpandableSearch } from "@/components/layout/expandable-search";
 import { WorkspaceErrorState, WorkspaceLoadingState, WorkspaceState } from "@/components/layout/workspace-state";
+import { SelectionCapsule, SelectionCapsuleSpacer } from "@/components/ui/product/selection-capsule";
 import { AssetMediaPreview } from "@/components/asset-media-preview";
 import { CachedResourceImage } from "@/components/cached-resource-image";
 import { AssetLibraryCard, AssetLibraryCardMedia } from "@/components/assets/asset-library-card";
@@ -403,18 +405,23 @@ function AssetsPageSession() {
     };
 
     const uploadFiles = async (files: File[], folderId: string) => {
-        const hideLoading = message.loading("正在上传素材…", 0);
+        const key = `asset-upload:${nanoid()}`;
+        const hideLoading = message.loading({ key, content: "正在上传素材…", duration: 0 });
+        let loadingReplaced = false;
         try {
             const result = await uploadWorkspaceAssetFiles(files, folderId, entryScope);
             if (!userScopeMatches(entryScope)) return;
             if (result.persistenceError) message.warning(localSavedRemotePendingMessage("部分素材已保存在本地", result.persistenceError));
-            else if (result.completed) message.success(`已上传 ${result.completed} 个素材`);
+            else if (result.completed) {
+                message.success({ key, content: `已上传 ${result.completed} 个素材` });
+                loadingReplaced = true;
+            }
             if (result.failed) message.error(`${result.failed} 个素材上传失败`);
             await invalidateAssetLibrary(entryScope);
         } catch (error) {
             if (!shouldSuppressAssetViewError(error, entryScope)) message.error(error instanceof Error ? error.message : "上传失败");
         } finally {
-            hideLoading();
+            if (!loadingReplaced) hideLoading();
         }
     };
 
@@ -1074,18 +1081,6 @@ function AssetsPageSession() {
                             </div>
                         </aside>
                         <section className="min-w-0">
-                            {selectedAssets.length ? (
-                                <AssetsBatchBar
-                                    count={selectedAssets.length}
-                                    allSelected={allFilteredSelected}
-                                    onSelectAll={() => setSelectedIds((current) => Array.from(new Set([...current, ...visibleAssetIds])))}
-                                    onClear={() => setSelectedIds([])}
-                                    onExport={() => void exportSelectedAssets()}
-                                    onDelete={() => setBatchDeleteOpen(true)}
-                                    folderOptions={folderSelectOptions}
-                                    onMoveToFolder={(folderId) => void moveSelectedAssetsToFolder(selectedAssets.map((asset) => asset.id), folderId)}
-                                />
-                            ) : null}
                             {canonicalReads && assetPageQuery.isError ? (
                                 <WorkspaceErrorState compact title="素材读取失败" description="请稍后重试。" actionLabel="重试" onRetry={() => void assetPageQuery.refetch()} />
                             ) : canonicalReads && !remoteReady ? (
@@ -1129,6 +1124,7 @@ function AssetsPageSession() {
                                             setPageSize(nextPageSize);
                                         }}
                                     />
+                                    <SelectionCapsuleSpacer active={selectedAssets.length > 0} />
                                 </>
                             )}
                         </section>
@@ -1149,6 +1145,17 @@ function AssetsPageSession() {
                     </div>
                 </aside>
             </WorkspacePage>
+
+            <AssetsBatchBar
+                count={selectedAssets.length}
+                allSelected={allFilteredSelected}
+                onSelectAll={() => setSelectedIds((current) => Array.from(new Set([...current, ...visibleAssetIds])))}
+                onClear={() => setSelectedIds([])}
+                onExport={() => void exportSelectedAssets()}
+                onDelete={() => setBatchDeleteOpen(true)}
+                folderOptions={folderSelectOptions}
+                onMoveToFolder={(folderId) => void moveSelectedAssetsToFolder(selectedAssets.map((asset) => asset.id), folderId)}
+            />
 
             <Modal
                 className="workspace-modal workspace-modal-wide library-modal"
@@ -1544,31 +1551,27 @@ function AssetsBatchBar({
     onMoveToFolder: (folderId: string) => void;
 }) {
     return (
-        <div className="assets-batch-bar" role="toolbar" aria-label="批量操作">
-            <span className="assets-batch-count">
-                已选择 <strong>{count}</strong> 个素材
-            </span>
-            <div className="assets-batch-actions">
-                <Button size="small" icon={<CheckCheck className="size-3.5" />} disabled={allSelected} onClick={onSelectAll}>
-                    全选
-                </Button>
-                <Button size="small" onClick={onClear}>
-                    取消选择
-                </Button>
-                <Button size="small" icon={<Download className="size-3.5" />} onClick={onExport}>
-                    导出
-                </Button>
-                <Dropdown
-                    trigger={["click"]}
-                    menu={{ items: folderOptions.map((folder) => ({ key: folder.value || "uncategorized", label: folder.label, onClick: () => onMoveToFolder(folder.value) })) }}
-                >
-                    <Button size="small" icon={<FolderOpen className="size-3.5" />}>移动到文件夹</Button>
-                </Dropdown>
-                <Button size="small" danger icon={<Trash2 className="size-3.5" />} onClick={onDelete}>
-                    永久删除
-                </Button>
-            </div>
-        </div>
+        <SelectionCapsule open={count > 0} label="素材批量操作" summary={`已选 ${count} 个素材`} onClear={onClear}>
+            <Button size="small" icon={<CheckCheck className="size-3.5" />} disabled={allSelected} onClick={onSelectAll}>
+                全选
+            </Button>
+            <Button size="small" onClick={onClear}>
+                取消选择
+            </Button>
+            <Button size="small" icon={<Download className="size-3.5" />} onClick={onExport}>
+                导出
+            </Button>
+            <Dropdown
+                trigger={["click"]}
+                placement="topLeft"
+                menu={{ items: folderOptions.map((folder) => ({ key: folder.value || "uncategorized", label: folder.label, onClick: () => onMoveToFolder(folder.value) })) }}
+            >
+                <Button size="small" icon={<FolderOpen className="size-3.5" />}>移动到文件夹</Button>
+            </Dropdown>
+            <Button size="small" danger icon={<Trash2 className="size-3.5" />} onClick={onDelete}>
+                永久删除
+            </Button>
+        </SelectionCapsule>
     );
 }
 

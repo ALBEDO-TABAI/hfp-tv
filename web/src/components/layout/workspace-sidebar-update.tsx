@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Popover } from "antd";
-import { useReducedMotion } from "motion/react";
+import { useReducedMotionConfig } from "motion/react";
 import { Download, LoaderCircle, RotateCcw } from "lucide-react";
 import { AppModal } from "@/components/ui/product/app-modal";
 
@@ -45,7 +45,7 @@ function statusLine(state: DesktopUpdateState, persistBusy: boolean, latest: str
 }
 
 export function WorkspaceSidebarUpdate({ collapsed }: { collapsed: boolean }) {
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     const updater = useDesktopUpdate();
     const { state, persistBusy, actionBusy, runtime } = updater;
     const [saveWarningOpen, setSaveWarningOpen] = useState(false);
@@ -129,7 +129,7 @@ function UpdateProgressBar({ state, percent, reducedMotion, paused }: { state: D
             aria-valuenow={percent ?? undefined}
             aria-valuetext={state.phase === "extracting" ? desktopUpdateDetailLabel(state) : desktopUpdateProgressLabel(state)}
         >
-            <span style={{ width: `${percent ?? (reducedMotion ? 100 : 32)}%` }} />
+            <span style={{ transform: `scaleX(${(percent ?? (reducedMotion ? 100 : 32)) / 100})` }} />
         </span>
     );
 }

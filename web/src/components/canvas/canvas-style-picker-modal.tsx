@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Clock3, Copy, Eye, Palette, Pencil, Plus, Search, SlidersHorizontal, Star, Trash2, UserRound } from "lucide-react";
 import { App, Button, Input } from "antd";
-import { AppModal } from "@/components/ui/product/app-modal";
+import { AppModal, useAppModal } from "@/components/ui/product/app-modal";
 import { nanoid } from "nanoid";
 
 import { StyleProfileEditorModal } from "@/components/canvas/style-profile-editor-modal";
@@ -437,7 +437,8 @@ export function CanvasStylePickerModal({ open, value, currentProfile, startInEdi
     onClose: () => void;
     onSelect: (preset: CanvasStylePreset) => void;
 }) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const queryClient = useQueryClient();
     const theme = canvasThemes[useActiveTheme()];
     const localMode = isLocalWorkspaceMode();

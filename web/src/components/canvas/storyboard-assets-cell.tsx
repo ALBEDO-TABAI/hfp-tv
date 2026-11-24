@@ -1,4 +1,5 @@
-import { Modal } from "antd";
+import { AppModal } from "@/components/ui/product/app-modal";
+
 import { Tooltip } from "@/components/ui/base/tooltip";
 import { useEffect, useMemo, useState } from "react";
 
@@ -76,7 +77,7 @@ function AssetThumbnail({ node }: { node: CanvasNodeData }) {
 function AssetPreviewModal({ node, onClose }: { node: CanvasNodeData | null; onClose: () => void }) {
     const source = useNodeMediaSource(node);
     return (
-        <Modal title={node?.title || "资产预览"} open={Boolean(node)} onCancel={onClose} footer={null} width={880} centered destroyOnHidden>
+        <AppModal title={node?.title || "资产预览"} open={Boolean(node)} onCancel={onClose} footer={null} width={880} centered destroyOnHidden>
             {node ? (
                 <div className="grid min-h-56 place-items-center overflow-hidden rounded-lg bg-black/[0.035] p-3 dark:bg-white/[0.035]" data-canvas-no-zoom>
                     {node.type === CanvasNodeType.Video && source ? <video src={source} controls autoPlay playsInline className="max-h-[68vh] max-w-full rounded-md" />
@@ -85,7 +86,7 @@ function AssetPreviewModal({ node, onClose }: { node: CanvasNodeData | null; onC
                                 : <span className="text-sm text-foreground/45">当前资产没有可预览的媒体内容</span>}
                 </div>
             ) : null}
-        </Modal>
+        </AppModal>
     );
 }
 

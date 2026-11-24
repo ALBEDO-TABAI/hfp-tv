@@ -1,9 +1,11 @@
 import { Command, Home, Search, X } from "lucide-react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { useNavigate } from "react-router";
 
 import { navigationTools } from "@/constant/navigation-tools";
 import { Kbd } from "@/components/ui/base/kbd";
+import { motionPreset, motionTransition } from "@/lib/motion-tokens";
 import { cn } from "@/lib/utils";
 
 type PaletteEntry = {
@@ -16,7 +18,12 @@ type PaletteEntry = {
 
 /** 顶栏搜索 / ⌘K 命令面板：按功能开关过滤当前可用页面入口。 */
 export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+    return <AnimatePresence>{open ? <CommandPaletteContent onClose={onClose} /> : null}</AnimatePresence>;
+}
+
+function CommandPaletteContent({ onClose }: { onClose: () => void }) {
     const navigate = useNavigate();
+    const isPresent = useIsPresent();
     const [query, setQuery] = useState("");
     const [highlight, setHighlight] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -52,18 +59,18 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
     };
 
     useEffect(() => {
-        if (open) {
+        if (isPresent) {
             setQuery("");
-            window.setTimeout(() => inputRef.current?.focus(), 20);
+            inputRef.current?.focus();
         }
-    }, [open]);
+    }, [isPresent]);
 
     useEffect(() => {
         setHighlight(0);
-    }, [filtered.length, open]);
+    }, [filtered.length, isPresent]);
 
     useEffect(() => {
-        if (!open) return;
+        if (!isPresent) return;
         const handler = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 event.preventDefault();
@@ -87,14 +94,17 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [activateEntry, filtered, highlight, onClose, open]);
-
-    if (!open) return null;
+    }, [activateEntry, filtered, highlight, onClose, isPresent]);
 
     return (
-        <div className="absolute inset-0 z-50 flex items-start justify-center bg-background/40 px-4 pt-28 backdrop-blur-sm lg:pt-32">
-            <div className="absolute inset-0" onClick={onClose} />
-            <div className="relative w-full max-w-xl overflow-hidden rounded-xl border border-[var(--workspace-border)] bg-[var(--workspace-surface-strong)] shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute inset-0 z-50 flex items-start justify-center px-4 pt-28 lg:pt-32" inert={!isPresent}>
+            <motion.div {...motionPreset.fade} className="absolute inset-0 bg-background/40 backdrop-blur-sm" onClick={onClose} />
+            <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1, transition: motionTransition.enter }}
+                exit={motionPreset.fade.exit}
+                className="relative w-full max-w-xl overflow-hidden rounded-xl border border-[var(--workspace-border)] bg-[var(--workspace-surface-strong)] shadow-2xl"
+            >
                 <div className="p-3 pb-2">
                     <div className="flex h-10 items-center gap-2 rounded-[var(--r-md)] border border-[var(--workspace-border)] bg-foreground/5 px-3 transition-colors hover:border-[var(--workspace-border-strong)] focus-within:border-[var(--workspace-border-strong)] focus-within:bg-foreground/[.06]">
                         <Search className="size-4 shrink-0 text-foreground/45" strokeWidth={1.6} />
@@ -131,7 +141,7 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
                                             onMouseEnter={() => setHighlight(index)}
                                             onClick={() => activateEntry(entry)}
                                             className={cn(
-                                                "flex w-full items-center gap-2.5 rounded-[var(--r-sm)] px-3 py-2.5 text-left text-[var(--fs-body)] transition-colors",
+                                                "flex w-full items-center gap-2.5 rounded-[var(--r-sm)] px-3 py-2.5 text-left text-[var(--fs-body)]",
                                                 index === highlight ? "bg-surface-hover text-foreground" : "text-foreground/65",
                                             )}
                                         >
@@ -149,7 +159,7 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
                         </div>
                     )}
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 }

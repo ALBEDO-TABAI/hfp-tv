@@ -7,11 +7,13 @@ import { saveRemoteUserDataNow } from "@/services/local-workspace-sync";
 import { recordDiagnosticEvent } from "@/services/diagnostics/client-diagnostics";
 import { startOperation } from "@/stores/use-operation-progress";
 import { createTransferSampler } from "@/lib/operation-progress";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 const size = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 
 export function StorageSettingsPane() {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const binding = getDesktopAppBinding();
     const [usage, setUsage] = useState<DesktopStorageUsage>();
     const [target, setTarget] = useState("");

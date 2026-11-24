@@ -8,13 +8,15 @@ import { platformErrorMessage } from "@/lib/platform-account";
 import { ApiError } from "@/services/api/request";
 import { approveWorkshopVersion, getWorkshopReview, rejectWorkshopVersion, workshopQueryKey, type Version } from "@/services/api/workshop";
 import { ReasonDialog } from "./reason-dialog";
+import { useClosingValue } from "@/hooks/use-closing-value";
 
-export function ReviewDetail({ id, onClose }: { id: string; onClose: () => void }) {
+export function ReviewDetail({ id, open = true, onClose, afterClose }: { id: string; open?: boolean; onClose: () => void; afterClose?: () => void }) {
     const { message } = App.useApp();
     const client = useQueryClient();
     const [filesOpen, setFilesOpen] = useState(false);
     const [ready, setReady] = useState(false);
     const [rejecting, setRejecting] = useState<Version | null>(null);
+    const rejectDialog = useClosingValue(rejecting);
     const [conflict, setConflict] = useState(false);
     const detail = useQuery({ queryKey: [...workshopQueryKey, "review", id], queryFn: ({ signal }) => getWorkshopReview(id, signal), refetchOnWindowFocus: false });
     const review = useMutation({
@@ -35,7 +37,7 @@ export function ReviewDetail({ id, onClose }: { id: string; onClose: () => void 
     });
     const item = detail.data;
     const busy = review.isPending || detail.isFetching || !ready || detail.isError || conflict;
-    return <AppDrawer open title="作品审核" width="min(1400px, 96vw)" onClose={() => { if (!review.isPending) onClose(); }}>
+    return <AppDrawer open={open} afterOpenChange={(next) => { if (!next) afterClose?.(); }} title="作品审核" width="min(1400px, 96vw)" onClose={() => { if (!review.isPending) onClose(); }}>
         {conflict && <Alert className="mb-4" type="warning" title="作者已更新或撤回稿件，请刷新后重新审核" action={<Button onClick={async () => { const result = await detail.refetch(); if (result.isSuccess) setConflict(false); }}>刷新</Button>} />}
         {detail.isError ? <Alert type="error" title={platformErrorMessage(detail.error)} action={<Button onClick={() => void detail.refetch()}>重试</Button>} /> : !item ? <Skeleton active /> : <div className="space-y-4">
             <header className="flex flex-wrap items-center justify-between gap-3"><h2 className="break-words text-lg font-medium">{item.version.title} · v{item.version.versionNo}</h2><Button onClick={() => setFilesOpen(true)}>文件清单</Button></header>
@@ -52,6 +54,6 @@ export function ReviewDetail({ id, onClose }: { id: string; onClose: () => void 
                 <Button danger disabled={busy} onClick={() => { review.reset(); setRejecting(item.version); }}>驳回</Button>
             </Space>}
         </div>}
-        {rejecting && <ReasonDialog title="驳回稿件" presets busy={review.isPending} error={review.isError ? platformErrorMessage(review.error) : undefined} onClose={() => setRejecting(null)} onConfirm={(reason) => review.mutate({ kind: "reject", version: rejecting, reason })} />}
+        {rejectDialog.shown && <ReasonDialog key={rejectDialog.key} open={rejectDialog.open} afterClose={rejectDialog.afterClose} title="驳回稿件" presets busy={review.isPending} error={review.isError ? platformErrorMessage(review.error) : undefined} onClose={() => setRejecting(null)} onConfirm={(reason) => { if (rejecting) review.mutate({ kind: "reject", version: rejecting, reason }); }} />}
     </AppDrawer>;
 }

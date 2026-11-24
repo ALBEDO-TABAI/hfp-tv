@@ -4,18 +4,22 @@ import { AppModal } from "@/components/ui/product/app-modal";
 import { assertUserScope, type CapturedUserScope } from "@/lib/user-scope-guard";
 
 // Capture scope at the entry point, before a lazy dialog can finish loading.
-export function CanvasDeleteConfirmation({ title, description, scope, onConfirm, onCancel }: {
+export function CanvasDeleteConfirmation({ title, description, scope, open = true, onConfirm, onCancel, afterClose }: {
     title: string;
     description: string;
     scope: CapturedUserScope;
+    open?: boolean;
     onConfirm: (assertCurrent: () => void) => Promise<void>;
     onCancel: () => void;
+    /** 离场动画结束后调用，父组件这时才卸载。 */
+    afterClose?: () => void;
 }) {
     const busy = useRef(false);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState("");
     const confirm = async () => {
-        if (busy.current) return;
+        // 离场中的弹窗已经 inert；这里再挡一次，关闭之后不会再执行删除。
+        if (busy.current || !open) return;
         busy.current = true;
         setDeleting(true);
         setError("");
@@ -32,7 +36,7 @@ export function CanvasDeleteConfirmation({ title, description, scope, onConfirm,
             setDeleting(false);
         }
     };
-    return <AppModal open centered title={title} closable={!deleting} keyboard={!deleting} maskClosable={!deleting}
+    return <AppModal open={open} afterClose={afterClose} centered title={title} closable={!deleting} keyboard={!deleting} maskClosable={!deleting}
         onCancel={() => { if (!busy.current) onCancel(); }}
         footer={<><Button disabled={deleting} onClick={onCancel}>取消</Button><Button danger type="primary" loading={deleting} onClick={() => void confirm()}>删除</Button></>}>
         <p className="text-sm text-foreground/60">{description}</p>

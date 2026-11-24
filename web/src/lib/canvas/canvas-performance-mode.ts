@@ -23,9 +23,11 @@ export function persistCanvasMediaPerformanceMode(mode: CanvasMediaPerformanceMo
     }
 }
 
-export function shouldReduceCanvasMediaEffects(mode: CanvasMediaPerformanceMode, nodes: CanvasNodeData[]) {
+/** fluidMode：应用的「流畅模式」开着时，「自动性能」按性能优先处理；用户明确选了画质优先则照办。 */
+export function shouldReduceCanvasMediaEffects(mode: CanvasMediaPerformanceMode, nodes: CanvasNodeData[], fluidMode = false) {
     if (mode === "performance") return true;
     if (mode === "quality") return false;
+    if (fluidMode) return true;
     const mediaCount = nodes.filter((node) => node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio).length;
     return nodes.length >= 80 || mediaCount >= 32;
 }

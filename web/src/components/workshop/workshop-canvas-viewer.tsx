@@ -1,6 +1,6 @@
-import { App, Button, Select } from "antd";
-import { Maximize, Minus, Plus } from "lucide-react";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Button, Select } from "antd";
+import { Check, Copy, Maximize, Minus, Plus, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CanvasNode } from "@/components/canvas/canvas-node";
 import { CanvasFrameNode } from "@/components/canvas/canvas-frame-node";
 import { ConnectionPath } from "@/components/canvas/canvas-connections";
@@ -32,7 +32,6 @@ function withNodeSize(node: CanvasNodeData): CanvasNodeData {
 export function WorkshopCanvasViewer({ canvas, versionId, focus, allowDownload = false }: {
     canvas: Snapshot["canvases"][number]; versionId: string; focus?: { nodeId: string }; allowDownload?: boolean;
 }) {
-    const { message } = App.useApp();
     const containerRef = useRef<HTMLDivElement>(null);
     const theme = useActiveTheme();
     const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
@@ -107,10 +106,7 @@ export function WorkshopCanvasViewer({ canvas, versionId, focus, allowDownload =
                 <p className="text-sm text-muted-foreground">类型：{getNodeDefinition(selected.type)?.label || selected.type}</p>
                 <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2"><strong className="text-sm">提示词</strong>
-                        <Button size="small" disabled={!selected.metadata?.prompt} onClick={async () => {
-                            try { await navigator.clipboard.writeText(selected.metadata?.prompt || ""); message.success("提示词已复制"); }
-                            catch { message.error("复制失败，请选择文字手动复制"); }
-                        }}>复制提示词</Button></div>
+                        <CopyPromptButton key={selected.id} prompt={selected.metadata?.prompt} /></div>
                     <p className="whitespace-pre-wrap break-words text-sm">{selected.metadata?.prompt || "无提示词"}</p>
                 </div>
                 <dl className="space-y-2 text-sm">{workshopNodeParameters(selected.metadata).map(([key, value]) => <div key={key} className="break-words"><dt className="text-muted-foreground">{key}</dt><dd>{value}</dd></div>)}</dl>
@@ -118,6 +114,50 @@ export function WorkshopCanvasViewer({ canvas, versionId, focus, allowDownload =
             </> : <p className="text-sm text-muted-foreground">点选画布上的节点，查看提示词、参数和产出。</p>}
         </aside>
     </div>;
+}
+
+const copyFeedback = {
+    idle: { label: "复制提示词", Icon: Copy },
+    copied: { label: "已复制", Icon: Check },
+    // 失败时直接给出补救办法：触屏没有悬停提示，按钮上的字要自己说清楚。
+    failed: { label: "请手动复制", Icon: TriangleAlert },
+};
+
+function CopyPromptButton({ prompt }: { prompt?: string }) {
+    const [copyState, setCopyState] = useState<keyof typeof copyFeedback>("idle");
+    const copyTimer = useRef<number | undefined>(undefined);
+    const copyAttempt = useRef(0);
+    useEffect(() => () => {
+        copyAttempt.current++;
+        window.clearTimeout(copyTimer.current);
+    }, []);
+    const copyPrompt = async () => {
+        if (!prompt) return;
+        const attempt = ++copyAttempt.current;
+        let result: "copied" | "failed" = "copied";
+        try {
+            await navigator.clipboard.writeText(prompt);
+        } catch {
+            result = "failed";
+        }
+        if (attempt !== copyAttempt.current) return;
+        window.clearTimeout(copyTimer.current);
+        setCopyState(result);
+        copyTimer.current = window.setTimeout(() => setCopyState("idle"), 1500);
+    };
+    return <>
+        <Button size="small" disabled={!prompt} aria-label={copyFeedback[copyState].label}
+            title={copyState === "failed" ? "请选中文字手动复制" : undefined} onClick={copyPrompt}>
+            <span className="inline-grid" aria-hidden="true">
+                {Object.entries(copyFeedback).map(([state, { label, Icon }]) => (
+                    <span key={state} className={`col-start-1 row-start-1 grid grid-cols-[auto_1fr] items-center gap-1.5 whitespace-nowrap text-center transition-opacity duration-(--motion-state) ease-(--ease-out) ${state === copyState ? "opacity-100" : "opacity-0"}`}>
+                        <Icon className="size-3.5" />{label}
+                    </span>
+                ))}
+            </span>
+        </Button>
+        <span role="status" className="sr-only">{copyState === "failed" ? "复制失败，请选中提示词手动复制" : copyState === "copied" ? "已复制" : ""}</span>
+    </>;
 }
 
 export function WorkshopNodeContent({ node, allowDownload }: { node: CanvasNodeData; allowDownload: boolean }) {

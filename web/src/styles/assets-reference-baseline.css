@@ -35,15 +35,15 @@
 .generation-history-grid { display: grid; grid-template-columns: repeat(6, 142px); gap: 12px; max-width: 900px; }
 .generation-history-card { width: 142px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--foreground) 3%, transparent); }
 .generation-history-thumb { position: relative; aspect-ratio: 1; background-position: center; background-size: cover; }
-.generation-history-hover-actions { position: absolute; inset: auto 8px 8px; z-index: 4; display: flex; gap: 4px; opacity: 0; pointer-events: none; transition: opacity 150ms ease; }
+.generation-history-hover-actions { position: absolute; inset: auto 8px 8px; z-index: 4; display: flex; gap: 4px; opacity: 0; pointer-events: none; transition: opacity var(--motion-instant) var(--ease-out); }
 .generation-history-card:hover .generation-history-hover-actions, .generation-history-card:focus-within .generation-history-hover-actions { opacity: 1; pointer-events: auto; }
-.generation-history-hover-actions button { display: grid; min-width: 0; height: 32px; flex: 1 1 0; place-items: center; border: 0; border-radius: 8px; background: rgba(0,0,0,.25); color: #fff; cursor: pointer; backdrop-filter: blur(10px); transition: background-color 150ms ease; }
+.generation-history-hover-actions button { display: grid; min-width: 0; height: 32px; flex: 1 1 0; place-items: center; border: 0; border-radius: 8px; background: rgba(0,0,0,.25); color: #fff; cursor: pointer; backdrop-filter: blur(10px); transition: background-color var(--motion-instant) var(--ease-out); }
 .generation-history-hover-actions button:hover, .generation-history-hover-actions button:focus-visible { background: rgba(0,0,0,.4); outline: none; }
 .generation-history-hover-actions button:last-child { color: #e74c3c; }
-.generation-history-select { position: absolute; top: 8px; right: 8px; z-index: 5; display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid rgba(255,255,255,.95); border-radius: 7px; background: rgba(128,128,128,.58); color: #fff; cursor: pointer; opacity: 0; transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease; }
+.generation-history-select { position: absolute; top: 8px; right: 8px; z-index: 5; display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid rgba(255,255,255,.95); border-radius: 7px; background: rgba(128,128,128,.58); color: #fff; cursor: pointer; opacity: 0; transition: opacity var(--motion-instant) var(--ease-out), background-color var(--motion-instant) var(--ease-out), color var(--motion-instant) var(--ease-out); }
 .generation-history-card:hover .generation-history-select, .generation-history-card:focus-within .generation-history-select, .generation-history-select.is-selected { opacity: 1; }
 .generation-history-card:hover .generation-history-badge { opacity: 0; pointer-events: none; }
-.generation-history-duration.is-video-duration { opacity: 0; transition: opacity 150ms ease; }
+.generation-history-duration.is-video-duration { opacity: 0; transition: opacity var(--motion-instant) var(--ease-out); }
 .generation-history-card:hover .generation-history-duration.is-video-duration { opacity: 1; }
 .generation-history-select.is-selected { background: #fff; border-color: #fff; color: #111; }
 .generation-history-batch-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; margin-bottom: 12px; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent); border-radius: 9px; background: color-mix(in srgb, var(--foreground) 5%, transparent); color: var(--foreground); }

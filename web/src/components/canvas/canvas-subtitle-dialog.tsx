@@ -1,7 +1,7 @@
 import "./canvas-media-editors.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { App, Button, ColorPicker, Dropdown, Input, InputNumber, Progress, Segmented } from "antd";
-import { AppModal } from "@/components/ui/product/app-modal";
+import { AppModal, useAppModal } from "@/components/ui/product/app-modal";
 import { Switch } from "@/components/ui/base/switch";
 import { Captions, FileDown, FileUp, ListPlus, LoaderCircle, Plus, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { reportOwnedMediaSave, saveOwnedOrBrowserBlob } from "@/services/desktop-media-save";
@@ -27,11 +27,14 @@ type CanvasSubtitleDialogProps = {
     projectId: string;
     config: AiConfig;
     onClose: () => void;
+    /** 离场动画结束后调用，父组件这时才卸载弹窗。 */
+    afterClose?: () => void;
     onSave: (nodeId: string, patch: Partial<CanvasNodeMetadata>) => void;
 };
 
-export function CanvasSubtitleDialog({ node, open, projectId, config, onClose, onSave }: CanvasSubtitleDialogProps) {
-    const { message, modal } = App.useApp();
+export function CanvasSubtitleDialog({ node, open, projectId, config, onClose, afterClose, onSave }: CanvasSubtitleDialogProps) {
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const theme = canvasThemes[useActiveTheme()];
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const [entries, setEntries] = useState<SrtEntry[]>([]);
@@ -304,6 +307,8 @@ export function CanvasSubtitleDialog({ node, open, projectId, config, onClose, o
     };
 
     const handleSave = () => {
+        // 弹窗关闭后（离场动画期间）不再写入。
+        if (!open) return;
         const normalized = normalizeEntries(entries);
         const { remapped } = remapHighlightsAfterResegment(highlights, normalized);
         onSave(node.id, {
@@ -507,7 +512,7 @@ export function CanvasSubtitleDialog({ node, open, projectId, config, onClose, o
     );
 
     return (
-        <AppModal className="canvas-subtitle-dialog" title={title} open={open} centered footer={null} width="min(1280px, calc(100vw - 32px))" destroyOnHidden onCancel={onClose} flush>
+        <AppModal className="canvas-subtitle-dialog" title={title} open={open} afterClose={afterClose} centered footer={null} width="min(1280px, calc(100vw - 32px))" destroyOnHidden onCancel={onClose} flush>
             <div className="media-editor-body subtitle-editor-body flex flex-col text-sm" style={{ color: theme.node.text }}>
                 <CanvasTranscriptionControls
                     key={`${projectId}:${node.id}:${node.metadata?.storageKey || ""}`}

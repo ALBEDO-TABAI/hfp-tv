@@ -1,6 +1,7 @@
+import { AppModal, useAppModal } from "@/components/ui/product/app-modal";
 import { CollectionToolbar } from "@/components/layout/collection-toolbar";
 import { hostedCapability } from "@/stores/use-platform-session";
-import { Alert, App, Button, Drawer, Form, Input, Modal, Select, Typography } from "antd";
+import { Alert, App, Button, Drawer, Form, Input, Select, Typography } from "antd";
 import { Switch } from "@/components/ui/base/switch";
 import { SegmentedControl } from "@/components/ui/base/segmented-control";
 import { Bug, LayoutGrid, List, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
@@ -63,7 +64,8 @@ function taskStatusFilter(value: string | null): TaskStatusFilter {
 }
 
 export default function TasksPage() {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const effectiveConfig = useEffectiveConfig();
@@ -524,7 +526,7 @@ export default function TasksPage() {
                     {!groupingActive ? <PaginationBar current={page} pageSize={pageSize} total={filteredTasks.length} pageSizeOptions={[20, 50, 100]} onChange={(nextPage, nextPageSize) => { setPage(nextPageSize !== pageSize ? 1 : nextPage); setPageSize(nextPageSize); }} /> : null}
                 </div>
             </WorkspacePage>
-            <Modal className="library-modal" title="新建异步生成任务" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={submitTask} confirmLoading={creating} okText="创建任务">
+            <AppModal destroyOnHidden={false} className="library-modal" title="新建异步生成任务" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={submitTask} confirmLoading={creating} okText="创建任务">
                 <Form form={form} layout="vertical" initialValues={{ operation: "text_to_video" }}>
                     <Form.Item name="operation" label="任务类型" rules={[{ required: true, message: "请选择任务类型" }]}>
                         <Select options={operationOptions} />
@@ -539,7 +541,7 @@ export default function TasksPage() {
                         <Input placeholder="可选，例如 seedance、kling、wan、nano-banana" />
                     </Form.Item>
                 </Form>
-            </Modal>
+            </AppModal>
             <Drawer className="library-drawer" title="任务详情" open={Boolean(detailTask)} onClose={() => { detailRequestRef.current += 1; setDetailTask(null); }} size="large" destroyOnHidden>
                 {detailTask ? (
                     <div className="space-y-5">
@@ -580,7 +582,7 @@ export default function TasksPage() {
                     </div>
                 ) : null}
             </Drawer>
-            <Modal
+            <AppModal
                 title={<span className="block truncate pr-8">{mediaPreview?.title || "生成结果预览"}</span>}
                 open={Boolean(mediaPreview)}
                 onCancel={() => setMediaPreview(null)}
@@ -600,7 +602,7 @@ export default function TasksPage() {
                         fallbackClassName="task-media-preview-unavailable"
                     />
                 ) : null}
-            </Modal>
+            </AppModal>
         </>
     );
 }

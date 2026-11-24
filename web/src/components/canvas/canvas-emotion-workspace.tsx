@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useIsPresent, usePresence } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { LoaderCircle, ScanFace, SquareDashedMousePointer, X } from "lucide-react";
@@ -6,13 +6,14 @@ import { LoaderCircle, ScanFace, SquareDashedMousePointer, X } from "lucide-reac
 import { CanvasNodeEmotionPanel, type CanvasEmotionCharacter, type CanvasImageEmotionPayload } from "@/components/canvas/canvas-node-emotion-panel";
 import { CanvasNodePanelOverlay } from "@/components/canvas/canvas-workspace-overlays";
 import { SpotlightSurface } from "@/components/ui/aceternity/spotlight-surface";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionDuration, motionPreset, motionSpring } from "@/lib/motion-tokens";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { buildEmotionImageArtifacts, buildEmotionPrompt, neutralEmotionPreset, type CanvasEmotionPreset, type CanvasFaceBox } from "@/lib/canvas/canvas-emotion";
 import { detectCanvasFaces } from "@/lib/canvas/canvas-face-detection";
 import { subscribeCanvasViewportPreview } from "@/lib/canvas/canvas-live-viewport";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import type { CanvasNodeData, Position, ViewportTransform } from "@/types/canvas";
+import { PresenceInert } from "@/components/ui/base/presence-inert";
 
 type WorkspaceStatus = "detecting" | "selecting" | "manual" | "editing" | "generating" | "error";
 
@@ -28,6 +29,19 @@ type CanvasEmotionWorkspaceProps = {
 
 export function CanvasEmotionWorkspace({ node, viewport, containerRef, dragOffset, isDragging = false, onClose, onConfirm }: CanvasEmotionWorkspaceProps) {
     const dataUrl = node.metadata?.content || "";
+    // 工作区自己决定何时卸载：关闭后让选脸工具条或编辑面板各自播完离场，再通知外层移除。
+    // 不用内层 AnimatePresence 的 propagate：内层已经没有子元素时它不会通知外层，工作区会一直挂着。
+    const [isPresent, safeToRemove] = usePresence();
+    // 图片准备是异步的：准备完成时工作区可能已经关了，提交前读最新的状态。
+    const presentRef = useRef(isPresent);
+    useEffect(() => {
+        presentRef.current = isPresent;
+    }, [isPresent]);
+    useEffect(() => {
+        if (isPresent) return;
+        const timer = window.setTimeout(safeToRemove, motionDuration.panel * 1000);
+        return () => window.clearTimeout(timer);
+    }, [isPresent, safeToRemove]);
     const [status, setStatus] = useState<WorkspaceStatus>("detecting");
     const [faces, setFaces] = useState<CanvasFaceBox[]>([]);
     const [characters, setCharacters] = useState<CanvasEmotionCharacter[]>([]);
@@ -93,6 +107,7 @@ export function CanvasEmotionWorkspace({ node, viewport, containerRef, dragOffse
         setError("");
         try {
             const artifacts = await buildEmotionImageArtifacts(dataUrl, character.faceBox, imageSize.width, imageSize.height);
+            if (!presentRef.current) return;
             const params = { presetId: preset.id, intimacy: preset.intimacy, arousal: preset.arousal, characterName: character.name, faceBox: character.faceBox };
             onConfirm({
                 ...params,
@@ -115,28 +130,35 @@ export function CanvasEmotionWorkspace({ node, viewport, containerRef, dragOffse
     const activeCharacter = characters.find((character) => character.id === activeCharacterId);
     return createPortal(
         <>
-            <FaceSelectionOverlay
-                node={node}
-                viewport={viewport}
-                containerRef={containerRef}
-                imageWidth={imageSize.width}
-                imageHeight={imageSize.height}
-                faces={faces}
-                characters={characters}
-                activeCharacterId={activeCharacterId}
-                status={status}
-                manualDraft={manualDraft}
-                onManualDraftChange={setManualDraft}
-                onManualComplete={(face) => {
-                    setFaces((current) => [...current, face]);
-                    selectFace(face);
-                    setManualDraft(null);
-                }}
-                onFaceSelect={selectFace}
-            />
-            <SelectionToolbar node={node} viewport={viewport} containerRef={containerRef} status={status} faceCount={faces.length} error={error} onManualSelect={beginManualSelection} onClose={onClose} />
+            {isPresent ? (
+                <FaceSelectionOverlay
+                    node={node}
+                    viewport={viewport}
+                    containerRef={containerRef}
+                    imageWidth={imageSize.width}
+                    imageHeight={imageSize.height}
+                    faces={faces}
+                    characters={characters}
+                    activeCharacterId={activeCharacterId}
+                    status={status}
+                    manualDraft={manualDraft}
+                    onManualDraftChange={setManualDraft}
+                    onManualComplete={(face) => {
+                        setFaces((current) => [...current, face]);
+                        selectFace(face);
+                        setManualDraft(null);
+                    }}
+                    onFaceSelect={selectFace}
+                />
+            ) : null}
             <AnimatePresence>
-                {activeCharacter && (status === "editing" || status === "generating") ? (
+                {isPresent && status !== "editing" && status !== "generating" ? (
+                    <SelectionToolbar node={node} viewport={viewport} containerRef={containerRef} status={status} faceCount={faces.length} error={error} onManualSelect={beginManualSelection} onClose={onClose} />
+                ) : null}
+            </AnimatePresence>
+            <AnimatePresence>
+                {isPresent && activeCharacter && (status === "editing" || status === "generating") ? (
+                    <PresenceInert key="emotion-panel"><div className="contents">
                     <CanvasNodePanelOverlay node={node} viewport={viewport} containerRef={containerRef} panelWidth={580} panelHeight={303} dragOffset={dragOffset} isDragging={isDragging}>
                         <CanvasNodeEmotionPanel
                             dataUrl={dataUrl}
@@ -157,6 +179,7 @@ export function CanvasEmotionWorkspace({ node, viewport, containerRef, dragOffse
                             onConfirm={() => void confirmGeneration()}
                         />
                     </CanvasNodePanelOverlay>
+                    </div></PresenceInert>
                 ) : null}
             </AnimatePresence>
         </>,
@@ -297,9 +320,7 @@ function FaceSelectionOverlay({
                             borderColor: active ? theme.accent.primary : "rgba(255,255,255,.94)",
                             boxShadow: active ? `0 0 0 3px ${theme.accent.primarySoft}, 0 8px 24px rgba(0,0,0,.24)` : "0 8px 20px rgba(0,0,0,.18)",
                         }}
-                        whileHover={{ scale: 1.025 }}
-                        whileTap={{ scale: 0.985 }}
-                        transition={aceternityMotion.spring.dock}
+                        transition={motionSpring.snappy}
                         onPointerDown={(event) => event.stopPropagation()}
                         onClick={(event) => {
                             event.stopPropagation();
@@ -353,21 +374,20 @@ function SelectionToolbar({
     onClose: () => void;
 }) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
+    const isPresent = useIsPresent();
     const toolbarRef = useRef<HTMLDivElement>(null);
+    const [placement] = useState(() => containerRef.current ? toolbarScreenRect(node, viewport, containerRef.current, null).placement : "below");
     useScreenAnchor(toolbarRef, node, viewport, containerRef, (next, container) => toolbarScreenRect(node, next, container, toolbarRef.current));
-    if (status === "editing" || status === "generating") return null;
     const label = status === "detecting" ? "正在识别人脸" : status === "manual" ? "拖动鼠标框选需要调节的人脸" : status === "selecting" ? `识别到 ${faceCount} 张人脸，请选择人物` : error || "请选择人物";
     return (
         <SpotlightSurface
             ref={toolbarRef}
             data-canvas-no-zoom
             spotlightColor={theme.toolbar.itemHover}
-            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -5, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.panel}
+            {...motionPreset.popover(placement)}
+            inert={!isPresent}
             className="aceternity-floating-panel absolute z-[var(--z-modal-overlay)] flex h-12 w-[420px] max-w-[calc(100%_-_24px)] items-center rounded-[var(--dock-radius-tight)] border px-2 backdrop-blur-2xl"
-            style={{ left: 12, top: 76, background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.node.text, boxShadow: `0 22px 60px ${theme.spatial.shadow}` }}
+            style={{ left: 12, top: 76, transformOrigin: placement === "above" ? "bottom center" : "top center", background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.node.text, boxShadow: `0 22px 60px ${theme.spatial.shadow}` }}
             onPointerDown={(event) => event.stopPropagation()}
         >
             <div className="flex size-full items-center">
@@ -446,8 +466,9 @@ function toolbarScreenRect(node: CanvasNodeData, viewport: ViewportTransform, co
     const viewportTop = container.scrollTop;
     const left = clamp(nodeRect.left + nodeRect.width / 2 - width / 2, viewportLeft + 12, Math.max(viewportLeft + 12, viewportLeft + container.clientWidth - width - 12));
     const above = nodeRect.top - height - 10;
-    const top = above >= viewportTop + 72 ? above : clamp(nodeRect.top + nodeRect.height + 10, viewportTop + 72, Math.max(viewportTop + 72, viewportTop + container.clientHeight - height - 12));
-    return { left, top };
+    if (above >= viewportTop + 72) return { left, top: above, placement: "above" as const };
+    const top = clamp(nodeRect.top + nodeRect.height + 10, viewportTop + 72, Math.max(viewportTop + 72, viewportTop + container.clientHeight - height - 12));
+    return { left, top, placement: "below" as const };
 }
 
 function sameFace(left: CanvasFaceBox, right: CanvasFaceBox) {

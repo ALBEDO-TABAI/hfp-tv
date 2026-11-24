@@ -7,7 +7,9 @@ import { resolveCanvasRightPanel, useCanvasAssistant, useCanvasAssistantDockable
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { AnimatePresence, motion } from "motion/react";
 import { appHref } from "@/lib/app-routing";
+import { motionTransition } from "@/lib/motion-tokens";
 import { isLocalWorkspaceMode } from "@/services/workspace-mode";
 import { subscribeHostedCanvasUpdates } from "@/services/api/canvas-events";
 import { isHostedMode } from "@/stores/use-platform-session";
@@ -39,7 +41,7 @@ import { useCanvasThemeStore, useCanvasThemeScope } from "@/stores/canvas/use-ca
 import { useUserStore } from "@/stores/use-user-store";
 import { App, Button } from "antd";
 import { ArrowLeftRight } from "lucide-react";
-import { AppModal } from "@/components/ui/product/app-modal";
+import { AppModal, useAppModal } from "@/components/ui/product/app-modal";
 import { CanvasDeleteConfirmation } from "@/components/canvas/canvas-delete-confirmation";
 import { CanvasConfigComposer } from "@/components/canvas/canvas-config-composer";
 import { CanvasConfigNodePanel } from "@/components/canvas/canvas-config-node-panel";
@@ -160,6 +162,7 @@ import {
 } from "@/types/canvas";
 import type { ReferenceImage } from "@/types/image";
 import { ART_CRITIQUE_NODE_TYPE } from "@/lib/art-critique/contracts";
+import { useClosingValue } from "@/hooks/use-closing-value";
 
 const EMPTY_RESOURCE_REFERENCES: CanvasResourceReference[] = [];
 
@@ -190,7 +193,8 @@ export default function CanvasPage() {
 
 function InfiniteCanvasPage() {
     // 命令式确认必须走 App.useApp().modal；静态 Modal.confirm 拿不到主题和 App 上下文。
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const params = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -722,6 +726,8 @@ function InfiniteCanvasPage() {
     }, [canvasProjects, importCanvasProject, message, projectId]);
 
     const [deletingCanvas, setDeletingCanvas] = useState<{ id: string; scope: CapturedUserScope } | null>(null);
+    const canvasDeletion = useClosingValue(deletingCanvas);
+    const shownCanvasDeletion = canvasDeletion.shown;
     const deleteCanvasFromMenu = useCallback((id: string) => setDeletingCanvas({ id, scope: captureUserScope() }), []);
 
     const versions = useCanvasVersionHistory(projectId, restoreCanvasProjectVersion, currentProject);
@@ -928,7 +934,8 @@ function InfiniteCanvasPage() {
         canvasId: projectId, domainProjectId: currentProject?.projectId, readOnly, nodes, nodesRef, setNodes, connectionsRef, setConnections, getCanvasCenter,
         persist: () => saveCanvasProject({ requireRemote: false }),
         focusNode: (node) => {
-            const k = Math.min(1, (size.width - 96) / node.width, (size.height - 160) / node.height);
+            // 窄视口里可用空间可能为负：缩放限制在画布允许的 0.05–1 之间。
+            const k = Math.max(0.05, Math.min(1, (size.width - 96) / node.width, (size.height - 160) / node.height));
             const next = { x: size.width / 2 - (node.position.x + node.width / 2) * k, y: size.height / 2 - (node.position.y + node.height / 2) * k, k };
             viewportRef.current = next;
             setViewport(next);
@@ -1810,6 +1817,13 @@ function InfiniteCanvasPage() {
     // Treat either signal as moving so floating editors disappear before the
     // first preview transform is painted and never affect drag layout.
     const isCanvasNodeMoving = isNodeDragging || Boolean(dragPreview?.nodeIds.size);
+    // 选区每次从无到有都给多选工具条换一个 key：上一次的工具条播完离场，新的重新绑定新的选区边框，
+    // 不会复用正在离场的实例、继续盯着已经移除的旧边框。
+    const selectionToolbarVisible = Boolean(selectedNodeBounds && !selectionBox);
+    const [selectionToolbarSession, setSelectionToolbarSession] = useState({ visible: selectionToolbarVisible, key: 0 });
+    if (selectionToolbarSession.visible !== selectionToolbarVisible) {
+        setSelectionToolbarSession({ visible: selectionToolbarVisible, key: selectionToolbarSession.key + (selectionToolbarVisible ? 1 : 0) });
+    }
     const subtitleNode = subtitleNodeId ? nodeById.get(subtitleNodeId) || null : null;
     const timelineNode = timelineNodeId ? nodeById.get(timelineNodeId) || null : null;
     const frameNode = frameDialogNodeId ? nodeById.get(frameDialogNodeId) || null : null;
@@ -2675,11 +2689,11 @@ function InfiniteCanvasPage() {
 
     return (
         <>
-            {deletingCanvas ? <CanvasDeleteConfirmation scope={deletingCanvas.scope} title="删除画布？"
-                description={`将删除「${canvasProjects.find((canvas) => canvas.id === deletingCanvas.id)?.title || "该画布"}」，里面的节点和连线也会一起移除。`}
+            {shownCanvasDeletion ? <CanvasDeleteConfirmation key={canvasDeletion.key} open={canvasDeletion.open} afterClose={canvasDeletion.afterClose} scope={shownCanvasDeletion.scope} title="删除画布？"
+                description={`将删除「${canvasProjects.find((canvas) => canvas.id === shownCanvasDeletion.id)?.title || "该画布"}」，里面的节点和连线也会一起移除。`}
                 onCancel={() => setDeletingCanvas(null)} onConfirm={async (assertCurrent) => {
-                    if (deletingCanvas.id === projectId) await deleteCurrentProject();
-                    else await deleteWorkspaceCanvasProjects([deletingCanvas.id]);
+                    if (shownCanvasDeletion.id === projectId) await deleteCurrentProject();
+                    else await deleteWorkspaceCanvasProjects([shownCanvasDeletion.id]);
                     assertCurrent();
                     message.success("画布已删除");
                 }} /> : null}
@@ -2693,7 +2707,7 @@ function InfiniteCanvasPage() {
             >
                 跳转到画布主内容
             </a>
-            <main ref={canvasMainRef} id="canvas-main" data-canvas-readonly={readOnly ? "true" : "false"} data-libtv-readonly-dense={searchParams.get("fixture") === "libtv-readonly-dense" ? "true" : "false"} tabIndex={-1} className="flex h-full min-h-0 overflow-hidden outline-none" style={{ background: resolvedCanvasAppearance.background, color: theme.node.text }}>
+            <main ref={canvasMainRef} id="canvas-main" data-canvas-readonly={readOnly ? "true" : "false"} data-libtv-readonly-dense={searchParams.get("fixture") === "libtv-readonly-dense" ? "true" : "false"} tabIndex={-1} className="relative flex h-full min-h-0 overflow-hidden outline-none" style={{ background: resolvedCanvasAppearance.background, color: theme.node.text }}>
                 {!focusMode && !versions.preview && shortDramaEnabled && currentProject?.projectId ? (
                     <CanvasProjectSidebar projectId={currentProject.projectId} detail={linkedProjectQuery.data} onAddChapter={handleProjectChapterInsert} onLocateStyle={locateProjectStyleNode} onOpenAssets={() => openProjectAssets()} />
                 ) : null}
@@ -2918,20 +2932,22 @@ function InfiniteCanvasPage() {
 
                                 <CanvasActiveTaskPanel tasks={activeTasks} onCancelTask={cancelCanvasTask} topInset={focusMode ? "var(--space-3)" : "var(--canvas-topbar-offset)"} />
 
-                                {focusMode ? (
-                                    <CanvasFocusModeBar
-                                        syncStatus={<CanvasSyncStatus projectId={projectId} onLoadLatest={reloadLatestCanvasProject} onOpenVersions={openVersions} />}
-                                        versionsOpen={versions.open}
-                                        onToggleVersions={toggleVersions}
-                                        dockRevealed={focusDockRevealed}
-                                        zoomPercent={viewport.k}
-                                        onToggleDock={() => setFocusDockRevealed((value) => !value)}
-                                        onExit={exitFocusMode}
-                                        onZoomIn={zoomCanvasIn}
-                                        onZoomOut={zoomCanvasOut}
-                                        onFit={fitCanvasContent}
-                                    />
-                                ) : null}
+                                <AnimatePresence>
+                                    {focusMode ? (
+                                        <CanvasFocusModeBar
+                                            syncStatus={<CanvasSyncStatus projectId={projectId} onLoadLatest={reloadLatestCanvasProject} onOpenVersions={openVersions} />}
+                                            versionsOpen={versions.open}
+                                            onToggleVersions={toggleVersions}
+                                            dockRevealed={focusDockRevealed}
+                                            zoomPercent={viewport.k}
+                                            onToggleDock={() => setFocusDockRevealed((value) => !value)}
+                                            onExit={exitFocusMode}
+                                            onZoomIn={zoomCanvasIn}
+                                            onZoomOut={zoomCanvasOut}
+                                            onFit={fitCanvasContent}
+                                        />
+                                    ) : null}
+                                </AnimatePresence>
 
                                 <CanvasFileDropOverlay active={fileDropActive} theme={theme} />
 
@@ -3032,19 +3048,21 @@ function InfiniteCanvasPage() {
                             </AppModal>
                         ) : null}
 
-                        {emotionNode?.metadata?.content && !isCanvasNodeMoving ? (
-                            <CanvasEmotionWorkspace
-                                node={emotionNode}
-                                viewport={viewport}
-                                containerRef={containerRef}
-                                dragOffset={dragPreview?.nodeIds.has(emotionNode.id) ? { x: dragPreview.x, y: dragPreview.y } : null}
-                                isDragging={isNodeDragging && Boolean(dragPreview?.nodeIds.has(emotionNode.id))}
-                                onClose={() => setEmotionNodeId(null)}
-                                onConfirm={(payload: CanvasImageEmotionPayload) => {
-                                    void generateEmotionNode(emotionNode, payload);
-                                }}
-                            />
-                        ) : null}
+                        <AnimatePresence>
+                            {emotionNode?.metadata?.content && !isCanvasNodeMoving ? (
+                                <CanvasEmotionWorkspace
+                                    node={emotionNode}
+                                    viewport={viewport}
+                                    containerRef={containerRef}
+                                    dragOffset={dragPreview?.nodeIds.has(emotionNode.id) ? { x: dragPreview.x, y: dragPreview.y } : null}
+                                    isDragging={isNodeDragging && Boolean(dragPreview?.nodeIds.has(emotionNode.id))}
+                                    onClose={() => setEmotionNodeId(null)}
+                                    onConfirm={(payload: CanvasImageEmotionPayload) => {
+                                        void generateEmotionNode(emotionNode, payload);
+                                    }}
+                                />
+                            ) : null}
+                        </AnimatePresence>
 
                         {dialogNode &&
                         !maskEditNodeId &&
@@ -3086,38 +3104,48 @@ function InfiniteCanvasPage() {
                             />
                         ) : null}
 
-                        {connectionReplaceHover ? (
-                            <div
-                                className="pointer-events-none fixed z-[var(--z-dialog-popover)] flex select-none items-center gap-1.5 rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/90 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-md transition-all"
-                                style={{
-                                    left: connectionReplaceHover.clientX + 14,
-                                    top: connectionReplaceHover.clientY + 14,
-                                    transform: "translateY(-50%)",
-                                }}
-                            >
-                                <ArrowLeftRight className="size-3 text-blue-400" />
-                                <span>松开替换</span>
-                                <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-200">@{connectionReplaceHover.referenceLabel}</span>
-                            </div>
-                        ) : null}
+                        <AnimatePresence>
+                            {connectionReplaceHover ? (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={motionTransition.exit}
+                                    className="pointer-events-none fixed z-[var(--z-dialog-popover)] flex -translate-y-1/2 select-none items-center gap-1.5 rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/90 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-md"
+                                    style={{ left: connectionReplaceHover.clientX + 14, top: connectionReplaceHover.clientY + 14 }}
+                                >
+                                    <ArrowLeftRight className="size-3 text-blue-400" />
+                                    <span>松开替换</span>
+                                    <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-200">@{connectionReplaceHover.referenceLabel}</span>
+                                </motion.div>
+                            ) : null}
+                        </AnimatePresence>
 
-                        {selectedNodeBounds && !selectionBox && !isCanvasNodeMoving ? (
-                            <CanvasProjectSelectionToolbar
-                                anchorRef={selectionBoundsElementRef}
-                                containerRef={containerRef}
-                                count={selectedNodeBounds.count}
-                                selectedVideoCount={selectedVideoNodes.length}
-                                mergingVideos={Boolean(mergeVideoProgress)}
-                                onAlign={alignSelectedNodes}
-                                onArrange={arrangeSelectedNodes}
-                                onCreateStoryboard={createStoryboardGroup}
-                                onCreateReferenceGroup={createReferenceGroup}
-                                onBatchConnect={() => beginBatchConnectionMode(Array.from(selectedNodeIds))}
-                                onMergeVideos={() => void mergeSelectedVideos()}
-                                onAskAssistant={openAssistant}
-                                onSaveWorkflow={readOnly ? undefined : () => workflowsRef.current?.saveSelection()}
-                            />
-                        ) : null}
+                        <div
+                            inert={isCanvasNodeMoving}
+                            className={`pointer-events-none absolute inset-0 z-[var(--z-panel-floating)] ${isCanvasNodeMoving ? "opacity-0" : "transition-opacity duration-(--motion-instant) ease-(--ease-out)"}`}
+                        >
+                            <AnimatePresence>
+                                {selectedNodeBounds && !selectionBox ? (
+                                    <CanvasProjectSelectionToolbar
+                                        key={selectionToolbarSession.key}
+                                        anchorRef={selectionBoundsElementRef}
+                                        containerRef={containerRef}
+                                        count={selectedNodeBounds.count}
+                                        selectedVideoCount={selectedVideoNodes.length}
+                                        mergingVideos={Boolean(mergeVideoProgress)}
+                                        onAlign={alignSelectedNodes}
+                                        onArrange={arrangeSelectedNodes}
+                                        onCreateStoryboard={createStoryboardGroup}
+                                        onCreateReferenceGroup={createReferenceGroup}
+                                        onBatchConnect={() => beginBatchConnectionMode(Array.from(selectedNodeIds))}
+                                        onMergeVideos={() => void mergeSelectedVideos()}
+                                        onAskAssistant={openAssistant}
+                                        onSaveWorkflow={readOnly ? undefined : () => workflowsRef.current?.saveSelection()}
+                                    />
+                                ) : null}
+                            </AnimatePresence>
+                        </div>
 
                         <CanvasNodeToolbar
                             node={isCanvasNodeMoving || nodeImageSettingsOpen || annotationNodeId || maskEditNodeId || emotionNodeId || angleNodeId || (dialogNode && !isCanvasMediaResultNode(dialogNode)) || textEditorNodeId ? null : toolbarNode}
@@ -3200,6 +3228,7 @@ function InfiniteCanvasPage() {
                                     libtvChrome={searchParams.get("libtvChrome") === "1"}
                                     containerRef={containerRef}
                                     onScaleChange={setZoomScale}
+                                    onZoomStep={(direction) => (direction === "in" ? zoomCanvasIn() : zoomCanvasOut())}
                                     onFitContent={fitCanvasContent}
                                     onAutoArrange={autoArrangeCanvasNodes}
                                     snapToGrid={snapToGrid}
@@ -3525,23 +3554,25 @@ function InfiniteCanvasPage() {
                     {versions.preview ? <CanvasVersionPreview key={versions.preview.key} preview={versions.preview} busy={versions.restoring || versions.confirming} onReturn={versions.returnToCurrent} onShowVersions={versions.show} /> : null}
                     </div>
                 </CanvasOverlayLayerProvider>
-                {rightPanel === "assistant" && !focusMode && !versions.preview ? (
-                    <CanvasAssistantSidebar
-                        proposalFeedback={assistantProposalFeedback}
-                        runningProposalIds={runningProposalIds}
-                        assistant={assistant}
-                        continuation={assistantContinuation}
-                        nodes={nodes}
-                        canvasTitle={workspaceProject?.title === "未命名项目" || !workspaceProject?.title ? "未命名工作区" : workspaceProject.title}
-                        dockable={assistantDockable}
-                        readOnly={readOnly}
-                        selectedNodeIds={assistantSelectedNodeIds}
-                        references={assistantMentionReferences}
-                        onLocateNodes={locateAssistantNodes}
-                        onRunProposal={runAssistantProposal}
-                        onOpenModelSettings={() => navigate("/settings?section=channels")}
-                    />
-                ) : null}
+                <AnimatePresence>
+                    {rightPanel === "assistant" && !focusMode && !versions.preview ? (
+                        <CanvasAssistantSidebar
+                            proposalFeedback={assistantProposalFeedback}
+                            runningProposalIds={runningProposalIds}
+                            assistant={assistant}
+                            continuation={assistantContinuation}
+                            nodes={nodes}
+                            canvasTitle={workspaceProject?.title === "未命名项目" || !workspaceProject?.title ? "未命名工作区" : workspaceProject.title}
+                            dockable={assistantDockable}
+                            readOnly={readOnly}
+                            selectedNodeIds={assistantSelectedNodeIds}
+                            references={assistantMentionReferences}
+                            onLocateNodes={locateAssistantNodes}
+                            onRunProposal={runAssistantProposal}
+                            onOpenModelSettings={() => navigate("/settings?section=channels")}
+                        />
+                    ) : null}
+                </AnimatePresence>
                 <CanvasVersionHistory history={versions} />
                 <CanvasWorkflowWorkspace
                     key={`${canvasStorageScope}:${projectId}`}

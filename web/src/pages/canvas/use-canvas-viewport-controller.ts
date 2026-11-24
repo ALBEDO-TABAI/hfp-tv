@@ -7,6 +7,7 @@ import { canOpenCanvasNodePromptPanel, isCanvasMediaResultNode } from "@/lib/can
 import { getCanvasNodesBounds, viewportAtScale, viewportForBounds, type CanvasViewportSize } from "@/lib/canvas/canvas-viewport";
 import { shouldRefreshCanvasVirtualization } from "@/lib/canvas/canvas-viewport-render-sync";
 import { shouldRebaseCanvasRaster } from "@/lib/canvas/canvas-leafer-viewport";
+import { motionDuration } from "@/lib/motion-tokens";
 import { CanvasNodeType, type CanvasNodeData, type ContextMenuState, type Position, type ViewportTransform } from "@/types/canvas";
 import { useCanvasViewportTransition } from "./use-canvas-viewport-transition";
 
@@ -48,11 +49,11 @@ export function useCanvasViewportController({
     const renderedViewportRef = useRef(viewportRef.current);
     const lastVirtualizationRefreshAtRef = useRef(0);
 
-    const previewViewport = useCallback((next: ViewportTransform) => {
+    const applyViewportPreview = useCallback((next: ViewportTransform) => {
         viewportRef.current = next;
         const container = containerRef.current;
         if (container && container.dataset.canvasViewportInteracting !== "true") container.dataset.canvasViewportInteracting = "true";
-        applyCanvasLiveViewport(containerRef.current, next);
+        applyCanvasLiveViewport(container, next);
     }, [containerRef, viewportRef]);
 
     const commitViewport = useCallback((next: ViewportTransform) => {
@@ -72,7 +73,31 @@ export function useCanvasViewportController({
         delete containerRef.current?.dataset.canvasViewportInteracting;
     }, [containerRef]);
 
-    const { cancelViewportTransition, transitionViewportTo } = useCanvasViewportTransition(viewportRef, previewViewport, commitViewport);
+    // 程序化镜头每帧也要更新可见范围，否则缩小时画面外的节点要等镜头结束才出现。
+    // 逐帧循环拿到的是开始时的回调，所以经 ref 调用最新的刷新函数。
+    const refreshVirtualizationRef = useRef<(next: ViewportTransform) => void>(() => {});
+    const previewTransitionViewport = useCallback((next: ViewportTransform) => {
+        applyViewportPreview(next);
+        refreshVirtualizationRef.current(next);
+    }, [applyViewportPreview]);
+    const { cancelViewportTransition, isViewportTransitionActive, transitionViewportTo, stepViewportZoom } = useCanvasViewportTransition(viewportRef, size, previewTransitionViewport, commitViewport);
+
+    useEffect(() => {
+        const interrupt = (event: PointerEvent) => {
+            const container = containerRef.current;
+            if (container && event.composedPath().includes(container) && cancelViewportTransition()) {
+                commitViewport(viewportRef.current);
+            }
+        };
+        document.addEventListener("pointerdown", interrupt, true);
+        return () => document.removeEventListener("pointerdown", interrupt, true);
+    }, [cancelViewportTransition, commitViewport, containerRef, viewportRef]);
+
+    const previewViewport = useCallback((next: ViewportTransform) => {
+        cancelViewportTransition();
+        applyViewportPreview(next);
+    }, [applyViewportPreview, cancelViewportTransition]);
+
     const screenToCanvas = useCallback((clientX: number, clientY: number): Position => {
         const rect = containerRef.current?.getBoundingClientRect();
         const viewport = viewportRef.current;
@@ -142,31 +167,31 @@ export function useCanvasViewportController({
         setToolbarNodeId(isCanvasMediaResultNode(node) ? node.id : null);
     }, [nodesRef, selectFocusedNode, setDialogNodeId, setToolbarNodeId, size.height, size.width, transitionViewportTo, viewportRef]);
 
+    // 缩放菜单的预设档位和输入的百分比：和其他程序化镜头一样过渡过去，任何输入立即接管。
     const setZoomScale = useCallback((scale: number) => {
-        cancelViewportTransition();
-        const next = viewportAtScale(viewportRef.current, size, scale);
-        previewViewport(next);
-        if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
-        commitTimerRef.current = setTimeout(() => commitViewport(viewportRef.current), 120);
+        transitionViewportTo(viewportAtScale(viewportRef.current, size, scale));
         setContextMenu(null);
-    }, [cancelViewportTransition, commitViewport, previewViewport, setContextMenu, size, viewportRef]);
+    }, [setContextMenu, size, transitionViewportTo, viewportRef]);
 
-    const zoomCanvasIn = useCallback(() => setZoomScale(viewportRef.current.k + 0.1), [setZoomScale, viewportRef]);
-    const zoomCanvasOut = useCallback(() => setZoomScale(viewportRef.current.k - 0.1), [setZoomScale, viewportRef]);
+    const zoomCanvas = useCallback((direction: "in" | "out") => {
+        stepViewportZoom(direction);
+        setContextMenu(null);
+    }, [setContextMenu, stepViewportZoom]);
+    const zoomCanvasIn = useCallback(() => zoomCanvas("in"), [zoomCanvas]);
+    const zoomCanvasOut = useCallback(() => zoomCanvas("out"), [zoomCanvas]);
 
     const zoomToActualSize = useCallback(() => {
         transitionViewportTo(viewportAtScale(viewportRef.current, size, 1));
     }, [size, transitionViewportTo, viewportRef]);
 
     const handleViewportChange = useCallback((next: ViewportTransform) => {
-        cancelViewportTransition();
+        // 滚轮收尾可能晚于新镜头指令，实际手势已在输入时接管视口。
+        if (isViewportTransitionActive()) return;
         commitViewport(next);
         setContextMenu(null);
-    }, [cancelViewportTransition, commitViewport, setContextMenu]);
+    }, [commitViewport, isViewportTransitionActive, setContextMenu]);
 
-    const handleViewportPreviewChange = useCallback((next: ViewportTransform) => {
-        cancelViewportTransition();
-        viewportRef.current = next;
+    const refreshVirtualization = useCallback((next: ViewportTransform) => {
         // The overview canvas redraws every frame from the live camera and
         // only leaves LOD after the gesture commits.
         if (virtualizationPausedRef?.current) return;
@@ -179,7 +204,16 @@ export function useCanvasViewportController({
         // existing scale limits, and commit the final camera on gesture end.
         if (shouldRebaseCanvasRaster(next, viewport)) setViewport(next);
         else setVirtualizationViewport(next);
-    }, [cancelViewportTransition, setViewport, setVirtualizationViewport, viewport, viewportRef, virtualizationPausedRef]);
+    }, [setViewport, setVirtualizationViewport, viewport, virtualizationPausedRef]);
+    useEffect(() => {
+        refreshVirtualizationRef.current = refreshVirtualization;
+    }, [refreshVirtualization]);
+
+    const handleViewportPreviewChange = useCallback((next: ViewportTransform) => {
+        cancelViewportTransition();
+        viewportRef.current = next;
+        refreshVirtualization(next);
+    }, [cancelViewportTransition, refreshVirtualization, viewportRef]);
 
     return {
         fitCanvasContent,

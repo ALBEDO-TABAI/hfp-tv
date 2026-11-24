@@ -156,12 +156,20 @@ function CompactMenuButton({
         const closeOnEscape = (event: KeyboardEvent) => {
             if (event.key === "Escape") setOpen(false);
         };
+        // 焦点离开触发按钮和菜单（例如用键盘退回去收起参数区）时关闭菜单：菜单挂在页面根部，参数区收起后的 inert 管不到它。
+        const closeOnFocusOut = (event: FocusEvent) => {
+            const target = event.target instanceof Node ? event.target : null;
+            if (target && (triggerRef.current?.contains(target) || menuRef.current?.contains(target))) return;
+            setOpen(false);
+        };
         const reposition = () => updatePosition();
+        document.addEventListener("focusin", closeOnFocusOut, true);
         document.addEventListener("pointerdown", close, true);
         document.addEventListener("keydown", closeOnEscape, true);
         window.addEventListener("resize", reposition);
         window.addEventListener("scroll", reposition, true);
         return () => {
+            document.removeEventListener("focusin", closeOnFocusOut, true);
             document.removeEventListener("pointerdown", close, true);
             document.removeEventListener("keydown", closeOnEscape, true);
             window.removeEventListener("resize", reposition);

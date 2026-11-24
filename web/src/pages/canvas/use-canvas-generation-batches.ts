@@ -13,6 +13,7 @@ import type { CanvasGenerationBatch, CanvasGenerationBatchItem, CanvasGeneration
 
 import type { CanvasNodeGenerationOptions } from "./use-canvas-generation-executor";
 import type { CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 const SCHEDULER_INTERVAL_MS = 2_000;
 const MAX_BATCH_HISTORY = 20;
@@ -29,7 +30,8 @@ type UseCanvasGenerationBatchesOptions = {
 };
 
 export function useCanvasGenerationBatches({ projectId, projectLoaded, nodes, nodesRef, setNodes, handleGenerateNode }: UseCanvasGenerationBatchesOptions) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const activeTaskLimit = useUserStore((state) => state.runtimeLimits.activeTaskLimit);

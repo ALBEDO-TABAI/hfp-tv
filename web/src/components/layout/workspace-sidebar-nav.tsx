@@ -1,5 +1,5 @@
 import { Activity, AlertTriangle, BadgeCheck, ClipboardCheck, Users, ChevronLeft, ChevronRight, Home, Plug, Plus, Settings2, HardDrive, Sun, Moon, GalleryHorizontalEnd } from "lucide-react";
-import { LayoutGroup, motion, useReducedMotion } from "motion/react";
+import { LayoutGroup, motion, useReducedMotionConfig } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 
@@ -8,7 +8,7 @@ import { WorkspaceSidebarUpdate } from "@/components/layout/workspace-sidebar-up
 import { WorkspaceSidebarSocialLinks } from "@/components/layout/workspace-sidebar-social-links";
 import { Kbd } from "@/components/ui/base/kbd";
 import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionSpring } from "@/lib/motion-tokens";
 import { cn } from "@/lib/utils";
 import { preloadWorkspaceRoute } from "@/lib/workspace-route-modules";
 import { useUserStore, type FeatureAvailability } from "@/stores/use-user-store";
@@ -16,6 +16,7 @@ import { useAppearanceStore } from "@/stores/use-appearance-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { getDesktopAppBinding } from "@/services/desktop-runtime";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+import { WorkspaceEffectsToggle } from "@/components/layout/workspace-effects-toggle";
 import { OnboardingEntry } from "@/components/onboarding/first-creation-guide";
 import { PlatformAccountMenu } from "@/components/layout/platform-account-menu";
 import { hostedCapability, usePlatformSession } from "@/stores/use-platform-session";
@@ -127,7 +128,7 @@ function NavItem({
     const isActive = activeId === item.id || (item.id === "settings" && activeId.startsWith("settings:"));
     const hasChildren = Boolean(item.children?.length);
     const [isOpen, setIsOpen] = useState(false);
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
 
     // 激活分支自动展开（如设置分区子项），保证当前位置可见。
     useEffect(() => {
@@ -155,13 +156,13 @@ function NavItem({
                     <Kbd className="hidden group-hover:inline-flex">{item.shortcut}</Kbd>
                 ) : null}
                 {item.badge !== undefined ? <span className="flex min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[var(--fs-tiny)] font-medium tabular-nums text-primary">{item.badge}</span> : null}
-                {hasChildren ? <ChevronRight className={cn("size-3.5 shrink-0 text-foreground/40 transition-transform duration-200", isOpen && "rotate-90")} strokeWidth={2} /> : null}
+                {hasChildren ? <ChevronRight className={cn("size-3.5 shrink-0 text-foreground/40 transition-transform duration-(--motion-state)", isOpen && "rotate-90")} strokeWidth={2} /> : null}
             </span>
         </>
     );
 
     const rowClassName = cn(
-        "app-workspace-nav-link group relative isolate flex min-h-11 w-full items-center justify-between gap-2 rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-body)] transition-[color,transform] duration-200 select-none",
+        "app-workspace-nav-link group relative isolate flex min-h-11 w-full items-center justify-between gap-2 rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-body)] transition-[color,transform] duration-(--motion-state) select-none",
         collapsed && "is-collapsed",
         item.disabled ? "is-disabled text-foreground/30" : isActive ? "is-active font-medium" : "text-foreground/62 hover:bg-surface-hover hover:text-foreground",
     );
@@ -170,7 +171,7 @@ function NavItem({
             layoutId="workspace-nav-active-pill"
             className="app-workspace-nav-active-pill"
             aria-hidden
-            transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.dock}
+            transition={reducedMotion ? { duration: 0 } : motionSpring.snappy}
         />
     ) : null;
 
@@ -220,7 +221,7 @@ function NavItem({
             )}
 
             {hasChildren && !collapsed ? (
-                <div className={cn("grid transition-[grid-template-rows,opacity] duration-300 ease-in-out", isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+                <div className={cn("grid transition-[grid-template-rows,opacity] duration-(--motion-panel) ease-(--ease-out)", isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")} inert={!isOpen}>
                     <div className="relative flex min-h-0 flex-col gap-0.5 overflow-hidden pt-0.5">
                         <span className="app-workspace-nav-guide-line" style={{ left: `${(level + 1) * 12 + 12.5}px` }} />
                         {item.children!.map((child) => (
@@ -259,9 +260,9 @@ function NavGroup({ group, activeId, onNavigate, onOpenSearch, collapsed }: { gr
         <div className="app-workspace-nav-group flex shrink-0 flex-col" data-nav-group-heading={group.heading}>
             <button type="button" onClick={() => setIsOpen((open) => !open)} aria-expanded={isOpen} className="app-workspace-nav-group-toggle select-none">
                 <span className="app-workspace-nav-group-label">{group.heading}</span>
-                <ChevronRight className={cn("size-3.5 shrink-0 text-foreground/35 transition-transform duration-200", isOpen && "rotate-90")} strokeWidth={2} />
+                <ChevronRight className={cn("size-3.5 shrink-0 text-foreground/35 transition-transform duration-(--motion-state)", isOpen && "rotate-90")} strokeWidth={2} />
             </button>
-            <div className={cn("grid transition-[grid-template-rows,opacity] duration-300 ease-in-out", isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+            <div className={cn("grid transition-[grid-template-rows,opacity] duration-(--motion-panel) ease-(--ease-out)", isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")} inert={!isOpen}>
                 <div className="min-h-0 overflow-hidden pt-0.5">{content}</div>
             </div>
         </div>
@@ -330,6 +331,7 @@ export function WorkspaceSidebarNav({ collapsed, onNavigate, onOpenSearch, onExp
                 </div>
                 <div className={cn("app-workspace-sidebar-utility-row", collapsed && "is-collapsed")}>
                     <WorkspaceSidebarUpdate collapsed={collapsed} />
+                    <WorkspaceEffectsToggle />
                     <AnimatedThemeToggler theme={theme} onThemeChange={setTheme} aria-label={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"} title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"} className="app-workspace-theme-action">
                         {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
                     </AnimatedThemeToggler>

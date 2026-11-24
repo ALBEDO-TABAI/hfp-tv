@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Slider } from "antd";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotionConfig } from "motion/react";
 import { RotateCcw, Send, Sun, X } from "lucide-react";
 
 import { SpotlightSurface } from "@/components/ui/aceternity/spotlight-surface";
 import { Tooltip } from "@/components/ui/base/tooltip";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionSpring } from "@/lib/motion-tokens";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
@@ -142,7 +142,7 @@ function buildLightingPrompt(input: {
 
 export function CanvasNodeLightingPanel({ dataUrl, onClose, onConfirm }: { dataUrl: string; onClose: () => void; onConfirm: (options: CanvasImageLightingOptions, prompt: string) => void }) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     const copyText = useCopyText();
     const [options, setOptions] = useState(defaultLightingOptions);
     const [smartDesc, setSmartDesc] = useState("");
@@ -204,7 +204,7 @@ export function CanvasNodeLightingPanel({ dataUrl, onClose, onConfirm }: { dataU
             spotlightColor={theme.toolbar.itemHover}
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.panel}
+            transition={reducedMotion ? { duration: 0 } : motionSpring.smooth}
             className="w-full max-w-full overflow-hidden rounded-[var(--r-2xl)] border backdrop-blur-2xl"
             style={{ background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.node.text, boxShadow: `0 28px 80px ${theme.spatial.shadow}` }}
             onMouseDown={(event) => event.stopPropagation()}
@@ -308,7 +308,7 @@ export function CanvasNodeLightingPanel({ dataUrl, onClose, onConfirm }: { dataU
                             type="button"
                             aria-pressed={options.stylePreset === preset.id}
                             onClick={() => updateOption("stylePreset", options.stylePreset === preset.id ? "" : preset.id)}
-                            className={`relative h-[60px] overflow-hidden rounded-[var(--r-lg)] text-left transition-[box-shadow,filter,border-color,background-color] duration-150 ${options.stylePreset === preset.id ? "ring-2 ring-white/60 shadow-[0_0_0_1px_rgba(255,255,255,0.15)]" : "hover:ring-1 hover:ring-white/30"}`}
+                            className={`relative h-[60px] overflow-hidden rounded-[var(--r-lg)] text-left transition-[border-color,background-color] duration-(--motion-instant) ease-(--ease-out) ${options.stylePreset === preset.id ? "ring-2 ring-white/60 shadow-[0_0_0_1px_rgba(255,255,255,0.15)]" : "hover:ring-1 hover:ring-white/30"}`}
                             style={{
                                 backgroundImage: `linear-gradient(to top, rgba(0,0,0,0.78), rgba(0,0,0,0.08)), url(${preset.image})`,
                                 backgroundSize: "cover",
@@ -332,8 +332,6 @@ export function CanvasNodeLightingPanel({ dataUrl, onClose, onConfirm }: { dataU
                 <button type="button" className={secondaryButtonClass} onClick={() => setIsTemplateDialogOpen(true)}>设置提示词</button>
                 <motion.button
                     type="button"
-                    whileHover={reducedMotion ? undefined : { y: -1 }}
-                    whileTap={reducedMotion ? undefined : { scale: 0.97 }}
                     className="flex h-8 items-center gap-1.5 rounded-[var(--dock-item-radius)] border px-3 text-[var(--fs-label)] font-semibold transition-colors"
                     style={{ borderColor: theme.node.activeStroke, color: theme.node.activeStroke, background: "transparent" }}
                     onClick={handleApply}

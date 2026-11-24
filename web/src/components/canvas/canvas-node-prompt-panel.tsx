@@ -35,6 +35,7 @@ import { usePluginStore } from "@/stores/use-plugin-store";
 import { useResolvedCanvasResourceReferences } from "./use-resolved-canvas-resource-references";
 import { CanvasReferenceFeedback, useCanvasReferenceCheck } from "./canvas-reference-feedback";
 import type { CanvasReferenceAction } from "@/lib/canvas/canvas-reference-issues";
+import { motionDuration } from "@/lib/motion-tokens";
 
 export type CanvasNodeGenerationMode = CanvasGenerationMode;
 
@@ -105,6 +106,15 @@ export function CanvasNodePromptPanel({ projectId, node, isRunning, onPromptChan
     const [expandedPromptContentHeight, setExpandedPromptContentHeight] = useState(() => estimatePromptContentHeight(savedPrompt, true));
     const [manualPromptHeight, setManualPromptHeight] = useState<number | null>(null);
     const [paramsExpanded, setParamsExpanded] = useState(false); // #98 决策2：B区参数区折叠状态（手风琴）
+    // 参数区展开时挂载内容；收起时先 inert 并播完收起（--motion-panel），再卸载。
+    // 卸载会一并关掉内容里挂在页面根部的菜单（例如首尾帧选择），收起后不能再改节点。
+    const [paramsMounted, setParamsMounted] = useState(false);
+    if (paramsExpanded && !paramsMounted) setParamsMounted(true);
+    useEffect(() => {
+        if (paramsExpanded || !paramsMounted) return;
+        const timer = window.setTimeout(() => setParamsMounted(false), motionDuration.panel * 1000);
+        return () => window.clearTimeout(timer);
+    }, [paramsExpanded, paramsMounted]);
     const [promptOptimizerOpen, setPromptOptimizerOpen] = useState(false);
     const [autoLinkEnabled, setAutoLinkEnabled] = useState(true);
     const resolvedMentionReferences = useResolvedCanvasResourceReferences(mentionReferences, { projectId });
@@ -339,8 +349,9 @@ export function CanvasNodePromptPanel({ projectId, node, isRunning, onPromptChan
                 aria-label={actionLabel}
                 title={actionLabel}
             >
-                <span className="canvas-node-composer-submit-action" aria-hidden>
-                    {isRunning ? <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" /> : <ArrowUp className="size-3.5" strokeWidth={2.4} />}
+                <span className="canvas-node-composer-submit-action canvas-node-composer-submit-swap" data-running={isRunning || undefined} aria-hidden>
+                    <ArrowUp className="canvas-node-composer-submit-idle size-3.5" strokeWidth={2.4} />
+                    <LoaderCircle className={`canvas-node-composer-submit-busy size-3.5 ${isRunning ? "animate-spin motion-reduce:animate-none" : ""}`} />
                 </span>
             </Button>
         );
@@ -615,13 +626,17 @@ export function CanvasNodePromptPanel({ projectId, node, isRunning, onPromptChan
                     >
                         <SlidersHorizontal className="size-3" strokeWidth={1.8} />
                         <span className="flex-1 text-left">参数</span>
-                        <ChevronDown className={`size-3 transition-transform duration-200 ${paramsExpanded ? "rotate-180" : ""}`} strokeWidth={1.8} />
+                        <ChevronDown className={`size-3 transition-transform duration-(--motion-state) ${paramsExpanded ? "rotate-180" : ""}`} strokeWidth={1.8} />
                     </button>
-                    {paramsExpanded ? (
-                        <div className="pt-1">
-                            {renderVideoPromptTools()}
+                    {/* 展开收起：高度和透明度一起过渡（--motion-panel），收起播完再卸载内容。 */}
+                    <div
+                        className={`grid transition-[grid-template-rows,opacity] duration-(--motion-panel) ease-(--ease-out) ${paramsExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                        inert={!paramsExpanded}
+                    >
+                        <div className="min-h-0 overflow-hidden">
+                            {paramsMounted ? <div className="pt-1">{renderVideoPromptTools()}</div> : null}
                         </div>
-                    ) : null}
+                    </div>
                 </div>
             ) : null}
 

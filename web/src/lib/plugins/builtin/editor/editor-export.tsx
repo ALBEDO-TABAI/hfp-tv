@@ -287,8 +287,8 @@ export function EditorExport() {
                         </div>
                         <div className="h-1.5 overflow-hidden rounded-full bg-[var(--director-control-hover)]">
                             <div
-                                className="h-full rounded-full bg-[var(--director-accent)] transition-all"
-                                style={{ width: `${state.percent}%` }}
+                                className="h-full w-full origin-left rounded-full bg-[var(--director-accent)] transition-transform duration-(--motion-panel) ease-linear"
+                                style={{ transform: `scaleX(${state.percent / 100})` }}
                             />
                         </div>
                     </div>

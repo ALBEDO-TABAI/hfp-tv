@@ -85,6 +85,25 @@ const controlTheme = {
     },
 };
 
+/**
+ * AntD 动效 token 对应 globals.css 第 7 节的动效语言：Fast/Mid/Slow 是即时、状态、面板三档；
+ * 各种 Out 曲线统一成进入曲线，In 与 InOutCirc（AntD 用它做缩放离开）统一成离开曲线。
+ */
+const antMotionTokens = {
+    motionDurationFast: "var(--motion-instant)",
+    motionDurationMid: "var(--motion-state)",
+    motionDurationSlow: "var(--motion-panel)",
+    motionEaseOut: "var(--ease-out)",
+    motionEaseOutCirc: "var(--ease-out)",
+    motionEaseOutQuint: "var(--ease-out)",
+    motionEaseOutBack: "var(--ease-out)",
+    // message、开关、分段控件进出共用这一条：取进入曲线，第一帧就有反应。
+    motionEaseInOut: "var(--ease-out)",
+    motionEaseInOutCirc: "var(--ease-in)",
+    motionEaseInQuint: "var(--ease-in)",
+    motionEaseInBack: "var(--ease-in)",
+} as const;
+
 export function getAntThemeConfig(dark: boolean, skinID: unknown = "classic"): ThemeConfig {
     const baseColor = dark ? controlTheme.dark : controlTheme.light;
     const skin = getSkinAntOverrides(skinID, dark ? "dark" : "light");
@@ -190,9 +209,8 @@ export function getAntThemeConfig(dark: boolean, skinID: unknown = "classic"): T
             controlHeightSM: skin.controlHeightSmall || 30,
             fontSize: 13,
             fontSizeSM: 12,
-            motionDurationFast: `${skin.motionFast ?? 120}ms`,
-            motionDurationMid: `${skin.motionNormal ?? 180}ms`,
-            motionDurationSlow: `${Math.max(skin.motionNormal ?? 180, 240)}ms`,
+            // AntD 的浮层、菜单和消息直接读动效语言的 CSS 变量，皮肤调过的时长也会跟着生效。
+            ...antMotionTokens,
         },
         components: {
             Tag: {
@@ -388,9 +406,6 @@ export function getWorkspaceAntThemeConfig(): ThemeConfig {
         token: {
             borderRadius: 12, borderRadiusLG: 16, borderRadiusSM: 8,
             controlHeight: 38, controlHeightSM: 30, controlHeightLG: 44,
-            motionDurationFast: "0.12s", motionDurationMid: "0.18s", motionDurationSlow: "0.36s",
-            motionEaseInOut: "cubic-bezier(0.16, 1, 0.3, 1)",
-            motionEaseOut: "cubic-bezier(0.16, 1, 0.3, 1)",
         },
         components: {
             Button: {

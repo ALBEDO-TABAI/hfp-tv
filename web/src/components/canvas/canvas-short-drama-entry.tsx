@@ -227,7 +227,7 @@ export function CanvasShortDramaGuide({ progress, collapsed, onToggle, onSkip, o
                             {index ? (
                                 <span
                                     aria-hidden
-                                    className="shrink-0 rounded-full transition-colors duration-150 motion-reduce:transition-none"
+                                    className="shrink-0 rounded-full transition-colors duration-(--motion-instant) motion-reduce:transition-none"
                                     style={{ width: "var(--flow-step-track-width)", height: "var(--flow-step-track-height)", background: step.status === "pending" ? theme.node.stroke : theme.accent.primary }}
                                 />
                             ) : null}
@@ -239,7 +239,7 @@ export function CanvasShortDramaGuide({ progress, collapsed, onToggle, onSkip, o
                                 onClick={() => onStepClick(step.id)}
                             >
                                 <span
-                                    className="grid shrink-0 place-items-center rounded-full font-semibold transition-all duration-150 motion-reduce:transition-none"
+                                    className="grid shrink-0 place-items-center rounded-full font-semibold transition-[background-color,color,box-shadow] duration-(--motion-instant) motion-reduce:transition-none"
                                     style={{
                                         width: step.status === "current" ? "var(--flow-step-node-current)" : "var(--flow-step-node)",
                                         height: step.status === "current" ? "var(--flow-step-node-current)" : "var(--flow-step-node)",
@@ -253,7 +253,7 @@ export function CanvasShortDramaGuide({ progress, collapsed, onToggle, onSkip, o
                                     {step.status === "completed" ? <Check className="size-3.5" /> : index + 1}
                                 </span>
                                 <span
-                                    className="whitespace-nowrap text-[var(--fs-caption)] font-semibold transition-colors duration-150 motion-reduce:transition-none"
+                                    className="whitespace-nowrap text-[var(--fs-caption)] font-semibold transition-colors duration-(--motion-instant) motion-reduce:transition-none"
                                     style={{ color: step.status === "current" ? theme.accent.primary : step.status === "completed" ? theme.node.text : theme.node.muted }}
                                 >
                                     {step.label}

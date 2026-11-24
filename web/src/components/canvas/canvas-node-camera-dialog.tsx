@@ -1,11 +1,11 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronUp, ChevronDown, Camera as CameraIcon, RotateCcw, X } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotionConfig } from "motion/react";
 
 import { SpotlightSurface } from "@/components/ui/aceternity/spotlight-surface";
 import { Tooltip } from "@/components/ui/base/tooltip";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionSpring } from "@/lib/motion-tokens";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
@@ -279,7 +279,7 @@ export function CanvasNodeCameraPanel({
     onConfirm: (options: CameraControlOptions, prompt: string) => void;
 }) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     const copyText = useCopyText();
 
     const [enabled, setEnabled] = useState(cameraControl?.enabled ?? defaultCameraControl.enabled);
@@ -343,7 +343,7 @@ export function CanvasNodeCameraPanel({
             spotlightColor={theme.toolbar.itemHover}
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.panel}
+            transition={reducedMotion ? { duration: 0 } : motionSpring.smooth}
             className="w-full overflow-hidden rounded-[var(--r-xl)] backdrop-blur-2xl"
             style={{ background: theme.spatial.elevated, color: theme.node.text, boxShadow: `0 28px 80px ${theme.spatial.shadow}` }}
             onMouseDown={(event) => event.stopPropagation()}
@@ -458,8 +458,6 @@ export function CanvasNodeCameraPanel({
                 </div>
                 <motion.button
                     type="button"
-                    whileHover={reducedMotion ? undefined : { y: -1 }}
-                    whileTap={reducedMotion ? undefined : { scale: 0.97 }}
                     className="canvas-node-camera-apply flex h-7 items-center gap-1.5 rounded-[var(--dock-item-radius)] border px-3.5 text-[var(--fs-label)] font-semibold transition-colors"
                     style={{ borderColor: theme.node.activeStroke, color: theme.node.activeStroke, background: "transparent" }}
                     onClick={handleApply}

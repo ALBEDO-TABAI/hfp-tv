@@ -1,9 +1,10 @@
 import { App, Button, Dropdown, Popover } from "antd";
 import { CheckCircle2, CircleAlert, CloudCheck, CloudOff, LoaderCircle, RefreshCw } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
+import { useSaveIndicator } from "@/components/layout/workspace-state";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 import { readAllCanvasSyncDrafts, readCanvasSyncDrafts, type CanvasSyncDraft } from "@/services/canvas-sync-drafts";
-import { getActiveUserScope } from "@/lib/user-scope";
+import { getActiveUserScope, subscribeUserScope } from "@/lib/user-scope";
 import { acceptExternalCanvasRevision, pendingExternalCanvasRevision, syncLocalCanvasProjectToBackend } from "@/services/local-workspace-repository";
 import { canvasExternalRevisionVersion, subscribeCanvasExternalRevision, useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { canvasSyncProgressKey, useSyncProgressStore, type SyncProjectProgress } from "@/stores/use-sync-progress-store";
@@ -49,15 +50,30 @@ export function canvasSyncStatusView(localOnly: boolean, progress: Pick<SyncProj
     };
 }
 
-function syncStatusIcon(localOnly: boolean, tone: CanvasSyncStatusView["tone"]) {
-    if (tone === "saving") return <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />;
-    if (localOnly) return tone === "failed" ? <CircleAlert className="size-3.5" /> : <CheckCircle2 className="size-3.5 text-emerald-500" />;
-    return tone === "failed" ? <CloudOff className="size-3.5" /> : <CloudCheck className="size-3.5" />;
+function syncStatusIcon(localOnly: boolean, tone: CanvasSyncStatusView["tone"] | undefined) {
+    const SavedIcon = localOnly ? CheckCircle2 : CloudCheck;
+    const FailedIcon = localOnly ? CircleAlert : CloudOff;
+    const layer = "col-start-1 row-start-1 size-3.5 transition-opacity duration-(--motion-state) ease-(--ease-out)";
+    return (
+        <span className="grid size-3.5 shrink-0" aria-hidden="true">
+            <LoaderCircle className={`${layer} animate-spin ${tone === "saving" ? "opacity-100" : "opacity-0 [animation-play-state:paused]"}`} />
+            <SavedIcon className={`${layer} ${localOnly ? "text-emerald-500" : ""} ${tone === "saved" ? "opacity-100" : "opacity-0"}`} />
+            <FailedIcon className={`${layer} ${tone === "failed" ? "opacity-100" : "opacity-0"}`} />
+        </span>
+    );
 }
 
-export function CanvasSyncStatus({ projectId, onLoadLatest, onOpenVersions }: { projectId: string; onLoadLatest: () => Promise<void>; onOpenVersions?: () => void }) {
+type CanvasSyncStatusProps = { projectId: string; onLoadLatest: () => Promise<void>; onOpenVersions?: () => void };
+
+export function CanvasSyncStatus(props: CanvasSyncStatusProps) {
+    const scope = useSyncExternalStore(subscribeUserScope, getActiveUserScope, getActiveUserScope);
+    const progressKey = canvasSyncProgressKey(props.projectId, scope);
+    return <CanvasSyncStatusBadge key={progressKey} progressKey={progressKey} {...props} />;
+}
+
+function CanvasSyncStatusBadge({ projectId, progressKey, onLoadLatest, onOpenVersions }: CanvasSyncStatusProps & { progressKey: string }) {
     const { message } = App.useApp();
-    const progress = useSyncProgressStore((state) => state.syncingProjects[canvasSyncProgressKey(projectId)]);
+    const progress = useSyncProgressStore((state) => state.syncingProjects[progressKey]);
     const localOnly = workspaceCapabilities().local;
     const [busy, setBusy] = useState(false);
     const [statusOpen, setStatusOpen] = useState(false);
@@ -67,7 +83,11 @@ export function CanvasSyncStatus({ projectId, onLoadLatest, onOpenVersions }: { 
     const externalConflict = pendingExternalCanvasRevision(projectId);
     const [adopting, setAdopting] = useState(false);
     const view = canvasSyncStatusView(localOnly, progress);
-    const label = view.label;
+    const { showSaving, settled } = useSaveIndicator(view.tone === "saving" ? null : progress, (value) => canvasSyncStatusView(localOnly, value).tone === "failed");
+    const status = showSaving
+        ? canvasSyncStatusView(localOnly, { phase: "saving" })
+        : settled === null ? undefined : canvasSyncStatusView(localOnly, settled);
+    const label = status?.label ?? "尚未确认保存";
     // 替换前会先把当前内容存成本地草稿；草稿没存成时不替换，并把原因告诉用户。
     const adoptLatest = async () => {
         setAdopting(true);
@@ -152,11 +172,11 @@ export function CanvasSyncStatus({ projectId, onLoadLatest, onOpenVersions }: { 
                 <Button
                     type="text"
                     size="small"
-                    danger={view.tone === "failed"}
+                    danger={status?.tone === "failed"}
                     aria-label={`画布保存状态：${label}`}
-                    icon={syncStatusIcon(localOnly, view.tone)}
+                    icon={syncStatusIcon(localOnly, status?.tone)}
                 >
-                    <span className="canvas-sync-status-label text-xs">{label}</span>
+                    <span className="canvas-sync-status-label w-[9em] text-left text-xs">{label}</span>
                 </Button>
             </Popover>
         </>

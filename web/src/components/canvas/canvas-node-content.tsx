@@ -208,6 +208,7 @@ function ErrorContent({ node, theme, onRetry, onReloadResource, onOpenTaskDetail
     const submissionUncertain = isGenerationTaskSubmissionUncertain(errorDisplayTask) || explanation.uncertain;
     return (
         <div
+            data-node-error
             data-canvas-no-zoom
             data-canvas-wheel-scroll
             data-canvas-live-scale
@@ -659,10 +660,15 @@ function ImageContent({ node, theme, scale = 1, isBatchRoot, batchCount, batchPr
                             </button>
                         </div>
                     </div>
-                ) : url ? <img src={url} alt={node.title} loading="lazy" decoding="async" draggable={false} onDragStart={(event) => event.preventDefault()} onError={fail} onLoad={(event) => fitToImage(event.currentTarget)} className={`pointer-events-none block h-full w-full select-none ${node.metadata?.freeResize ? "object-fill" : "object-contain"}`} /> : <div role="status" aria-label="正在加载图片" className="grid size-full place-items-center" style={{ background: theme.node.fill, color: theme.node.muted }}><span data-canvas-live-scale style={{ transform: "scale(var(--canvas-live-inverse-scale, 1))" }}>{loading ? <LoaderCircle className="size-5 animate-spin" /> : <ImageIcon className="size-5" />}</span></div>}
+                ) : url ? <img src={url} alt={node.title} loading="lazy" decoding="async" draggable={false} data-node-result ref={markLoadedIfComplete} onDragStart={(event) => event.preventDefault()} onError={fail} onLoad={(event) => { event.currentTarget.dataset.loaded = "true"; fitToImage(event.currentTarget); }} className={`pointer-events-none block h-full w-full select-none ${node.metadata?.freeResize ? "object-fill" : "object-contain"}`} /> : <div role="status" aria-label="正在加载图片" className="grid size-full place-items-center" style={{ background: theme.node.fill, color: theme.node.muted }}><span data-canvas-live-scale style={{ transform: "scale(var(--canvas-live-inverse-scale, 1))" }}>{loading ? <LoaderCircle className="size-5 animate-spin" /> : <ImageIcon className="size-5" />}</span></div>}
             </div>
         </BatchFrame>
     );
+}
+
+/** 已经在缓存里的图片挂载时就是加载完成，直接标记，不等 load 事件，避免生成完成时的淡入一直停在透明。 */
+function markLoadedIfComplete(image: HTMLImageElement | null) {
+    if (image?.complete && image.naturalWidth > 0) image.dataset.loaded = "true";
 }
 
 function useNodeResourceUrl(node: CanvasNodeData, eager: boolean, previewSize?: number) {
@@ -816,7 +822,7 @@ function BatchFrame({ batchCount, batchPreviewNodes, batchExpanded, batchOpening
                     {Array.from({ length: Math.min(batchCount - 1, 5) }).map((_, index) => (
                         <div
                             key={index}
-                            className="absolute rounded-[var(--r-lg)] transition-all duration-300 group-hover/batch:translate-x-2"
+                            className="absolute rounded-[var(--r-lg)] transition-transform duration-(--motion-state) group-hover/batch:translate-x-2"
                             style={{
                                 inset: 0,
                                 background: theme.node.panel,

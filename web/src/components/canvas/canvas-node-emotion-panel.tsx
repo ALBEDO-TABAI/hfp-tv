@@ -1,5 +1,5 @@
 import { Canvas, useLoader, useThree } from "@react-three/fiber";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotionConfig } from "motion/react";
 import { Suspense, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ScanFace, Sparkles, X } from "lucide-react";
 import { Box3, Color, Mesh, MeshStandardMaterial, Vector3, type Object3D } from "three";
@@ -8,7 +8,7 @@ import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
 import { SpotlightSurface } from "@/components/ui/aceternity/spotlight-surface";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionDuration, motionSpring } from "@/lib/motion-tokens";
 import { canvasThemes } from "@/lib/canvas-theme";
 import {
     canvasEmotionPresets,
@@ -55,7 +55,7 @@ type CanvasNodeEmotionPanelProps = {
 
 export function CanvasNodeEmotionPanel({ dataUrl, imageWidth, imageHeight, characters, activeCharacterId, preset, generating, error, onSelectCharacter, onManualSelect, onPresetChange, onClose, onConfirm }: CanvasNodeEmotionPanelProps) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     return (
         <SpotlightSurface
             data-canvas-no-zoom
@@ -63,7 +63,7 @@ export function CanvasNodeEmotionPanel({ dataUrl, imageWidth, imageHeight, chara
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 5, scale: 0.98 }}
-            transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.panel}
+            transition={reducedMotion ? { duration: 0 } : motionSpring.smooth}
             className="aceternity-floating-panel w-[580px] max-w-full overflow-hidden rounded-[var(--r-2xl)] border backdrop-blur-2xl"
             style={{ background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.node.text, boxShadow: `0 28px 80px ${theme.spatial.shadow}` }}
         >
@@ -74,12 +74,11 @@ export function CanvasNodeEmotionPanel({ dataUrl, imageWidth, imageHeight, chara
                             key={character.id}
                             type="button"
                             layout
-                            whileTap={reducedMotion ? undefined : { scale: 0.96 }}
                             className="relative flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--dock-item-radius)] border px-1.5 pr-2 text-[var(--fs-label)] font-medium outline-none"
                             style={{ background: activeCharacterId === character.id ? theme.toolbar.activeBg : theme.spatial.surface, borderColor: activeCharacterId === character.id ? theme.spatial.glowStrong : theme.toolbar.border }}
                             onClick={() => onSelectCharacter(character.id)}
                         >
-                            {activeCharacterId === character.id ? <motion.span layoutId="emotion-active-character" className="absolute inset-0 -z-10 rounded-[var(--r-md)]" style={{ boxShadow: `inset 0 0 0 1px ${theme.accent.primarySoft}` }} transition={aceternityMotion.spring.dock} /> : null}
+                            {activeCharacterId === character.id ? <motion.span layoutId="emotion-active-character" className="absolute inset-0 -z-10 rounded-[var(--r-md)]" style={{ boxShadow: `inset 0 0 0 1px ${theme.accent.primarySoft}` }} transition={motionSpring.snappy} /> : null}
                             <FaceThumbnail dataUrl={dataUrl} imageWidth={imageWidth} imageHeight={imageHeight} box={character.faceBox} />
                             <span>{character.name}</span>
                         </motion.button>
@@ -99,19 +98,17 @@ export function CanvasNodeEmotionPanel({ dataUrl, imageWidth, imageHeight, chara
             <div className="flex min-h-11 items-center gap-2 border-t px-3" style={{ borderColor: theme.toolbar.border }}>
                 <span className="text-[var(--fs-tiny)]" style={{ color: theme.node.muted }}>情绪定位</span>
                 <AnimatePresence mode="wait" initial={false}>
-                    <motion.span key={preset.id} initial={reducedMotion ? false : { opacity: 0, y: 4, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={reducedMotion ? undefined : { opacity: 0, y: -3, filter: "blur(3px)" }} transition={{ duration: reducedMotion ? 0 : 0.18 }} className="text-xs font-semibold">{preset.label}</motion.span>
+                    <motion.span key={preset.id} initial={reducedMotion ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { opacity: 0, y: -3 }} transition={{ duration: reducedMotion ? 0 : motionDuration.state }} className="text-xs font-semibold">{preset.label}</motion.span>
                 </AnimatePresence>
                 {error ? <span className="min-w-0 flex-1 truncate text-right text-[var(--fs-tiny)]" style={{ color: theme.accent.danger }} title={error}>{error}</span> : <span className="flex-1" />}
                 <motion.button
                     type="button"
                     disabled={generating}
-                    whileHover={reducedMotion || generating ? undefined : { y: -1 }}
-                    whileTap={reducedMotion || generating ? undefined : { scale: 0.97 }}
                     className="flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--dock-item-radius)] px-3 text-[var(--fs-label)] font-semibold disabled:cursor-wait disabled:opacity-55"
                     style={{ background: theme.node.activeStroke, color: theme.node.panel }}
                     onClick={onConfirm}
                 >
-                    <Sparkles className={`size-3.5 ${generating ? "animate-pulse" : ""}`} />{generating ? "准备生成" : "生成"}
+                    <Sparkles className="size-3.5" />{generating ? "准备生成" : "生成"}
                 </motion.button>
             </div>
         </SpotlightSurface>
@@ -130,7 +127,7 @@ function FaceThumbnail({ dataUrl, imageWidth, imageHeight, box }: { dataUrl: str
 
 function EmotionPad({ preset, onChange }: { preset: CanvasEmotionPreset; onChange: (preset: CanvasEmotionPreset) => void }) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
     const [dragging, setDragging] = useState(false);
     const update = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -176,7 +173,7 @@ function EmotionPad({ preset, onChange }: { preset: CanvasEmotionPreset; onChang
                         <button key={item.id} type="button" aria-label={item.label} title={item.label} className="relative m-auto grid size-7 place-items-center rounded-full outline-none" onClick={() => onChange(item)}>
                             <motion.span
                                 animate={{ scale: active ? 1.65 : 1 + proximity * 0.42, opacity: active ? 1 : onPath ? 0.88 : 0.42 + proximity * 0.45 }}
-                                transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.dock}
+                                transition={reducedMotion ? { duration: 0 } : motionSpring.snappy}
                                 className={`block rounded-full ${active ? "size-3 border-2 bg-transparent" : "size-2 bg-current"}`}
                                 style={{ color: active || onPath ? theme.node.activeStroke : theme.node.muted, borderColor: theme.node.activeStroke, boxShadow: active ? `0 0 0 5px ${theme.accent.primarySoft}, 0 0 18px ${theme.spatial.glowStrong}` : undefined }}
                             />
@@ -202,7 +199,7 @@ function EmotionHeadPreview({ preset }: { preset: CanvasEmotionPreset }) {
             </Canvas>
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/55 to-transparent" />
             <AnimatePresence mode="wait" initial={false}>
-                <motion.span key={preset.id} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} exit={{ opacity: 0, filter: "blur(5px)" }} transition={{ duration: aceternityMotion.duration.state }} className="pointer-events-none absolute bottom-2 left-2.5 text-[var(--fs-tiny)] font-medium text-white/72">实时预览 · {preset.label}</motion.span>
+                <motion.span key={preset.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: motionDuration.state }} className="pointer-events-none absolute bottom-2 left-2.5 text-[var(--fs-tiny)] font-medium text-white/72">实时预览 · {preset.label}</motion.span>
             </AnimatePresence>
         </div>
     );
@@ -215,7 +212,7 @@ function EmotionFaceModel({ preset }: { preset: CanvasEmotionPreset }) {
         loader.setMeshoptDecoder(MeshoptDecoder);
     });
     const invalidate = useThree((state) => state.invalidate);
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     const model = useMemo(() => createMannequinModel(gltf.scene), [gltf.scene]);
     const animationRef = useRef<number | null>(null);
 

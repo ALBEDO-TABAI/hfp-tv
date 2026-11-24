@@ -37,6 +37,7 @@ import { canvasGenerationFailureMetadata, canvasGenerationRetryBlocked, canvasIm
 import { createReferenceLinkResolver } from "@/components/generation-reference-links";
 import { confirmCanvasGeneration, waitForCanvasPreparation } from "./canvas-generation-preflight";
 import { startOperation } from "@/stores/use-operation-progress";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 type UseCanvasGenerationExecutorOptions = {
     projectId: string;
@@ -94,7 +95,8 @@ export function useCanvasGenerationExecutor({
     bindGenerationTask,
     applyGenerationTaskResult,
 }: UseCanvasGenerationExecutorOptions) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const submissionLocksRef = useRef(new Map<string, Promise<unknown>>());

@@ -21,7 +21,10 @@ describe("canvas node drag overlays", () => {
         expect(projectSource).toContain("angleNode?.metadata?.content ? (");
         expect(projectSource).toContain("dragOffset={dragPreview?.nodeIds.has(angleNode.id)");
         expect(projectSource).toContain("emotionNode?.metadata?.content && !isCanvasNodeMoving");
-        expect(projectSource).toContain("selectedNodeBounds && !selectionBox && !isCanvasNodeMoving");
+        // 多选工具条在拖动期间保持挂载但立即隐藏、不可交互，松手后淡回，而不是卸载再重新弹出。
+        expect(projectSource).toContain("inert={isCanvasNodeMoving}");
+        expect(projectSource).toContain('${isCanvasNodeMoving ? "opacity-0" :');
+        expect(projectSource).toContain("selectedNodeBounds && !selectionBox ? (");
         expect(projectSource).toContain(
             "node={isCanvasNodeMoving || nodeImageSettingsOpen || annotationNodeId || maskEditNodeId || emotionNodeId || angleNodeId || (dialogNode && !isCanvasMediaResultNode(dialogNode)) || textEditorNodeId ? null : toolbarNode}",
         );

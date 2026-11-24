@@ -1,4 +1,5 @@
-import { App, Button, ColorPicker, Dropdown, Input, InputNumber, Modal, Select, Slider } from "antd";
+import { App, Button, ColorPicker, Dropdown, Input, InputNumber, Select, Slider } from "antd";
+import { AppModal, useAppModal } from "@/components/ui/product/app-modal";
 import { Switch } from "@/components/ui/base/switch";
 import type { MenuProps } from "antd";
 import { Box, BoxSelect, Camera, ChevronDown, ChevronRight, Circle, Clock3, Copy, Cuboid, Eye, EyeOff, FileUp, Focus, Folder, Image as ImageIcon, LampDesk, Lightbulb, LockKeyhole, LockKeyholeOpen, PanelLeftClose, PanelLeftOpen, Plus, ScanSearch, Search, Sparkles, Trash2, UserRound, Video, X } from "lucide-react";
@@ -60,7 +61,8 @@ import type { ReferenceImage } from "@/types/image";
 import type { DirectorCamera, DirectorCameraMove, DirectorHumanoidBone, DirectorKeyframeDeleteTarget, DirectorKeyframeEasing, DirectorLight, DirectorObject, DirectorPose, DirectorQuat, DirectorRenderMode, DirectorRig, DirectorScene, DirectorSceneOutput, DirectorShot, DirectorShotSize, DirectorTransform, DirectorVec3 } from "@/types/director";
 
 export function CanvasDirectorWorkbench({ open, scene, projectId, imageNodes, onboardingScope, onClose, onChange, onApply, onDeleteImageNode, onAddCanvasImage, onFlush, onShouldCaptureCover, onCaptureCover, generatePanorama = generateDirectorPanorama }: { open: boolean; scene: DirectorScene | null; projectId?: string; imageNodes: CanvasNodeData[]; onboardingScope: string; onClose: () => void; onChange: (scene: DirectorScene) => void; onApply: (output: DirectorSceneOutput) => Promise<void | { confirmed?: boolean }>; onDeleteImageNode: (nodeId: string) => void; onAddCanvasImage?: (image: Awaited<ReturnType<typeof uploadImage>>, title: string, signal: AbortSignal, expectedScope: CapturedUserScope) => void | Promise<void | DirectorCanvasImageHandoff>; onFlush?: () => void | Promise<void>; onShouldCaptureCover?: (scene: DirectorScene, shotId: string) => boolean; onCaptureCover?: (input: { scene: DirectorScene; shotId: string; beauty: Blob }) => Promise<void>; generatePanorama?: typeof generateDirectorPanorama }) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const theme = canvasThemes[useActiveTheme()];
     const effectiveConfig = useEffectiveConfig();
     const viewportRef = useRef<DirectorViewportHandle>(null);
@@ -1852,7 +1854,7 @@ export function CanvasDirectorWorkbench({ open, scene, projectId, imageNodes, on
                 </> : null}
             </div>
 
-            <Modal title="AI 识图导入" open={sceneImportModalOpen} onCancel={() => { setSceneImportModalOpen(false); setNavigationTab("scene"); }} destroyOnHidden={false} width={760}
+            <AppModal title="AI 识图导入" open={sceneImportModalOpen} onCancel={() => { setSceneImportModalOpen(false); setNavigationTab("scene"); }} destroyOnHidden={false} width={760}
                 footer={<div className="flex items-center justify-between gap-4 text-left"><span className="text-xs opacity-65">关闭不会中断识图任务，生成站位参考后自动导入导演台</span><Button type="primary" disabled={!sceneReferenceImage || sceneLayoutBusy} loading={sceneLayoutBusy} onClick={() => void analyzeSceneReference()}>生成站位参考</Button></div>}>
                 <div className="mb-3 flex gap-5 border-b pb-2 text-xs">
                     <button type="button" className={sceneImportView === "reference" ? "font-semibold" : "opacity-55"} onClick={() => setSceneImportView("reference")}>本地上传</button>
@@ -1875,8 +1877,8 @@ export function CanvasDirectorWorkbench({ open, scene, projectId, imageNodes, on
                     {imageAssets.map((asset) => <button key={asset.id} type="button" className="overflow-hidden rounded-lg border text-left text-xs" style={{ borderColor: theme.toolbar.border }} onClick={() => setSceneReferenceImage({ id: asset.id, name: asset.title, type: asset.data.mimeType || "image/png", dataUrl: asset.data.dataUrl, url: asset.data.dataUrl, storageKey: asset.data.storageKey, width: asset.data.width, height: asset.data.height, bytes: asset.data.bytes })}><PanoramaHistoryThumbnail storageKey={asset.data.storageKey} fallback={asset.coverUrl || asset.data.dataUrl} /><span className="block truncate p-2">{asset.title}</span></button>)}
                     {imageNodes.length + imageAssets.length === 0 ? <p className="col-span-4 py-10 text-center text-xs opacity-55">暂无图片历史</p> : null}
                 </div> : <div className="max-h-[55vh] space-y-3 overflow-y-auto"><section><PanelTitle title="3D模型" /><div className="grid grid-cols-3 gap-2">{modelAssets.map((asset) => <button key={asset.id} type="button" className="rounded-lg border p-3 text-left text-xs" style={{ borderColor: theme.toolbar.border }} onClick={() => { addModelAsset(asset); setSceneImportModalOpen(false); setNavigationTab("scene"); }}>{asset.title}</button>)}</div></section><section><PanelTitle title="画布图片立牌" /><div className="grid grid-cols-3 gap-2">{imageNodes.map((node) => <button key={node.id} type="button" className="rounded-lg border p-2 text-left text-xs" style={{ borderColor: theme.toolbar.border }} onClick={() => { const url = node.metadata?.content; if (!url) return; setSceneReferenceImage({ id: node.id, name: node.title, type: String(node.metadata?.mimeType || "image/png"), dataUrl: url, url, storageKey: node.metadata?.storageKey }); setSceneImportView("reference"); setSceneImportModalOpen(false); setNavigationTab("scene"); addBillboard(node); }}><span className="block truncate">{node.title}</span></button>)}</div></section><section><PanelTitle title="图片素材历史" /><div className="grid grid-cols-3 gap-2">{imageAssets.map((asset) => <button key={asset.id} type="button" className="rounded-lg border p-2 text-left text-xs" style={{ borderColor: theme.toolbar.border }} onClick={() => { setSceneReferenceImage({ id: asset.id, name: asset.title, type: asset.data.mimeType || "image/png", dataUrl: asset.data.dataUrl, url: asset.data.dataUrl, storageKey: asset.data.storageKey }); setSceneImportView("reference"); setSceneImportModalOpen(false); setNavigationTab("scene"); addObject(createDirectorBillboard(asset.title, asset.data.dataUrl, asset.data.storageKey)); }}><span className="block truncate">{asset.title}</span></button>)}</div></section></div>}
-            </Modal>
-            <Modal title="生成历史" open={panoramaHistoryOpen} onCancel={() => setPanoramaHistoryOpen(false)} footer={null} destroyOnHidden width={680}>
+            </AppModal>
+            <AppModal title="生成历史" open={panoramaHistoryOpen} onCancel={() => setPanoramaHistoryOpen(false)} footer={null} destroyOnHidden width={680}>
                 <div className="mb-4 flex gap-2" role="group" aria-label="历史范围">
                     <button type="button" aria-pressed={panoramaHistoryScope === "all"} className="rounded-lg px-3 py-1.5 text-xs aria-pressed:bg-white/10" onClick={() => setPanoramaHistoryScope("all")}>全部画布</button>
                     <button type="button" aria-pressed={panoramaHistoryScope === "canvas"} className="rounded-lg px-3 py-1.5 text-xs aria-pressed:bg-white/10" onClick={() => setPanoramaHistoryScope("canvas")}>本画布</button>
@@ -1892,7 +1894,7 @@ export function CanvasDirectorWorkbench({ open, scene, projectId, imageNodes, on
                     </button>)}
                 </div>
                 {(panoramaHistoryScope === "canvas" || imageAssets.length === 0) && imageNodes.every((node) => !node.metadata?.content) ? <p className="py-8 text-center text-xs opacity-60">暂无图片，可先本地上传</p> : null}
-            </Modal>
+            </AppModal>
             <DirectorPanoramaAIModal open={panoramaAIOpen} busy={panoramaAIBusy} status={panoramaAIStatus} onClose={() => setPanoramaAIOpen(false)} onGenerate={startPanoramaGeneration} />
 
             {/* 时间轴与一级工具模式解耦：底部按钮可在摆场等模式直接展开，不切走场景检查器。 */}

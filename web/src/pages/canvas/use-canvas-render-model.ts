@@ -12,6 +12,7 @@ import type { Skill } from "@/services/api/skills";
 import type { Asset, ImageAsset } from "@/stores/use-asset-store";
 import type { DirectorScene } from "@/types/director";
 import { CanvasNodeType, type CanvasConnection, type CanvasDisplayConnection, type CanvasMediaPerformanceMode, type CanvasNodeData, type ContextMenuState, type ViewportTransform } from "@/types/canvas";
+import { useThemeStore } from "@/stores/use-theme-store";
 
 type DragPreview = { x: number; y: number; nodeIds: Set<string> } | null;
 type IndexedConnection = { connection: CanvasConnection; fromId: string; toId: string };
@@ -82,7 +83,8 @@ export function useCanvasRenderModel({
     lodPinnedNodeIds = EMPTY_PINNED_NODE_IDS,
     viewportInteracting = false,
 }: UseCanvasRenderModelOptions) {
-    const reduceMediaEffects = useMemo(() => shouldReduceCanvasMediaEffects(mediaPerformanceMode, nodes), [mediaPerformanceMode, nodes]);
+    const fluidMode = useThemeStore((state) => state.effects === "lite");
+    const reduceMediaEffects = useMemo(() => shouldReduceCanvasMediaEffects(mediaPerformanceMode, nodes, fluidMode), [fluidMode, mediaPerformanceMode, nodes]);
     const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
     // These maps are consumed by both virtualization and node chrome. Building
     // them together keeps a metadata update from walking a 50k-node array six

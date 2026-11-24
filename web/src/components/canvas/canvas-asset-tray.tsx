@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { ChevronDown, CircleUserRound, Crosshair, ImageIcon, Images, Plus, Search, X } from "lucide-react";
 
@@ -6,7 +6,7 @@ import { FloatingDock, type FloatingDockEntry } from "@/components/ui/aceternity
 import { AssetMediaPreview } from "@/components/asset-media-preview";
 import { CachedResourceImage } from "@/components/cached-resource-image";
 import { useCanvasOverlayLayer } from "@/components/canvas/canvas-overlay-layer";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionPreset, motionSpring } from "@/lib/motion-tokens";
 import { canvasDockStyle } from "@/lib/canvas/canvas-aceternity-style";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,6 @@ type CanvasAssetTrayProps = {
 
 export function CanvasAssetTray({ libraryAssets, canvasImages, showLibrary = true, activeNodeId, onInsertAsset, onFocusCanvasImage, libtvReadonlyDense = false }: CanvasAssetTrayProps) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
     const { bringToFront, zIndex } = useCanvasOverlayLayer("asset-tray", "var(--z-panel)");
     const rootRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
@@ -82,7 +81,6 @@ export function CanvasAssetTray({ libraryAssets, canvasImages, showLibrary = tru
         window.addEventListener("resize", updateDockLabels);
         return () => window.removeEventListener("resize", updateDockLabels);
     }, []);
-    const motionEnabled = !reducedMotion;
 
     const startAssetDrag = (event: DragEvent<HTMLElement>, asset: ImageAsset) => {
         event.dataTransfer.effectAllowed = "copy";
@@ -195,10 +193,7 @@ export function CanvasAssetTray({ libraryAssets, canvasImages, showLibrary = tru
             <AnimatePresence>
                 {open ? (
                     <motion.aside
-                        initial={{ opacity: 0, y: 20, scale: 0.92, rotateX: 5 }}
-                        animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
-                        exit={{ opacity: 0, y: 14, scale: 0.95, rotateX: 3 }}
-                        transition={aceternityMotion.spring.panel}
+                        {...motionPreset.popover("above")}
                         ref={panelRef}
                         data-canvas-asset-tray
                         className="canvas-asset-tray-panel aceternity-floating-panel absolute bottom-[var(--canvas-dock-popover-offset)] left-0 flex w-[min(88vw,312px)] origin-bottom-left flex-col overflow-hidden rounded-[var(--r-2xl)] p-2.5 backdrop-blur-2xl"
@@ -209,7 +204,7 @@ export function CanvasAssetTray({ libraryAssets, canvasImages, showLibrary = tru
                         </button>
 
                         <div className="flex justify-end px-1 pb-2.5 pt-1.5">
-                            <motion.button type="button" whileHover={motionEnabled ? { rotate: -5, scale: 1.05 } : undefined} whileTap={motionEnabled ? { scale: 0.92 } : undefined} className="grid size-7 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2" style={{ background: theme.spatial.surface, color: theme.node.muted }} onClick={() => setOpen(false)} aria-label="收起素材空间">
+                            <motion.button type="button" className="grid size-7 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2" style={{ background: theme.spatial.surface, color: theme.node.muted }} onClick={() => setOpen(false)} aria-label="收起素材空间">
                                 <ChevronDown className="size-4" />
                             </motion.button>
                         </div>
@@ -230,7 +225,7 @@ export function CanvasAssetTray({ libraryAssets, canvasImages, showLibrary = tru
                                 filteredAssets.length ? (
                                     <div className="space-y-1.5">
                                         {filteredAssets.map((asset) => (
-                                            <AssetTrayRow key={asset.id} title={asset.title} imageUrl="" asset={asset} insertable draggable={asset.kind === "image"} motionEnabled={motionEnabled} onDragStart={asset.kind === "image" ? (event) => startAssetDrag(event, asset) : undefined} onClick={() => onInsertAsset(asset)} icon={<Plus className="size-3.5" />} />
+                                            <AssetTrayRow key={asset.id} title={asset.title} imageUrl="" asset={asset} insertable draggable={asset.kind === "image"} onDragStart={asset.kind === "image" ? (event) => startAssetDrag(event, asset) : undefined} onClick={() => onInsertAsset(asset)} icon={<Plus className="size-3.5" />} />
                                         ))}
                                     </div>
                                 ) : (
@@ -239,7 +234,7 @@ export function CanvasAssetTray({ libraryAssets, canvasImages, showLibrary = tru
                             ) : filteredNodes.length ? (
                                 <div className="space-y-1.5">
                         {filteredNodes.map((node) => (
-                            <AssetTrayRow key={node.id} title={canvasImageTitle(node)} imageUrl={node.metadata?.content || node.metadata?.previewContent || ""} storageKey={node.metadata?.storageKey} active={activeNodeId === node.id} motionEnabled={motionEnabled} onClick={() => onFocusCanvasImage(node.id)} icon={<Crosshair className="size-3.5" />} />
+                            <AssetTrayRow key={node.id} title={canvasImageTitle(node)} imageUrl={node.metadata?.content || node.metadata?.previewContent || ""} storageKey={node.metadata?.storageKey} active={activeNodeId === node.id} onClick={() => onFocusCanvasImage(node.id)} icon={<Crosshair className="size-3.5" />} />
                                     ))}
                                 </div>
                             ) : (
@@ -274,13 +269,13 @@ type CanvasTheme = (typeof canvasThemes)[keyof typeof canvasThemes];
 function TrayTabButton({ active, label, theme, onClick }: { active: boolean; label: string; theme: CanvasTheme; onClick: () => void }) {
     return (
         <button type="button" className={cn("relative z-10 h-7 rounded-[var(--dock-item-radius)] px-2 text-[var(--fs-tiny)] font-semibold outline-none transition-colors focus-visible:ring-2", active ? "" : "opacity-55 hover:opacity-90")} style={{ color: active ? theme.node.text : theme.node.muted }} onClick={onClick}>
-            {active ? <motion.span layoutId="canvas-asset-tray-active-tab" className="absolute inset-0 -z-10 rounded-[var(--dock-item-radius)]" style={{ background: theme.node.panel, boxShadow: `0 6px 16px ${theme.spatial.shadow}` }} transition={aceternityMotion.spring.dock} /> : null}
+            {active ? <motion.span layoutId="canvas-asset-tray-active-tab" className="absolute inset-0 -z-10 rounded-[var(--dock-item-radius)]" style={{ background: theme.node.panel, boxShadow: `0 6px 16px ${theme.spatial.shadow}` }} transition={motionSpring.snappy} /> : null}
             {label}
         </button>
     );
 }
 
-function AssetTrayRow({ title, imageUrl, storageKey, asset, insertable = false, icon, active = false, draggable = false, motionEnabled, onClick, onDragStart }: { title: string; imageUrl: string; storageKey?: string; asset?: Asset; insertable?: boolean; icon: ReactNode; active?: boolean; draggable?: boolean; motionEnabled: boolean; onClick: () => void; onDragStart?: (event: DragEvent<HTMLElement>) => void }) {
+function AssetTrayRow({ title, imageUrl, storageKey, asset, insertable = false, icon, active = false, draggable = false, onClick, onDragStart }: { title: string; imageUrl: string; storageKey?: string; asset?: Asset; insertable?: boolean; icon: ReactNode; active?: boolean; draggable?: boolean; onClick: () => void; onDragStart?: (event: DragEvent<HTMLElement>) => void }) {
     const theme = canvasThemes[useActiveTheme()];
     return (
         <motion.button
@@ -288,9 +283,7 @@ function AssetTrayRow({ title, imageUrl, storageKey, asset, insertable = false, 
             data-canvas-asset-row
             aria-label={`${title}，${active ? "当前已选择" : draggable ? "拖入画布或点击插入" : insertable ? "点击插入画布" : "点击定位到画布"}`}
             draggable={draggable}
-            whileHover={motionEnabled ? { x: 4, scale: 1.008 } : undefined}
-            whileTap={motionEnabled ? { scale: 0.985 } : undefined}
-            transition={aceternityMotion.spring.dock}
+            transition={motionSpring.snappy}
             className="group grid h-12 w-full grid-cols-[36px_minmax(0,1fr)_24px] items-center gap-1.5 rounded-[var(--r-lg)] px-1.5 text-left outline-none focus-visible:ring-2"
             style={{ background: active ? theme.accent.primarySoft : theme.spatial.surface, color: active ? theme.accent.primary : theme.node.text, boxShadow: active ? `0 6px 18px ${theme.spatial.shadow}` : undefined }}
             onClick={onClick}

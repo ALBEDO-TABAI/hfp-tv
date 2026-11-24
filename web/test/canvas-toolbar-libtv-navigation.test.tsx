@@ -13,7 +13,10 @@ describe("LibTV canvas navigation dock", () => {
         const dock = readFileSync(resolve(root, "src/components/ui/aceternity/floating-dock.tsx"), "utf8");
         const styles = readFileSync(resolve(root, "src/styles/globals.css"), "utf8");
 
-        expect(dock).toContain("libtv: { base: 32, magnified: 32, icon: 18, iconMagnified: 18, distance: 0 }");
+        // LibTV 停靠栏保持 32px 按钮和 18px 图标；Dock 不再做指针放大，没有跟随指针的尺寸弹簧。
+        expect(dock.match(/libtv: \{ base: 32, icon: 18 \}/g)?.length).toBe(2);
+        expect(dock).not.toContain("useSpring(");
+        expect(dock).not.toContain("magnified");
         expect(styles).toContain("height: 44px !important;");
         expect(styles).toContain("padding: 4px !important;");
     });

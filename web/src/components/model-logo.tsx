@@ -163,7 +163,7 @@ export function ModelIconPicker({ value, onChange }: { value?: string; onChange?
                                         aria-selected={selected}
                                         title={item.title}
                                         className={cn(
-                                            "group relative flex size-12 flex-col items-center justify-center rounded-lg border border-border/50 bg-surface text-foreground/75 transition-all hover:scale-105 hover:border-primary/60 hover:bg-surface-active hover:text-foreground",
+                                            "group relative flex size-12 flex-col items-center justify-center rounded-lg border border-border/50 bg-surface text-foreground/75 transition-[color,background-color,border-color] hover:border-primary/60 hover:bg-surface-active hover:text-foreground",
                                             selected && "border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary"
                                         )}
                                         onClick={() => {

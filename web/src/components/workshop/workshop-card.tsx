@@ -9,7 +9,7 @@ export function WorkshopCard({ publication, onCopy }: { publication: Publication
             <Link to={`/workshop/${publication.id}`} className="block h-full focus-visible:outline-2 focus-visible:outline-ring" aria-label={`预览 ${publication.title}`}>
                 {publication.coverSha256 ? <img src={workshopFileUrl(publication.coverSha256, publication.currentVersionId)} alt={publication.title} loading="lazy" className="h-full w-full object-contain" /> : <span className="grid h-full place-items-center text-sm text-muted-foreground">{publication.title}</span>}
             </Link>
-            <div className="absolute bottom-2 right-2 flex gap-2 rounded-[var(--r-sm)] bg-card p-1 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+            <div className="absolute bottom-2 right-2 flex gap-2 rounded-[var(--r-sm)] bg-card p-1 transition-opacity duration-(--motion-instant) ease-(--ease-out) md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
                 <Link to={`/workshop/${publication.id}`} className="inline-flex items-center px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring">预览</Link>
                 <Button size="small" onClick={() => onCopy(publication)}>复制</Button>
             </div>

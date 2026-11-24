@@ -9,7 +9,10 @@ import { removeCreationConversationSnapshot, updateCreationConversationSnapshot 
 test("Create exposes one accessible copy action beside each displayed user prompt", async () => {
     const source = await Bun.file(new URL("../src/pages/create/creation-workspace.tsx", import.meta.url)).text();
     expect(source).toContain('aria-label="复制提示词"');
-    expect(source).toContain('copyText(visiblePrompt, "提示词已复制")');
+    // 复制结果在按钮原地交代：图标换成对勾、提示改成「已复制 / 复制失败」，读屏同步播报。
+    expect(source).toContain("setCopyFeedback({ copied: await copy(visiblePrompt) })");
+    expect(source).toContain('copyFeedback.copied ? "已复制" : "复制失败"');
+    expect(source).toContain('<span className="sr-only" role="status">');
 });
 
 test("Create submit button does not forward the browser click event as retry context", async () => {

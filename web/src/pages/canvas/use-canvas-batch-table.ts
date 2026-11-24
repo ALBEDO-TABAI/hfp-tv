@@ -9,6 +9,7 @@ import { buildGenerationConfig, resetGenerationTaskMetadata } from "@/lib/canvas
 import { navigateToSettings } from "@/lib/settings-navigation";
 import { modelDisplayName, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { CanvasNodeType, type CanvasBatchRow, type CanvasBatchTableData, type CanvasConnection, type CanvasGenerationBatchMode, type CanvasNodeData } from "@/types/canvas";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 type Options = {
     nodesRef: { current: CanvasNodeData[] };
@@ -20,7 +21,8 @@ type Options = {
 };
 
 export function useCanvasBatchTable({ nodesRef, connectionsRef, setNodes, setConnections, setSelectedNodeIds, enqueueGenerationBatch }: Options) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
 

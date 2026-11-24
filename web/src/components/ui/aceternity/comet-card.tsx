@@ -1,8 +1,8 @@
-import { motion, useMotionTemplate, useMotionValue, useReducedMotion, useSpring, useTransform, type HTMLMotionProps, type MotionStyle } from "motion/react";
+import { motion, useMotionTemplate, useMotionValue, useReducedMotionConfig, useSpring, useTransform, type HTMLMotionProps, type MotionStyle } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionSpring, motionSpringValue } from "@/lib/motion-tokens";
 
 type CometCardProps = Omit<HTMLMotionProps<"div">, "children"> & {
     children?: ReactNode;
@@ -36,14 +36,14 @@ function resetCometCardsAfterWindowBlur() {
 }
 
 export function CometCard({ containerClassName, className, rotateDepth = 5.5, translateDepth = 5, disabled = false, glare = true, children, style, onMouseEnter, onMouseMove, onMouseLeave, onPointerCancel, ...props }: CometCardProps) {
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     const motionEnabled = !disabled && !reducedMotion;
     const [motionActive, setMotionActive] = useState(false);
     const settleTimerRef = useRef<number | null>(null);
     const x = useMotionValue(0);
     const y = useMotionValue(0);
-    const springX = useSpring(x, aceternityMotion.spring.surface);
-    const springY = useSpring(y, aceternityMotion.spring.surface);
+    const springX = useSpring(x, motionSpringValue.snappy);
+    const springY = useSpring(y, motionSpringValue.snappy);
     const rotateX = useTransform(springY, [-0.5, 0.5], [-rotateDepth, rotateDepth]);
     const rotateY = useTransform(springX, [-0.5, 0.5], [rotateDepth, -rotateDepth]);
     const translateX = useTransform(springX, [-0.5, 0.5], [-translateDepth, translateDepth]);
@@ -94,7 +94,7 @@ export function CometCard({ containerClassName, className, rotateDepth = 5.5, tr
                 data-comet-active={motionEnabled && motionActive ? "true" : "false"}
                 style={motionStyle}
                 whileHover={motionEnabled && motionActive ? { scale: 1.022, z: 28 } : undefined}
-                transition={aceternityMotion.spring.surface}
+                transition={motionSpring.snappy}
                 onMouseEnter={(event) => {
                     if (motionEnabled) {
                         clearSettleTimer();

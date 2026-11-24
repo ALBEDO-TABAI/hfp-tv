@@ -1,5 +1,5 @@
 import { App, Button, ColorPicker, Dropdown, Input, Popover } from "antd";
-import { AppModal } from "@/components/ui/product/app-modal";
+import { AppModal, useAppModal } from "@/components/ui/product/app-modal";
 import { Tooltip } from "@/components/ui/base/tooltip";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -43,7 +43,8 @@ type CanvasTextEditorModalProps = {
 };
 
 export function CanvasTextEditorModal({ node, open, onClose, onSave }: CanvasTextEditorModalProps) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const theme = canvasThemes[useActiveTheme()];
     const [title, setTitle] = useState("");
     const [dirty, setDirty] = useState(false);

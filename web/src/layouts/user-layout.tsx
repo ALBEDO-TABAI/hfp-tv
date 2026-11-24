@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, type ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { ConfigProvider } from "antd";
 
@@ -6,11 +6,9 @@ import { HfpSplash } from "@/components/brand/hfp-splash";
 import { AppWorkspaceShell } from "@/components/layout/app-top-nav";
 import { FirstCreationGuide } from "@/components/onboarding/first-creation-guide";
 import { WorkspaceOperationProgress } from "@/components/layout/workspace-operation-progress";
-import { initHfpGlassRuntime } from "@/lib/hfp-glass";
 import { cn } from "@/lib/utils";
 import { isSpatialWorkbenchPath } from "@/lib/workspace-routes";
 import { getWorkspaceAntThemeConfig } from "@/lib/app-theme";
-import { useWorkspaceButtonFeedback } from "@/hooks/use-workspace-button-feedback";
 import { useThemeStore } from "@/stores/use-theme-store";
 import "@/styles/workspace-product.css";
 import "@/styles/hfp-design-system.css";
@@ -22,11 +20,6 @@ export default function UserLayout({ children }: { children: ReactNode }) {
     const theme = useThemeStore((state) => state.theme);
     const spatialWorkbench = isSpatialWorkbenchPath(pathname);
     const productWorkspace = !/^\/canvas\/[^/]+(?:\/|$)/.test(pathname);
-    useWorkspaceButtonFeedback(productWorkspace);
-
-    useEffect(() => {
-        initHfpGlassRuntime();
-    }, []);
 
     useLayoutEffect(() => {
         document.documentElement.dataset.theme = theme;

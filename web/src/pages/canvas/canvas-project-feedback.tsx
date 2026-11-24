@@ -4,7 +4,7 @@ import { CheckCircle2, CloudUpload, LoaderCircle, TriangleAlert } from "lucide-r
 import type { GenerationTask } from "@/services/api/task-center";
 import type { MergeVideoProgress } from "@/lib/canvas/canvas-video-merge";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionDuration, motionSpring } from "@/lib/motion-tokens";
 
 export type CanvasUploadStatus = {
     id: number;
@@ -26,7 +26,7 @@ export function CanvasUploadStatusToast({ status, theme }: { status: CanvasUploa
             aria-live="polite"
             initial={{ opacity: 0, x: 22, scale: 0.94 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={aceternityMotion.spring.panel}
+            transition={motionSpring.smooth}
             className="pointer-events-none absolute right-4 top-20 z-[var(--z-panel-floating)] w-[var(--panel-width-compact)] overflow-hidden rounded-[var(--panel-radius-wide-tight)] border px-4 py-4 backdrop-blur-2xl"
             style={{
                 background: theme.spatial.elevated,
@@ -39,7 +39,7 @@ export function CanvasUploadStatusToast({ status, theme }: { status: CanvasUploa
             <div className="flex items-start gap-3">
                 <motion.span
                     animate={status.done || status.error ? { scale: [0.8, 1.08, 1] } : { y: [0, -2, 0] }}
-                    transition={status.done || status.error ? { duration: aceternityMotion.duration.panel } : { duration: 1.5, repeat: Number.POSITIVE_INFINITY }}
+                    transition={status.done || status.error ? { duration: motionDuration.panel } : { duration: 1.5, repeat: Number.POSITIVE_INFINITY }}
                     className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-[var(--dock-radius)] border"
                     style={{ background: theme.spatial.surface, borderColor: `${accent}44`, color: accent }}
                 >
@@ -107,7 +107,7 @@ export function CanvasMergeStatusToast({ progress, theme }: { progress: MergeVid
                 </span>
             </div>
             <div className="mt-2 h-1 overflow-hidden rounded-full" style={{ background: theme.toolbar.itemHover }}>
-                <div className="h-full rounded-full transition-all duration-300" style={{ width: showPercent ? `${percent}%` : "30%", background: theme.node.activeStroke }} />
+                <div className="h-full w-full origin-left rounded-full transition-transform duration-(--motion-panel) ease-linear" style={{ transform: `scaleX(${showPercent ? percent / 100 : 0.3})`, background: theme.node.activeStroke }} />
             </div>
         </div>
     );

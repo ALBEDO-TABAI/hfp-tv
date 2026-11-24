@@ -9,7 +9,7 @@ import { ApiError } from "@/services/api/request";
 import { copyWorkshopPublication, getWorkshopCopy, workshopQueryKey, type Publication } from "@/services/api/workshop";
 
 // Mount once per dialog opening so retries keep the same request identity.
-export function WorkshopCopyDialog({ publication, onClose }: { publication: Publication; onClose: () => void }) {
+export function WorkshopCopyDialog({ publication, open = true, onClose, afterClose }: { publication: Publication; open?: boolean; onClose: () => void; afterClose?: () => void }) {
     // randomUUID needs a secure context; the intranet page is often plain HTTP.
     const [requestId] = useState(() => createClientId());
     const [title, setTitle] = useState(`${publication.title}（副本）`);
@@ -34,7 +34,7 @@ export function WorkshopCopyDialog({ publication, onClose }: { publication: Publ
         },
         onSuccess: () => { void client.invalidateQueries({ queryKey: workshopQueryKey }); },
     });
-    return <AppModal flush open footer={null} onCancel={() => { if (!copy.isPending) onClose(); }} closable={!copy.isPending} maskClosable={!copy.isPending} keyboard={!copy.isPending}>
+    return <AppModal flush open={open} afterClose={afterClose} footer={null} onCancel={() => { if (!copy.isPending) onClose(); }} closable={!copy.isPending} maskClosable={!copy.isPending} keyboard={!copy.isPending}>
         <div className="space-y-5 p-6">
             <h2 className="text-lg font-medium">复制到我的工作区</h2>
             {copy.data ? <>

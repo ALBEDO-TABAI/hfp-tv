@@ -216,8 +216,8 @@
     color: var(--fg);
     font-size: var(--fs-body);
     transition:
-        transform var(--motion-state) var(--motion-ease-out),
-        background-color var(--motion-state) var(--motion-ease-out);
+        transform var(--motion-state) var(--ease-out),
+        background-color var(--motion-instant) var(--ease-out);
 }
 
 .folder-preview-lab-open {
@@ -285,8 +285,8 @@
     border-radius: var(--r-3xl);
     background: var(--library-surface);
     transition:
-        transform var(--motion-state) var(--motion-ease-out),
-        background-color var(--motion-state) var(--motion-ease-out);
+        transform var(--motion-state) var(--ease-out),
+        background-color var(--motion-instant) var(--ease-out);
 }
 
 .folder-preview-lab-asset:hover {

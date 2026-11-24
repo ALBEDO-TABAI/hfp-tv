@@ -108,18 +108,6 @@
     --r-2xl: 28px;
     --r-pill: 999px;
 
-    /* ---- Motion & Easing ---- */
-    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-    --ease-liquid: cubic-bezier(0.3, 0.7, 0.2, 1);
-    --ease-shelf: cubic-bezier(0.77, 0, 0.175, 1);
-    --d-1: 120ms;
-    --d-2: 200ms;
-    --d-3: 320ms;
-    --d-4: 480ms;
-    --d-5: 640ms;
-
     /* ---- Palette: Light (Warm Gallery Desk) ---- */
     --stage: #ebebee;
     --stage-2: #e3e3e8;
@@ -216,31 +204,6 @@
     --book-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 20px 34px -16px rgba(0, 0, 0, 0.8), 0 4px 10px -4px rgba(0, 0, 0, 0.5);
 
     --amb-alpha: 0.08;
-}
-
-@supports (transition-timing-function: linear(0, 1)) {
-    :root {
-        --ease-spring: linear(
-            0,
-            0.009,
-            0.035 2.1%,
-            0.141 4.4%,
-            0.723 12.9%,
-            0.938 16.7%,
-            1.017 19.4%,
-            1.067,
-            1.099 24.3%,
-            1.103 25.9%,
-            1.096,
-            1.077 30.4%,
-            1.002 39%,
-            0.979 43.5%,
-            0.975 47.6%,
-            0.998 59.6%,
-            1.002 66.6%,
-            1
-        );
-    }
 }
 
 /* ---- Bridge Product Workspace Tokens to Ready Library Tokens ---- */
@@ -375,9 +338,9 @@ kbd,
         var(--shadow-2);
     border-radius: var(--r-xl);
     transition:
-        background-color var(--d-3) var(--ease-out),
-        box-shadow var(--d-3) var(--ease-out),
-        transform var(--d-3) var(--ease-out);
+        background-color var(--motion-instant) var(--ease-out),
+        box-shadow var(--motion-state) var(--ease-out),
+        transform var(--motion-state) var(--ease-out);
 }
 /* Glass rim light angle, written per .lg element by hfp-glass.ts. Not inherited, so
    updating it never restyles the content inside a glass panel. */
@@ -464,6 +427,7 @@ kbd,
     white-space: nowrap;
 }
 .led {
+    position: relative;
     width: 8px;
     height: 8px;
     border-radius: 50%;
@@ -473,48 +437,46 @@ kbd,
         0 0 0 4px rgb(255 90 31 / 0.2),
         0 0 14px rgb(255 90 31 / 0.9);
 }
-.led.busy {
-    animation: hfp-led-pulse 640ms var(--ease-in-out) infinite alternate;
+/* 进行中：一圈光环向外扩散后淡出。只动 transform 和 opacity，不逐帧重绘阴影。 */
+.led::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--rl-accent);
+    content: "";
+    opacity: 0;
+    pointer-events: none;
 }
-@keyframes hfp-led-pulse {
+.led.busy::after {
+    animation: hfp-led-ping 1.6s var(--ease-out) infinite;
+}
+@keyframes hfp-led-ping {
+    from {
+        opacity: 0.5;
+        transform: scale(1);
+    }
     to {
-        box-shadow:
-            0 0 0 7px rgb(255 90 31 / 0.06),
-            0 0 24px rgb(255 90 31 / 1);
-        transform: scale(1.18);
+        opacity: 0;
+        transform: scale(2.8);
     }
 }
 
-/* ---- Liquid Press & Jelly Release ---- */
+/* ---- Press ----
+   按下立即朝指针位置内收，松开按弹簧回到原位。缩放用独立的 scale 属性，
+   和悬停抬起的 transform 叠加，按下时卡片不会先掉回原位。 */
 .press {
     transition:
-        transform 520ms var(--ease-spring),
-        background-color var(--d-2) var(--ease-out),
-        color var(--d-2),
-        box-shadow var(--d-2);
+        scale var(--motion-state) var(--ease-spring),
+        transform var(--motion-state) var(--ease-out),
+        background-color var(--motion-instant) var(--ease-out),
+        color var(--motion-instant) var(--ease-out),
+        box-shadow var(--motion-state) var(--ease-out);
     transform-origin: var(--ox, 50%) var(--oy, 50%);
 }
 .press:active {
-    transform: scale(0.95);
-    transition-duration: 110ms;
+    scale: 0.97;
+    transition-duration: var(--motion-press);
     transition-timing-function: var(--ease-out);
-}
-.press.jelly {
-    animation: hfp-jelly 560ms var(--ease-out);
-}
-@keyframes hfp-jelly {
-    0% {
-        transform: scale(0.95, 0.95);
-    }
-    30% {
-        transform: scale(1.04, 0.97);
-    }
-    55% {
-        transform: scale(0.99, 1.02);
-    }
-    100% {
-        transform: scale(1, 1);
-    }
 }
 
 /* ---- Splash Sheet (Ready Library 2200×1396 Proportional Poster Frame) ---- */
@@ -531,7 +493,7 @@ kbd,
         var(--stage);
     color: var(--ink);
     font-family: var(--font-ui);
-    transition: opacity 0.36s var(--ease-out);
+    transition: opacity var(--motion-panel) var(--ease-out);
     cursor: pointer;
 }
 .splash.out {
@@ -609,7 +571,7 @@ kbd,
     margin: 0 auto;
     list-style: none;
     opacity: 0;
-    transition: opacity 0.45s var(--ease-out);
+    transition: opacity var(--motion-stage) var(--ease-out);
 }
 .sp-stats.on {
     opacity: 1;
@@ -743,6 +705,10 @@ body .app-user-workspace .app-workspace-sidebar {
     --workspace-reference-sidebar: var(--sidebar-width);
     width: var(--sidebar-width) !important;
     flex-basis: var(--sidebar-width);
+    /* 折叠和展开按侧栏档滑动；flex 布局里真正决定宽度的是 flex-basis，必须一起过渡。 */
+    transition:
+        width var(--motion-stage) var(--ease-out),
+        flex-basis var(--motion-stage) var(--ease-out);
     background:
         linear-gradient(180deg, rgb(var(--glass-tint) / 0.72), rgb(var(--glass-tint) / 0.54)) !important;
     -webkit-backdrop-filter: blur(22px) saturate(180%);
@@ -849,18 +815,29 @@ body .app-user-workspace .libtv-create-project-card {
     box-shadow:
         inset 0 1px 0 var(--glass-inner-hi),
         var(--shadow-2) !important;
+    position: relative;
     transition:
-        transform var(--d-3) var(--ease-spring),
-        border-color var(--d-2),
-        box-shadow var(--d-3) !important;
+        transform var(--motion-state) var(--ease-out),
+        border-color var(--motion-instant) var(--ease-out) !important;
+}
+/* 悬停加深的那层阴影放在伪元素上，只过渡透明度，不逐帧重算大块阴影。 */
+body .app-user-workspace .libtv-create-project-card::after {
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    box-shadow: var(--shadow-3);
+    content: "";
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--motion-state) var(--ease-out);
 }
 body .app-user-workspace .libtv-create-project-card:hover {
-    transform: translateY(-3px) !important;
+    transform: translateY(-2px) !important;
     border-style: solid !important;
     border-color: var(--rl-accent) !important;
-    box-shadow:
-        inset 0 1px 0 var(--glass-inner-hi),
-        var(--shadow-3) !important;
+}
+body .app-user-workspace .libtv-create-project-card:hover::after {
+    opacity: 1;
 }
 body .app-user-workspace .libtv-create-project-icon {
     width: 36px !important;
@@ -876,12 +853,12 @@ body .app-user-workspace .lib-tv-project-page .libtv-library-card-cover {
     background: rgb(var(--glass-tint) / 0.56) !important;
     box-shadow: var(--book-shadow) !important;
     transition:
-        transform var(--d-3) var(--ease-spring),
-        box-shadow var(--d-3) var(--ease-out),
-        border-color var(--d-2);
+        transform var(--motion-state) var(--ease-out),
+        box-shadow var(--motion-state) var(--ease-out),
+        border-color var(--motion-instant) var(--ease-out);
 }
 body .app-user-workspace .lib-tv-project-page .libtv-library-card:hover .libtv-library-card-cover {
-    transform: translateY(-4px);
+    transform: translateY(-2px);
     border-color: color-mix(in oklab, var(--rl-accent) 55%, var(--hair-2)) !important;
     box-shadow: var(--shadow-3) !important;
 }
@@ -939,9 +916,6 @@ body .app-user-workspace .creation-chat-composer {
         inset 0 1px 0 var(--glass-inner-hi),
         var(--shadow-3) !important;
 }
-body .app-user-workspace .creation-chat-composer:focus-within {
-    border-color: color-mix(in oklab, var(--rl-accent) 55%, var(--hair-2)) !important;
-}
 body .app-user-workspace .creation-home .creation-submit.ant-btn .creation-submit-action {
     background: var(--rl-accent) !important;
     color: #ffffff !important;
@@ -956,12 +930,9 @@ body .app-user-workspace .creation-featured-card {
     box-shadow:
         inset 0 1px 0 var(--glass-inner-hi),
         var(--shadow-2) !important;
-    transition:
-        transform var(--d-3) var(--ease-spring),
-        box-shadow var(--d-3) var(--ease-out) !important;
+    transition: box-shadow var(--motion-state) var(--ease-out) !important;
 }
 body .app-user-workspace .creation-featured-card:hover {
-    transform: translateY(-4px) !important;
     box-shadow:
         inset 0 1px 0 var(--glass-inner-hi),
         var(--shadow-3) !important;
@@ -981,9 +952,9 @@ body .app-user-workspace .plugin-card {
         inset 0 1px 0 var(--glass-inner-hi),
         var(--shadow-1) !important;
     transition:
-        transform var(--d-2) var(--ease-out),
-        border-color var(--d-2),
-        box-shadow var(--d-2);
+        transform var(--motion-state) var(--ease-out),
+        border-color var(--motion-instant) var(--ease-out),
+        box-shadow var(--motion-state) var(--ease-out);
 }
 body .app-user-workspace .skill-market-row {
     padding: 18px 22px !important;
@@ -1176,15 +1147,6 @@ body.app-product-overlays .diagnostics-modal p {
     outline-offset: 2px !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 1ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 1ms !important;
-    }
-}
 @media (prefers-reduced-transparency: reduce) {
     .lg,
     body .app-user-workspace .app-workspace-sidebar,

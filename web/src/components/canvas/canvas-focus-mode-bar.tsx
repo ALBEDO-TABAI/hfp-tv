@@ -1,10 +1,10 @@
 import { Tooltip } from "@/components/ui/base/tooltip";
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useIsPresent } from "motion/react";
 import { History, PanelBottom, X, ZoomIn, ZoomOut } from "lucide-react";
 
 
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionPreset } from "@/lib/motion-tokens";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 
@@ -23,14 +23,13 @@ type CanvasFocusModeBarProps = {
 
 export function CanvasFocusModeBar({ versionsOpen, onToggleVersions, syncStatus, dockRevealed, zoomPercent, onToggleDock, onExit, onZoomIn, onZoomOut, onFit }: CanvasFocusModeBarProps) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
+    const isPresent = useIsPresent();
 
     return (
         <motion.div
-            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.panel}
-            className="pointer-events-auto absolute left-1/2 top-2 z-[var(--z-toolbar)] -translate-x-1/2"
+            {...motionPreset.popover("below")}
+            inert={!isPresent}
+            className="pointer-events-auto absolute left-1/2 top-2 z-[var(--z-toolbar)] origin-top -translate-x-1/2"
             role="toolbar"
             aria-label="专注模式工具栏"
         >

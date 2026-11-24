@@ -38,6 +38,7 @@ import {
     type CanvasNodeData,
     type StoryboardRow,
 } from "@/types/canvas";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 type UseCanvasStoryboardOptions = {
     projectId: string;
@@ -69,7 +70,8 @@ export function useCanvasStoryboard({
     startGenerationRequest,
     finishGenerationRequest,
 }: UseCanvasStoryboardOptions) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const effectiveConfig = useEffectiveConfig();
     const localMode = workspaceCapabilities().local;
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);

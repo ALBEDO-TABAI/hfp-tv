@@ -1,5 +1,13 @@
 .skill-market-page .skill-market-toolbar { display: flex; gap: 12px; margin-bottom: 20px; }
 .skill-market-page .skill-market-toolbar .ant-input-search { max-width: 480px; }
+.skill-market-tab-indicator { transition: transform var(--motion-state) var(--ease-out); }
+:root[data-effects="lite"] .skill-market-tab-indicator { transition: none; }
+.skill-market-results { opacity: 0; transition: opacity var(--motion-instant) var(--ease-out); }
+.skill-market-results[data-ready="true"] { opacity: 1; }
+.skill-market-results[data-updating="true"] { opacity: 0.6; }
+.skill-market-toggle-label { display: inline-grid; text-align: center; white-space: nowrap; }
+.skill-market-toggle-label > span { grid-area: 1 / 1; opacity: 0; transition: opacity var(--motion-state) var(--ease-out); }
+.skill-market-toggle-label > span[aria-hidden="false"] { opacity: 1; }
 .skill-market-row { display: flex; align-items: flex-start; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
 .skill-market-copy { flex: 1; min-width: 0; }
 .skill-market-copy h2, .skill-market-preview h2 { font-size: var(--fs-body); font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }

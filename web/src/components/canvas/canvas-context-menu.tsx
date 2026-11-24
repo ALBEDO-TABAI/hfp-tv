@@ -28,7 +28,7 @@ import {
 
 import { CanvasCreateMenu, type CanvasCreateCommand } from "@/components/canvas/canvas-create-menu";
 import { ASSET_CATEGORY_OPTIONS } from "@/lib/asset-category";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionDuration, motionEase } from "@/lib/motion-tokens";
 import { SpotlightSurface } from "@/components/ui/aceternity/spotlight-surface";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { canvasNodeAssetCategory } from "@/lib/canvas/canvas-node-asset";
@@ -181,7 +181,7 @@ export function CanvasNodeContextMenu({
                 data-canvas-context-menu
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }}
+                transition={{ duration: motionDuration.instant, ease: motionEase.out }}
                 className={cn(
                     "aceternity-floating-panel fixed z-[var(--z-popover)] flex w-[224px] max-h-[calc(100vh-84px)] origin-top-left flex-col overflow-hidden rounded-xl border p-1.5 backdrop-blur-2xl",
                     menu.type === "canvas" && addOpen && "pointer-events-none invisible",
@@ -385,7 +385,7 @@ function AddNodeContextMenu({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }}
+            transition={{ duration: motionDuration.instant, ease: motionEase.out }}
             className="canvas-create-menu-surface aceternity-floating-panel fixed z-[var(--z-popover)] w-[232px] origin-top overflow-hidden rounded-xl border p-2 backdrop-blur-2xl"
             style={{ left: getListMenuLeft(parentPosition.left), top: getListMenuTop(parentPosition.top), background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.node.text }}
             onContextMenu={(event) => event.preventDefault()}

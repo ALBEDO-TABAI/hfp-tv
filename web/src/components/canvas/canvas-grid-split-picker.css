@@ -21,7 +21,7 @@
     top: 0;
     left: calc(100% + var(--space-1));
     transform-origin: top left;
-    animation: canvas-grid-split-picker-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: canvas-grid-split-picker-in var(--motion-state) var(--ease-out) both;
 }
 
 @keyframes canvas-grid-split-picker-in {

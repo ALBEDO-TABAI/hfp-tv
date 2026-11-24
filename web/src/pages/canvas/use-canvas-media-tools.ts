@@ -90,6 +90,7 @@ function normalizeMaskEditQuality(quality: string | undefined, size: string | un
 import { defaultConfig, resolveModelRequestConfig, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type ContextMenuState } from "@/types/canvas";
 import type { StartCanvasUploadStatus } from "./use-canvas-upload";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 type UseCanvasMediaToolsOptions = {
     projectId: string;
@@ -137,7 +138,8 @@ export function useCanvasMediaTools({
     finishGenerationRequest,
     bindGenerationTask,
 }: UseCanvasMediaToolsOptions) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const extractingVideoFramesNodeIdRef = useRef<string | null>(null);

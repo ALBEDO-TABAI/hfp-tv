@@ -1,5 +1,6 @@
+import { AppModal } from "@/components/ui/product/app-modal";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Modal, Segmented } from "antd";
+import { Button, Segmented } from "antd";
 import { ImagePlus } from "lucide-react";
 
 import { readImageMeta } from "@/lib/image-utils";
@@ -50,7 +51,7 @@ export function CanvasNodeUpscaleDialog({ dataUrl, open, onClose, onConfirm }: {
     }, [image, sourceLongEdge]);
 
     return (
-        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={820} centered destroyOnHidden>
+        <AppModal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={820} centered destroyOnHidden>
             <div className="space-y-5">
                 <div>
                     <h2 className="text-xl font-semibold">调整尺寸</h2>
@@ -108,6 +109,6 @@ export function CanvasNodeUpscaleDialog({ dataUrl, open, onClose, onConfirm }: {
                     </Button>
                 </div>
             </div>
-        </Modal>
+        </AppModal>
     );
 }

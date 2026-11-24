@@ -15,11 +15,9 @@
 .workspace-account-card svg { width: 17px; height: 17px; flex-shrink: 0; stroke-width: 1.7; }
 .workspace-account-card-avatar svg { width: 100%; height: 100%; }
 .workspace-account-card-actions { display: grid; gap: 4px; }
-.workspace-account-card-actions > a, .workspace-account-card-actions > button { display: flex; align-items: center; gap: 10px; min-height: 40px; height: auto; width: 100%; padding: 10px; border: 0; border-radius: 12px; font-size: 13px; text-align: left; justify-content: flex-start; transition: background var(--user-motion), transform var(--user-motion); }
+.workspace-account-card-actions > a, .workspace-account-card-actions > button { display: flex; align-items: center; gap: 10px; min-height: 40px; height: auto; width: 100%; padding: 10px; border: 0; border-radius: 12px; font-size: 13px; text-align: left; justify-content: flex-start; transition: background var(--motion-instant) var(--ease-out), transform var(--motion-state) var(--ease-out); }
 .workspace-account-card-actions > a { color: var(--user-ink); }
 .workspace-account-card-actions > a > span { flex: 1; }
 .workspace-account-card-actions > a > svg:last-child { color: var(--user-ink-soft); width: 14px; }
 .workspace-account-card-actions > a:hover { background: var(--user-surface-muted); }
-.workspace-account-card-actions > a:active { transform: scale(.98); }
 .workspace-account-card-actions > a:focus-visible, .workspace-account-card-wallet > button:focus-visible { outline: 2px solid var(--user-accent); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .workspace-account-card-actions > a:active { transform: none; } }

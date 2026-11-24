@@ -16,6 +16,7 @@ import {
     type UserPromptCustomization,
     type UserPromptPreference,
 } from "@/services/api/prompt-preferences";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 type CustomizationMode = UserPromptCustomization["mode"];
 
@@ -26,7 +27,8 @@ const modeOptions = [
 ];
 
 export function PromptPreferencesPane() {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const [preferences, setPreferences] = useState<UserPromptPreference[]>([]);
     const [selectedOperation, setSelectedOperation] = useState("");
     const [mode, setMode] = useState<CustomizationMode>("inherit");

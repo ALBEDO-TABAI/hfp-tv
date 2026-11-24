@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { nanoid } from "nanoid";
-import { App } from "antd";
+
 import { channelHasGenerationCredential, isBuiltinBeefAPIChannel, useConfigStore } from "@/stores/use-config-store";
 import { isHostedMode } from "@/stores/use-platform-session";
 import { CanvasNodeType, type CanvasNodeData, type CanvasConnection } from "@/types/canvas";
@@ -12,6 +12,7 @@ import { createUpscaleTask, estimateUpscale } from "@/services/api/media-upscale
 import { findGenerationTaskByOperation, queryGenerationTask, type GenerationTask } from "@/services/api/task-center";
 import { syncLocalCanvasSnapshot } from "@/services/local-workspace-sync";
 import { flushCanvasStorePersistence, useCanvasStore } from "@/stores/canvas/use-canvas-store";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 type Dependencies = {
     projectId: string; nodesRef: { current: CanvasNodeData[] }; connectionsRef: { current: CanvasConnection[] };
@@ -23,7 +24,7 @@ type Dependencies = {
 };
 
 export function useCanvasUpscaleBatch({ projectId, nodesRef, connectionsRef, setNodes, setConnections, setSelectedNodeIds, prepareResource, observeTask, bindTask }: Dependencies) {
-    const { modal } = App.useApp();
+    const modal = useAppModal();
     const locks = useRef(new Set<string>());
     const mounted = useRef(true);
     const lifetime = useRef(0);

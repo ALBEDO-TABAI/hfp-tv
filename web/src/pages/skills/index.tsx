@@ -14,6 +14,7 @@ import { SkillDetailModal } from "@/pages/skills/skill-detail-drawer";
 import { SkillEditorDrawer } from "@/pages/skills/skill-editor-drawer";
 import { SkillInstallModal } from "@/pages/skills/skill-install-modal";
 import { addSkill, deleteSkill, getSkill, likeSkill, listSkills, removeSkill, syncSkill, unlikeSkill, type Skill, type SkillCategory, type SkillScope, type SkillSort } from "@/services/api/skills";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 const scopeOptions = [
     { label: "技能广场", value: "public", icon: Sparkles },
@@ -39,7 +40,8 @@ const sortOptions: { label: string; value: SkillSort }[] = [
 ];
 
 export default function SkillsPage() {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const [scope, setScope] = useState<SkillScope>("public");
     const [sort, setSort] = useState<SkillSort>("popular");
     const [search, setSearch] = useState("");
@@ -58,7 +60,8 @@ export default function SkillsPage() {
         const indicator = indicatorRef.current;
         const active = tabs?.querySelector<HTMLButtonElement>('[aria-selected="true"]');
         if (!tabs || !indicator || !active) return;
-        indicator.style.left = `${active.offsetLeft}px`;
+        // 位置用 transform 平移；宽度跟着变（单个没有子元素的绝对定位块，只重排它自己）。
+        indicator.style.transform = `translateX(${active.offsetLeft}px)`;
         indicator.style.width = `${active.offsetWidth}px`;
     }, [scope, counts]);
     const [loading, setLoading] = useState(true);

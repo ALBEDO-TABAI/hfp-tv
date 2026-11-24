@@ -246,7 +246,7 @@ function AssetDetailSheet({
         <div
             role="dialog"
             aria-label={`${asset.title || "素材"} 详情`}
-            className={`absolute inset-1.5 z-10 flex min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--director-sequencer-border)] bg-[var(--director-sequencer-surface-raised)] shadow-[0_12px_32px_rgba(0,0,0,0.35)] transition-[opacity,transform] duration-150 ease-out ${
+            className={`absolute inset-1.5 z-10 flex min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--director-sequencer-border)] bg-[var(--director-sequencer-surface-raised)] shadow-[0_12px_32px_rgba(0,0,0,0.35)] transition-[opacity,transform] duration-(--motion-instant) ease-out ${
                 shown ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
             }`}
         >
@@ -596,7 +596,7 @@ function EditorAssetIngestSession() {
                                                 open ? "bg-[var(--director-accent)]/15 text-[var(--director-accent)]" : "bg-[var(--director-control-hover)] text-[var(--director-dock-fg)]/55 group-hover:text-[var(--director-dock-fg-strong)]"
                                             }`}
                                         >
-                                            <ChevronRight className={`size-3 transition-transform duration-150 ease-out ${open ? "rotate-90" : ""}`} />
+                                            <ChevronRight className={`size-3 transition-transform duration-(--motion-instant) ease-out ${open ? "rotate-90" : ""}`} />
                                         </span>
                                         <group.icon className={`size-3.5 shrink-0 transition-colors ${open ? "text-[var(--director-accent)]" : "text-[var(--director-dock-fg)]/60"}`} />
                                         <span className="truncate text-[11px] font-medium text-[var(--director-dock-fg-strong)]">{group.label}</span>
@@ -630,7 +630,7 @@ function EditorAssetIngestSession() {
                                                                     expanded ? "bg-[var(--director-accent)]/15 text-[var(--director-accent)]" : "text-[var(--director-dock-fg)]/40 group-hover:text-[var(--director-dock-fg)]/80"
                                                                 }`}
                                                             >
-                                                                <ChevronDown className={`size-3.5 transition-transform duration-150 ease-out ${expanded ? "rotate-180" : ""}`} />
+                                                                <ChevronDown className={`size-3.5 transition-transform duration-(--motion-instant) ease-out ${expanded ? "rotate-180" : ""}`} />
                                                             </span>
                                                         </button>
                                                     </li>

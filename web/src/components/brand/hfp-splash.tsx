@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
@@ -9,9 +9,12 @@ export type SplashStage = "start" | "shelf" | "type" | "covers";
 export type SplashStat = [number | null, string, string];
 
 const STAGE: Record<SplashStage, number> = { start: 0.18, shelf: 0.48, type: 0.76, covers: 0.94 };
-const FILL_MS = 1650;
-const HOLD_MS = 220;
-const FADE_MS = 360;
+// 总长约 1.1s：读条 760ms、停 120ms、淡出 240ms。只在首次安装和升级后出现，所以不必长。
+const FILL_MS = 760;
+const HOLD_MS = 120;
+const FADE_MS = 240;
+const SPLASH_VERSION_KEY = "hfp-tv:splash-version";
+const APP_VERSION_LABEL = `v${__APP_VERSION__.replace(/^v/, "")}`;
 const ease = (t: number) => (t >= 1 ? 1 : 0.5 - Math.cos(Math.PI * Math.max(0, t)) / 2);
 
 function Count({ n }: { n: number | null }) {
@@ -23,7 +26,7 @@ function Count({ n }: { n: number | null }) {
         const t0 = performance.now();
         let raf = 0;
         const tick = (now: number) => {
-            const k = Math.min(1, (now - t0) / 800);
+            const k = Math.min(1, (now - t0) / 600);
             const e = 1 - Math.pow(1 - k, 3);
             setV(Math.round(a + (n - a) * e));
             if (k < 1) raf = requestAnimationFrame(tick);
@@ -44,16 +47,27 @@ export function HfpSplash({ forceShow = false, onFinished }: { forceShow?: boole
         if (forceShow) return true;
         if (typeof window === "undefined") return false;
         const params = new URLSearchParams(window.location.search);
+        // 流畅模式和系统「减少动态效果」下不放幕布，直接进工作区；?splash=1 也不例外。
+        if (document.documentElement.dataset.effects === "lite" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return false;
         if (params.get("splash") === "1") return true;
         if (params.get("splash") === "0") return false;
         try {
-            if (window.sessionStorage.getItem("hfp-tv:splash-shown") === "1") return false;
-            window.sessionStorage.setItem("hfp-tv:splash-shown", "1");
-            return true;
+            // 只在首次安装或升级后放一次；桌面版每次启动都是新会话，不能按会话判断。
+            // 这里只读，记下版本放在 effect 里：开发模式会把初始化函数调用两次。
+            return window.localStorage.getItem(SPLASH_VERSION_KEY) !== APP_VERSION_LABEL;
         } catch {
             return false;
         }
     });
+
+    useEffect(() => {
+        if (!visible) return;
+        try {
+            window.localStorage.setItem(SPLASH_VERSION_KEY, APP_VERSION_LABEL);
+        } catch {
+            // 存不下就下次再放一次，不影响使用。
+        }
+    }, [visible]);
 
     const [stage, setStage] = useState<SplashStage>("start");
     const [ready, setReady] = useState(false);
@@ -67,17 +81,31 @@ export function HfpSplash({ forceShow = false, onFinished }: { forceShow?: boole
     const live = useRef({ stage, ready, onFinished });
     live.current = { stage, ready, onFinished };
 
+    // 自然结束、点按和按键共用一个只执行一次的收尾：淡出后卸下幕布，结束回调只调用一次。
+    const closingRef = useRef(false);
+    const closeTimerRef = useRef(0);
+    const close = useCallback(() => {
+        if (closingRef.current) return;
+        closingRef.current = true;
+        setOut(true);
+        closeTimerRef.current = window.setTimeout(() => {
+            setVisible(false);
+            live.current.onFinished?.();
+        }, FADE_MS);
+    }, []);
+    useEffect(() => () => window.clearTimeout(closeTimerRef.current), []);
+
     useEffect(() => {
         if (!visible) return;
         let active = true;
-        const t1 = window.setTimeout(() => { if (active) setStage("shelf"); }, 220);
-        const t2 = window.setTimeout(() => { if (active) setStage("type"); }, 520);
+        const t1 = window.setTimeout(() => { if (active) setStage("shelf"); }, 120);
+        const t2 = window.setTimeout(() => { if (active) setStage("type"); }, 300);
         const t3 = window.setTimeout(() => {
             if (active) {
                 setStage("covers");
                 setReady(true);
             }
-        }, 900);
+        }, 520);
         return () => {
             active = false;
             clearTimeout(t1);
@@ -91,7 +119,6 @@ export function HfpSplash({ forceShow = false, onFinished }: { forceShow?: boole
         let raf = 0;
         let p = 0;
         let full = 0;
-        let timer = 0;
         const t0 = performance.now();
         let last = t0;
         const tick = (now: number) => {
@@ -103,21 +130,21 @@ export function HfpSplash({ forceShow = false, onFinished }: { forceShow?: boole
             if (bar.current) bar.current.style.transform = `scaleX(${p})`;
             if (p === 1 && !full) full = now;
             if (full && now - full >= HOLD_MS) {
-                setOut(true);
-                timer = window.setTimeout(() => {
-                    setVisible(false);
-                    live.current.onFinished?.();
-                }, FADE_MS);
+                close();
                 return;
             }
             raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
-        return () => {
-            cancelAnimationFrame(raf);
-            clearTimeout(timer);
-        };
-    }, [visible]);
+        return () => cancelAnimationFrame(raf);
+    }, [close, visible]);
+
+    // 任意键也能跳过。
+    useEffect(() => {
+        if (!visible) return;
+        window.addEventListener("keydown", close, { once: true });
+        return () => window.removeEventListener("keydown", close);
+    }, [close, visible]);
 
     if (!visible) return null;
 
@@ -133,16 +160,10 @@ export function HfpSplash({ forceShow = false, onFinished }: { forceShow?: boole
             className={`splash${out ? " out" : ""}`}
             role="status"
             aria-label="hfp - all in one 启动幕布"
-            onClick={() => {
-                setOut(true);
-                window.setTimeout(() => {
-                    setVisible(false);
-                    onFinished?.();
-                }, 220);
-            }}
+            onClick={close}
         >
             <div className="sp-art">
-                <p className="sp-kicker">AI-Native Video Screening Room · Infinite Canvas · v2.0.3</p>
+                <p className="sp-kicker">AI-Native Video Screening Room · Infinite Canvas · {APP_VERSION_LABEL}</p>
                 <h1>
                     hfp - <i>all in one</i>
                 </h1>

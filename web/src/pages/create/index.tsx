@@ -2,8 +2,10 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { App, Spin } from "antd";
 import { Tooltip } from "@/components/ui/base/tooltip";
 import { History, Sparkles, Maximize2 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotionConfig } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router";
+
+import { motionSpring } from "@/lib/motion-tokens";
 
 import type { AssetLibraryPickerItem } from "@/components/assets/asset-library-picker-modal";
 import { createReferenceLinkResolver } from "@/components/generation-reference-links";
@@ -38,6 +40,7 @@ import { attachCreationTaskContexts, completedCreationGenerationTask, conversati
 import { CreationComposer, CreationEmptySuggest, CreationFeaturedWorks, CreationHistoryDrawer, CreationMessageView, CreationModeTabs, CreationWorkspaceToolbar, creationAssetCategoryLabels } from "./creation-workspace";
 import { createDemoConversation } from "./creation-demo-data";
 import { CreationConflictBanner, CreationConflictDialog } from "./creation-conflict";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 const AssetLibraryPickerModal = lazy(() => import("@/components/assets/asset-library-picker-modal").then((module) => ({ default: module.AssetLibraryPickerModal })));
 const loadCreationRuntime = () => import("./creation-runtime");
@@ -69,7 +72,8 @@ export default function CreatePage() {
     const requestedMode = requestedCreationMode(searchParams.get("mode"));
     const demoConversation = searchParams.get("demo") === "conversation";
     const marketplaceSkill = (searchParams.get("skill") || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("skill") : ""))?.trim() || "";
-    const { message: toast, modal } = App.useApp();
+    const { message: toast } = App.useApp();
+    const modal = useAppModal();
     const resolveReferenceLinks = useMemo(() => createReferenceLinkResolver(modal), [modal]);
     const toastRef = useRef(toast);
     toastRef.current = toast;
@@ -131,7 +135,7 @@ export default function CreatePage() {
     const composerFocusRef = useRef<HTMLTextAreaElement>(null);
     const threadScrollRef = useRef<HTMLElement>(null);
     const launchpadRef = useRef<HTMLElement>(null);
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     const [launchpadCondensed, setLaunchpadCondensed] = useState(false);
     const followLatestMessageRef = useRef(true);
     const taskSyncWarningRef = useRef(false);
@@ -199,7 +203,10 @@ export default function CreatePage() {
     const pendingTaskIds = useMemo(() => pendingCreationTaskIds(conversations), [conversations]);
     const recoveryTaskKey = useMemo(() => pendingTaskIds.filter((id) => !activeGenerationTaskIdsRef.current.has(id)).join("|"), [pendingTaskIds]);
     const videoShots = useMemo(() => creationShotRail(activeConversation?.messages || []), [activeConversation]);
-    const jumpToShot = (shot: CreationShotRailEntry) => { const id = shot.result?.id; if (id) document.getElementById(`creation-shot-${id}`)?.scrollIntoView({ block: "start", behavior: "smooth" }); };
+    const jumpToShot = (shot: CreationShotRailEntry) => {
+        const id = shot.result?.id;
+        if (id) document.getElementById(`creation-shot-${id}`)?.scrollIntoView({ block: "start", behavior: reducedMotion ? "auto" : "smooth" });
+    };
 
 
     useEffect(() => {
@@ -1148,7 +1155,7 @@ export default function CreatePage() {
 
 
 
-    const generationActive = activeConversation.messages.some((message) => message.role === "assistant" && message.status === "pending");
+    const generationActive = activeConversation.messages.some((message) => message.role === "assistant" && (message.status === "pending" || message.status === "streaming"));
 
     const composerProps = {
         mode,
@@ -1227,7 +1234,7 @@ export default function CreatePage() {
                     {launchpadCondensed ? <motion.div className="creation-floating-prompt" key="floating-prompt"
                         style={{ x: "-50%" }}
                         initial={{ opacity: 0, y: -12, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: .98 }}
-                        transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 360, damping: 32, mass: .8 }}>
+                        transition={reducedMotion ? { duration: 0 } : motionSpring.smooth}>
                         <Sparkles aria-hidden="true" />
                         <input aria-label="快捷编辑提示词" placeholder="继续描述你的创作想法…" value={prompt} disabled={busy || referenceReplacementBusy} onChange={(event) => setPrompt(event.target.value)} />
                         <Tooltip title="展开完整创作区"><button type="button" aria-label="展开完整创作区" onClick={() => {

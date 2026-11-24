@@ -1,8 +1,8 @@
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { Search, X } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionSpring } from "@/lib/motion-tokens";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { cn } from "@/lib/utils";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
@@ -137,7 +137,6 @@ function CanvasCreateCommandList({ commands }: { commands: CanvasCreateCommand[]
 
 function CanvasCreateCommandGrid({ commands, variant }: { commands: CanvasCreateCommand[]; variant: "node" | "compact" | "workflow" }) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
 
     return (
         <div className={cn("grid gap-1", variant === "node" ? "grid-cols-4" : variant === "workflow" ? "grid-cols-1" : "grid-cols-2")}>
@@ -149,9 +148,7 @@ function CanvasCreateCommandGrid({ commands, variant }: { commands: CanvasCreate
                     disabled={Boolean(command.disabledReason)}
                     aria-disabled={Boolean(command.disabledReason)}
                     aria-description={command.disabledReason}
-                    whileHover={reducedMotion ? undefined : { y: -1 }}
-                    whileTap={reducedMotion ? undefined : { scale: 0.98 }}
-                    transition={aceternityMotion.spring.dock}
+                    transition={motionSpring.snappy}
                     className={cn(
                         "group min-w-0 overflow-hidden border border-black/10 bg-white/70 outline-none transition-colors focus-visible:ring-2 dark:border-white/10 dark:bg-white/[.04]",
                         command.disabledReason ? "cursor-not-allowed opacity-40 grayscale" : "hover:border-black/20 hover:bg-black/5 dark:hover:border-white/20 dark:hover:bg-white/8",

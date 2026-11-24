@@ -1,4 +1,5 @@
-import { Button, Modal } from "antd";
+import { Button } from "antd";
+import { AppModal } from "@/components/ui/product/app-modal";
 import { Check, Star } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -10,7 +11,7 @@ export function CanvasVersionCompareModal({ open, versions, onClose, onSetPrimar
     const theme = canvasThemes[useActiveTheme()];
     const modalWidth = Math.min(1180, Math.max(440, 112 + versions.length * 340));
     return (
-        <Modal title="版本对比" open={open} footer={null} width={modalWidth} centered onCancel={onClose} styles={{ body: { overflow: "hidden" } }}>
+        <AppModal destroyOnHidden={false} title="版本对比" open={open} footer={null} width={modalWidth} centered onCancel={onClose} styles={{ body: { overflow: "hidden" } }}>
             <div className="thin-scrollbar grid max-h-[70vh] grid-flow-col auto-cols-[328px] gap-3 overflow-x-auto pb-2">
                 {versions.map((node) => {
                     const videoPreview = canvasNodeVideoPreviewUrl(node);
@@ -33,7 +34,7 @@ export function CanvasVersionCompareModal({ open, versions, onClose, onSetPrimar
                     );
                 })}
             </div>
-        </Modal>
+        </AppModal>
     );
 }
 

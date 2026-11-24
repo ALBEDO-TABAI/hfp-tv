@@ -85,7 +85,7 @@ export function WorkspaceBootstrapHydrator({ children }: { children: ReactNode }
     }, []);
 
     if (restoreStatus === "error") return <WorkspaceErrorState title="工作区暂时无法加载" description="项目或模型配置未能完成读取。原有配置不会被覆盖，请重新加载后再试。" onRetry={() => window.location.reload()} />;
-    return hydrated && restoreStatus === "ready" ? children : <FullScreenLoader label="正在准备本地工作区" detail="加载项目、画布与模型配置" />;
+    return hydrated && restoreStatus === "ready" ? children : <FullScreenLoader label="正在打开工作区" detail="加载项目、画布与模型配置" />;
 }
 
 export async function initializeWorkspaceState<T>({

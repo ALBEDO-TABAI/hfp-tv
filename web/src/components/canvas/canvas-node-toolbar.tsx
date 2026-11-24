@@ -1,5 +1,6 @@
+import { AppModal } from "@/components/ui/product/app-modal";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { App, Button, Dropdown, Input, Modal, Tag, Tooltip } from "antd";
+import { App, Button, Dropdown, Input, Tag, Tooltip } from "antd";
 import type { MenuProps } from "antd";
 import { Camera, ChevronDown, ChevronRight, Images, Maximize2, Plus, Settings2, SlidersHorizontal, UserRound } from "lucide-react";
 
@@ -722,7 +723,7 @@ export function CanvasNodeInfoModal({
     );
 
     return (
-        <Modal className="workspace-modal canvas-node-info-modal" title={title} open={open && Boolean(node)} centered footer={null} onCancel={onClose} width="min(920px, calc(100vw - 32px))" styles={{ body: { paddingTop: 4 } }}>
+        <AppModal destroyOnHidden={false} className="workspace-modal canvas-node-info-modal" title={title} open={open && Boolean(node)} centered footer={null} onCancel={onClose} width="min(920px, calc(100vw - 32px))" styles={{ body: { paddingTop: 4 } }}>
             {node ? (
                 <div className="canvas-node-inspector" style={{ color: theme.node.text }}>
                     <div className="thin-scrollbar canvas-node-inspector-scroll">
@@ -843,7 +844,7 @@ export function CanvasNodeInfoModal({
                     </div>
                 </div>
             ) : null}
-        </Modal>
+        </AppModal>
     );
 }
 

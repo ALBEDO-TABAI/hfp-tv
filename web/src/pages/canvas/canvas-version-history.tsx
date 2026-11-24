@@ -2,16 +2,19 @@ import { AppDrawer } from "@/components/ui/product/app-drawer";
 import { EmptyState } from "@/components/ui/product/empty-state";
 import { App, Button, Grid, Spin } from "antd";
 import { Check, ChevronDown, Download, RefreshCw, X } from "lucide-react";
+import { AnimatePresence, motion, usePresence, useReducedMotionConfig } from "motion/react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getCanvasHistoryEntry, listCanvasHistory, type CanvasHistoryEntry } from "@/services/api/workspace-data";
 import { preserveCanvasSyncDraft, readCanvasSyncDrafts, type CanvasSyncDraft } from "@/services/canvas-sync-drafts";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
+import { motionDuration, motionEase, motionTransition } from "@/lib/motion-tokens";
 import { getActiveUserScope, getActiveUserScopeEpoch, subscribeUserScope } from "@/lib/user-scope";
 import { captureUserScope, userScopeMatches } from "@/lib/user-scope-guard";
 import type { CanvasProject } from "@/stores/canvas/use-canvas-store";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { canvasSyncProgressKey, useSyncProgressStore } from "@/stores/use-sync-progress-store";
 import "./canvas-version-history.css";
+import { useAppModal } from "@/components/ui/product/app-modal/use-app-modal";
 
 export type CanvasVersionPreviewState = {
     key: string;
@@ -24,7 +27,8 @@ export type CanvasVersionPreviewState = {
 };
 
 export function useCanvasVersionHistory(projectId: string, onRestore: (snapshotId: string, revision: number) => Promise<void>, projectFromEditor?: CanvasProject) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
+    const modal = useAppModal();
     const desktop = Boolean(Grid.useBreakpoint().lg);
     const scope = getActiveUserScope();
     const scopeEpoch = useSyncExternalStore(subscribeUserScope, getActiveUserScopeEpoch, getActiveUserScopeEpoch);
@@ -248,8 +252,17 @@ export function useCanvasVersionHistory(projectId: string, onRestore: (snapshotI
 export type CanvasVersionHistoryController = ReturnType<typeof useCanvasVersionHistory>;
 
 export function CanvasVersionHistory({ history }: { history: CanvasVersionHistoryController }) {
-    const { open, tab, entries, drafts: displayDrafts, currentRevision, preview, loading, draftLoading, draftError, restoring, exporting, error } = history;
-    if (!open) return null;
+    return (
+        <AnimatePresence>
+            {history.open ? <CanvasVersionHistoryPanel history={history} /> : null}
+        </AnimatePresence>
+    );
+}
+
+function CanvasVersionHistoryPanel({ history }: { history: CanvasVersionHistoryController }) {
+    const { tab, entries, drafts: displayDrafts, currentRevision, preview, loading, draftLoading, draftError, restoring, exporting, error } = history;
+    const [isPresent, finishExit] = usePresence(!history.desktop && history.listOpen);
+    const reducedMotion = useReducedMotionConfig();
     const groups = new Map<string, CanvasHistoryEntry[]>();
     for (const entry of entries) {
         const day = new Date(entry.contentUpdatedAt).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
@@ -361,13 +374,21 @@ export function CanvasVersionHistory({ history }: { history: CanvasVersionHistor
     );
 
     return history.desktop ? (
-        <aside className="canvas-version-sidebar" aria-label="版本记录">
+        <motion.aside
+            inert={!isPresent}
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0, transition: { duration: motionDuration.stage, ease: motionEase.out } }}
+            exit={{ opacity: 0, x: reducedMotion ? 0 : 8, transition: { ...motionTransition.panelExit, ease: reducedMotion ? motionEase.out : motionEase.in } }}
+            className="canvas-version-sidebar"
+            aria-label="版本记录"
+        >
             {content}
-        </aside>
+        </motion.aside>
     ) : (
         <AppDrawer
             flush
-            open={history.listOpen}
+            open={history.listOpen && isPresent}
+            afterOpenChange={(open) => { if (!open) finishExit?.(); }}
             focusable={{ trap: !history.confirming }}
             placement="right"
             title={null}

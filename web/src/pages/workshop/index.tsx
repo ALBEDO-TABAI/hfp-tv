@@ -1,12 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Button, Input, Segmented, Select, Skeleton, Tabs } from "antd";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "motion/react";
 import { useSearchParams } from "react-router";
 import { WorkshopCard, WorkshopEmptyState } from "@/components/workshop/workshop-card";
 import { WorkshopCopyDialog } from "@/components/workshop/workshop-copy-dialog";
+import { motionPreset } from "@/lib/motion-tokens";
 import { platformErrorMessage } from "@/lib/platform-account";
 import { listWorkshopPublications, workshopQueryKey, type BrowseFilters, type Publication } from "@/services/api/workshop";
 import { MySubmissions } from "./my-submissions";
+import { useClosingValue } from "@/hooks/use-closing-value";
+
+const cardGrid = "grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4";
 
 export default function WorkshopPage() {
     const [params, setParams] = useSearchParams();
@@ -24,11 +29,20 @@ function BrowseWorkshop() {
     const [source, setSource] = useState<BrowseFilters["source"]>("all");
     const [sort, setSort] = useState<BrowseFilters["sort"]>("featured");
     const [copying, setCopying] = useState<Publication | null>(null);
+    const copyDialog = useClosingValue(copying);
+    const [showSkeleton, setShowSkeleton] = useState(false);
     const publications = useInfiniteQuery({
         queryKey: [...workshopQueryKey, "browse", { q, source, sort, tag }], initialPageParam: 1,
         queryFn: ({ signal, pageParam }) => listWorkshopPublications({ q, source, sort, tag, page: pageParam, pageSize: 20 }, signal),
         getNextPageParam: (last, pages) => pages.reduce((count, page) => count + page.items.length, 0) < last.total ? pages.length + 1 : undefined,
+        placeholderData: keepPreviousData,
     });
+    const { isPending, isPlaceholderData } = publications;
+    useEffect(() => {
+        if (!isPending) { setShowSkeleton(false); return; }
+        const timer = window.setTimeout(() => setShowSkeleton(true), 200);
+        return () => window.clearTimeout(timer);
+    }, [isPending]);
     const items = publications.data?.pages.flatMap((page) => page.items) || [];
     return <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-3">
@@ -38,8 +52,20 @@ function BrowseWorkshop() {
             <Input.Search aria-label="按标签筛选" placeholder="标签" allowClear onSearch={setTag} className="max-w-48" />
         </div>
         {publications.isError && <Alert type="error" title={platformErrorMessage(publications.error)} action={<Button onClick={() => void (publications.isFetchNextPageError ? publications.fetchNextPage() : publications.refetch())}>重试</Button>} />}
-        {publications.isPending ? <Skeleton active /> : items.length ? <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">{items.map((publication) => <WorkshopCard key={publication.id} publication={publication} onCopy={setCopying} />)}</div> : !publications.isError && <WorkshopEmptyState />}
-        {publications.hasNextPage && <div className="text-center"><Button loading={publications.isFetchingNextPage} onClick={() => void publications.fetchNextPage()}>加载更多</Button></div>}
-        {copying && <WorkshopCopyDialog publication={copying} onClose={() => setCopying(null)} />}
+        <div className="grid" aria-busy={isPending || isPlaceholderData}>
+            <AnimatePresence>
+                {isPending && showSkeleton && <motion.div key="skeleton" {...motionPreset.fade} aria-hidden="true" className={`pointer-events-none col-start-1 row-start-1 ${cardGrid}`}>
+                    {Array.from({ length: 4 }, (_, index) => <div key={index} className="overflow-hidden rounded-[var(--r-md)] border border-border bg-card">
+                        <div className="aspect-video bg-muted" />
+                        <div className="p-4"><Skeleton title={false} paragraph={{ rows: 3 }} /></div>
+                    </div>)}
+                </motion.div>}
+            </AnimatePresence>
+            <div inert={isPlaceholderData} className={`col-start-1 row-start-1 space-y-5 transition-opacity duration-(--motion-instant) ease-(--ease-out) ${isPending ? "opacity-0" : isPlaceholderData ? "opacity-60" : "opacity-100"}`}>
+                {items.length ? <div className={cardGrid}>{items.map((publication) => <WorkshopCard key={publication.id} publication={publication} onCopy={setCopying} />)}</div> : !isPending && !publications.isError && <WorkshopEmptyState />}
+                {publications.hasNextPage && <div className="text-center"><Button loading={publications.isFetchingNextPage} onClick={() => void publications.fetchNextPage()}>加载更多</Button></div>}
+            </div>
+        </div>
+        {copyDialog.shown && <WorkshopCopyDialog key={copyDialog.key} publication={copyDialog.shown} open={copyDialog.open} afterClose={copyDialog.afterClose} onClose={() => setCopying(null)} />}
     </div>;
 }

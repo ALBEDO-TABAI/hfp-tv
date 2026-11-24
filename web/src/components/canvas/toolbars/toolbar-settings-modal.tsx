@@ -1,7 +1,7 @@
 import { Modal } from "antd";
 import { Switch } from "@/components/ui/base/switch";
 import { GripVertical, RotateCcw, X } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotionConfig } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -43,7 +43,7 @@ type SettingsItem = {
 
 export function ToolbarSettingsModal({ open, onClose, toolbar }: ToolbarSettingsModalProps) {
     const theme = canvasThemes[useActiveTheme()];
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionConfig();
     const [items, setItems] = useState<SettingsItem[]>([]);
     const [toolbarId, setToolbarId] = useState<ToolbarId>(toolbar);
     const draggedItemIdRef = useRef<string | null>(null);

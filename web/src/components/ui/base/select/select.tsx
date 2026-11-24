@@ -122,7 +122,7 @@ export function Select<V extends string = string>({ value, onChange, options = [
                         <X className="size-3.5" />
                     </span>
                 )}
-                <ChevronDown aria-hidden="true" className={cn("size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} />
+                <ChevronDown aria-hidden="true" className={cn("size-4 shrink-0 text-muted-foreground transition-transform duration-(--motion-state) motion-reduce:transition-none", open && "rotate-180")} />
             </AriaButton>
             <AriaPopover ref={popoverRef} isNonModal placement="bottom" offset={4} style={popoverWidth ? { width: popoverWidth } : undefined} className={cn("z-50 rounded-lg border border-border bg-surface-strong p-1 shadow-lg", "ra-pop-in")}>
                 <AriaListBox aria-label={ariaLabel ?? placeholder ?? "选项"} className="max-h-60 overflow-auto outline-none">

@@ -1,0 +1,38 @@
+/* 产品弹窗的进出场（AppModal 的 transitionName）。
+   出现：朝点击处轻微放大并淡入，面板档；离开：快一档，轻微缩小并淡出（纯淡出用 out，第一帧就有反应）。
+   AntD 默认从 20% 缩放弹出，幅度太大；这里只留 4% 交代来处。
+   prepare 阶段保持无变换，AntD 在这一步按未缩放的位置计算以点击点为原点的 transform-origin。 */
+.app-modal-motion-enter,
+.app-modal-motion-appear {
+    opacity: 0;
+    transform: scale(0.96);
+}
+
+.app-modal-motion-enter-prepare,
+.app-modal-motion-appear-prepare {
+    transform: none;
+}
+
+.app-modal-motion-enter-active,
+.app-modal-motion-appear-active {
+    opacity: 1;
+    transform: none;
+    transition:
+        opacity var(--motion-panel) var(--ease-out),
+        transform var(--motion-panel) var(--ease-out);
+}
+
+.app-modal-motion-leave-active {
+    opacity: 0;
+    transform: scale(0.98);
+    transition:
+        opacity var(--motion-state) var(--ease-out),
+        transform var(--motion-state) var(--ease-out);
+    pointer-events: none;
+}
+
+/* AntD 的遮罩不接收点击（由外壳接住）。离场时外壳是 inert，点击会穿透到背后的页面，
+   所以让 AppModal 的遮罩自己接住点击：打开时外壳盖在遮罩上，行为不变。 */
+.app-modal-root .ant-modal-mask {
+    pointer-events: auto;
+}

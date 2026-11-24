@@ -4,13 +4,13 @@ import { canvasConnectionTilt, latchCanvasConnectionApproach } from "../src/lib/
 
 const node = { position: { x: 100, y: 200 }, width: 400, height: 200 };
 test("connection approach determines tilt direction and pivot", () => {
-    expect(canvasConnectionTilt(node, { x: 100, y: 300 })).toEqual({ rotateX: 0, rotateY: -5, origin: "0% 50%" });
-    expect(canvasConnectionTilt(node, { x: 500, y: 300 })).toEqual({ rotateX: 0, rotateY: 5, origin: "100% 50%" });
-    expect(canvasConnectionTilt(node, { x: 300, y: 200 })?.rotateX).toBe(5);
-    expect(canvasConnectionTilt(node, { x: 300, y: 400 })?.rotateX).toBe(-5);
+    expect(canvasConnectionTilt(node, { x: 100, y: 300 })).toEqual({ rotateX: 0, rotateY: -3, origin: "0% 50%" });
+    expect(canvasConnectionTilt(node, { x: 500, y: 300 })).toEqual({ rotateX: 0, rotateY: 3, origin: "100% 50%" });
+    expect(canvasConnectionTilt(node, { x: 300, y: 200 })?.rotateX).toBe(3);
+    expect(canvasConnectionTilt(node, { x: 300, y: 400 })?.rotateX).toBe(-3);
 });
 test("snap padding is clamped, absent or invalid approach stays flat", () => {
-    expect(canvasConnectionTilt(node, { x: -100, y: 700 })).toEqual({ rotateX: -5, rotateY: -5, origin: "0% 100%" });
+    expect(canvasConnectionTilt(node, { x: -100, y: 700 })).toEqual({ rotateX: -3, rotateY: -3, origin: "0% 100%" });
     expect(canvasConnectionTilt(node)).toBeUndefined();
     expect(canvasConnectionTilt(node, { x: NaN, y: 0 })).toBeUndefined();
     expect(canvasConnectionTilt({ ...node, width: 0 }, { x: 0, y: 0 })).toBeUndefined();

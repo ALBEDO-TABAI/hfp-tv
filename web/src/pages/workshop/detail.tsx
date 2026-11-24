@@ -9,6 +9,7 @@ import { WorkshopSnapshotView } from "@/components/workshop/workshop-snapshot-vi
 import { platformErrorMessage } from "@/lib/platform-account";
 import { ApiError } from "@/services/api/request";
 import { getWorkshopPublication, workshopQueryKey } from "@/services/api/workshop";
+import { useClosingValue } from "@/hooks/use-closing-value";
 
 export default function WorkshopDetailPage() {
     const { id } = useParams();
@@ -20,6 +21,7 @@ export default function WorkshopDetailPage() {
         retry: false,
     });
     const work = publication.data;
+    const copyDialog = useClosingValue(copyOpen && work);
     return <main className="app-workspace-page h-full space-y-4 overflow-y-auto p-4 text-foreground sm:p-6">
         <Link to="/workshop" className="inline-block text-sm focus-visible:outline-2 focus-visible:outline-ring">← 返回创意工坊</Link>
         {publication.isError ? publication.error instanceof ApiError && (publication.error.status === 410 || publication.error.reason === "publication_unlisted") ? <EmptyState title="该作品已下架" />
@@ -31,7 +33,7 @@ export default function WorkshopDetailPage() {
                 </header>
                 <Collapse defaultActiveKey={["intro"]} items={[{ key: "intro", label: "只读预览 · 复制后可以编辑和重新生成", children: <div className="space-y-3"><p className="whitespace-pre-wrap break-words">{work.summary || "暂无简介"}</p><div>{work.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}</div><WorkshopOrigin origin={work.derivedFrom} /></div> }]} />
                 <WorkshopSnapshotView key={work.currentVersionId} versionId={work.currentVersionId} allowDownload={work.allowDownload || work.canManage} filesOpen={filesOpen} onCloseFiles={() => setFilesOpen(false)} />
-                {copyOpen && <WorkshopCopyDialog publication={work} onClose={() => setCopyOpen(false)} />}
+                {copyDialog.shown && <WorkshopCopyDialog key={copyDialog.key} publication={copyDialog.shown} open={copyDialog.open} afterClose={copyDialog.afterClose} onClose={() => setCopyOpen(false)} />}
             </>}
     </main>;
 }

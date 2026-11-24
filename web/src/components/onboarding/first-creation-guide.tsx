@@ -42,6 +42,7 @@ export function FirstCreationGuide() {
     const [notice, setNotice] = useState("");
     const [finished, setFinished] = useState(false);
     const [highlight, setHighlight] = useState<{ step: typeof onboardingSteps[number]; rect: DOMRect } | null>(null);
+    const [spot, setSpot] = useState<{ rect: DOMRect; visible: boolean; step: typeof onboardingSteps[number]; glide: boolean } | null>(null);
     const nodeStepStartedAt = useRef<number | null>(null);
     const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
     const [drag, setDrag] = useState<{ x: number; y: number; left: number; top: number } | null>(null);
@@ -166,17 +167,21 @@ export function FirstCreationGuide() {
     const advance = (skip = false) => { guide.advance(skip); if (step === "return") setFinished(true); else goToLesson(onboardingSteps[guide.step + 1]); };
     const back = () => { guide.back(); goToLesson(onboardingSteps[guide.step - 1]); };
     const highlightRect = highlight?.step === step ? highlight.rect : null;
-    const spotlight = highlightRect && guide.status === "active" && !collapsed && !(step === "node" && ready) && {
-        left: Math.max(0, highlightRect.left - 8),
-        top: Math.max(0, highlightRect.top - 8),
-        right: Math.min(window.innerWidth, highlightRect.right + 8),
-        bottom: Math.min(window.innerHeight, highlightRect.bottom + 8),
-    };
+    const spotlightWanted = guide.status === "active" && !collapsed && !(step === "node" && ready);
+    const spotlightTarget = spotlightWanted ? highlightRect : null;
+    // 聚光灯在引导进行中一直挂着：换步骤时新目标要等下一次测量，先停在原处，找到后整块平移过去（glide）；
+    // 同一步里目标因滚动等原因移动时立即跟上，不拖在后面。400ms 内仍没找到，或这一步本来就不需要高亮，再淡出，淡完才卸载。
+    useEffect(() => {
+        if (spotlightTarget) { setSpot((current) => ({ rect: spotlightTarget, visible: true, step, glide: Boolean(current?.visible) && current?.step !== step })); return; }
+        if (!spotlightWanted) { setSpot((current) => current && { ...current, visible: false }); return; }
+        const timer = window.setTimeout(() => setSpot((current) => current && { ...current, visible: false }), 400);
+        return () => window.clearTimeout(timer);
+    }, [spotlightTarget, spotlightWanted, step]);
     return <>
-        <AppModal open={finished} transitionName="" maskTransitionName="" title="引导已结束" onCancel={() => setFinished(false)} footer={<Button type="primary" onClick={() => setFinished(false)}>继续使用 hfp - all in one</Button>} width={420}>
+        <AppModal open={finished} title="引导已结束" onCancel={() => setFinished(false)} footer={<Button type="primary" onClick={() => setFinished(false)}>继续使用 hfp - all in one</Button>} width={420}>
             <p className="first-creation-intro">随时从侧栏重新打开引导。</p>
         </AppModal>
-        <AppModal open={welcome} transitionName="" maskTransitionName="" title="完成第一次创作" onCancel={dismiss} footer={null} width={420} destroyOnHidden>
+        <AppModal open={welcome} title="完成第一次创作" onCancel={dismiss} footer={null} width={420} destroyOnHidden>
             <p className="first-creation-intro">跟着高亮操作，点击引导卡上的箭头按钮切换步骤。</p>
             <div className="first-creation-actions"><Button onClick={dismiss}>稍后</Button><Button type="primary" onClick={() => { guide.restart(); goToLesson(onboardingSteps[0]); setWelcome(false); setCollapsed(false); }}>开始</Button></div>
         </AppModal>
@@ -190,12 +195,7 @@ export function FirstCreationGuide() {
                 </div><div className="first-creation-navigation"><button type="button" disabled={guide.step === 0} aria-label="上一步" title="上一步" onClick={back}><ChevronLeft size={18} /></button><button type="button" className="is-next" aria-label={step === "return" ? "结束引导" : "下一步"} title={step === "return" ? "结束引导" : "下一步"} onClick={() => advance(!ready)}><ChevronRight size={18} /></button></div></div>
             </>}
         </aside>}
-        {spotlight && <>
-            <div className="first-creation-dim" aria-hidden style={{ inset: "0 0 auto 0", height: spotlight.top }} />
-            <div className="first-creation-dim" aria-hidden style={{ left: 0, top: spotlight.top, width: spotlight.left, height: spotlight.bottom - spotlight.top }} />
-            <div className="first-creation-dim" aria-hidden style={{ right: 0, top: spotlight.top, left: spotlight.right, height: spotlight.bottom - spotlight.top }} />
-            <div className="first-creation-dim" aria-hidden style={{ inset: `${spotlight.bottom}px 0 0 0` }} />
-            <div className="first-creation-highlight" aria-hidden style={{ left: highlightRect.left - 4, top: highlightRect.top - 4, width: highlightRect.width + 8, height: highlightRect.height + 8 }} />
-        </>}
+        {/* 聚光灯是一个元素：描边是它的边框，四周的暗幕是一圈很大的阴影。换到下一步时整块平移过去，而不是跳。 */}
+        {spot && <div className="first-creation-spotlight" data-visible={spot.visible || undefined} data-glide={spot.glide || undefined} aria-hidden onTransitionEnd={(event) => { if (event.target === event.currentTarget && event.propertyName === "opacity" && !spot.visible) setSpot(null); }} style={{ transform: `translate(${spot.rect.left - 4}px, ${spot.rect.top - 4}px)`, width: spot.rect.width + 8, height: spot.rect.height + 8 }} />}
     </>;
 }

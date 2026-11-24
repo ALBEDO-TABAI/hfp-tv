@@ -1,6 +1,8 @@
 import { ScrollText } from "lucide-react";
 import { lazy, Suspense, useState, type CSSProperties, type ReactNode } from "react";
 
+import { useOpenedOnce } from "@/hooks/use-opened-once";
+
 const AppChangelogDialog = lazy(() => import("@/components/layout/app-changelog-dialog").then((module) => ({ default: module.AppChangelogDialog })));
 
 export const APP_VERSION = __APP_VERSION__;
@@ -27,6 +29,7 @@ export function formatAppVersionLabel(version: string) {
 
 export function AppChangelogButton({ className, style, showVersion = false, showLabel = false, showIcon = true, labelClassName, versionClassName, icon, label = "更新日志", version, ariaLabel }: AppChangelogButtonProps) {
     const [open, setOpen] = useState(false);
+    const mounted = useOpenedOnce(open);
     const displayed = formatAppVersionLabel(version ?? APP_VERSION);
     const resolvedAriaLabel = ariaLabel || (displayed ? `当前版本 ${displayed}，查看更新日志` : "查看更新日志");
 
@@ -37,9 +40,9 @@ export function AppChangelogButton({ className, style, showVersion = false, show
                 {showLabel ? <span className={`whitespace-nowrap ${labelClassName || ""}`}>{label}</span> : null}
                 {showVersion && displayed ? <span className={versionClassName}>{displayed}</span> : null}
             </button>
-            {open ? (
+            {mounted ? (
                 <Suspense fallback={null}>
-                    <AppChangelogDialog open onClose={() => setOpen(false)} />
+                    <AppChangelogDialog open={open} onClose={() => setOpen(false)} />
                 </Suspense>
             ) : null}
         </>

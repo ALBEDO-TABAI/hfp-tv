@@ -512,14 +512,14 @@ function ArtCritiqueProgress({ stage, theme }: { stage: ArtCritiquePipelineStage
             </div>
             <div className="h-2 overflow-hidden rounded-full" style={{ background: "color-mix(in oklch, var(--workspace-accent) 14%, transparent)" }}>
                 <div
-                    className="h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none"
+                    className="h-full w-full origin-left rounded-full transition-transform duration-(--motion-panel) ease-(--ease-out)"
                     role="progressbar"
                     aria-label="AI 审美批改阶段进度"
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={percent}
                     aria-valuetext={`${artCritiqueStageLabel(stage)}，约 ${percent}%`}
-                    style={{ width: `${percent}%`, background: theme.accent.primary }}
+                    style={{ transform: `scaleX(${percent / 100})`, background: theme.accent.primary }}
                 />
             </div>
             <div className="text-[var(--fs-micro)]" style={{ color: theme.node.muted }}>

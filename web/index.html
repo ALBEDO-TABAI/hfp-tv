@@ -17,7 +17,7 @@
                 inset: 0;
                 min-height: 100vh;
                 overflow: hidden;
-                background: #0b0b0d;
+                background: var(--boot-background, #0b0b0d);
             }
             #root:empty::after {
                 content: "";
@@ -32,13 +32,20 @@
         </style>
         <script>
             let theme = "dark";
+            let effects = "full";
             try {
-                if (JSON.parse(localStorage.getItem("infinite-canvas:theme_store"))?.state?.theme === "light") theme = "light";
+                const saved = JSON.parse(localStorage.getItem("infinite-canvas:theme_store"))?.state;
+                if (saved?.theme === "light") theme = "light";
+                if (saved?.effects === "lite") effects = "lite";
             } catch {}
+            // 流畅模式和主题一样在首帧前生效，避免先画一帧毛玻璃再关掉。
+            if (effects === "lite") document.documentElement.dataset.effects = "lite";
             document.documentElement.classList.toggle("dark", theme === "dark");
             document.documentElement.dataset.theme = theme;
             document.documentElement.style.colorScheme = theme;
             document.documentElement.style.setProperty("--background", theme === "dark" ? "#0b0b0d" : "#ebebee");
+            // 启动占位和加载画面的底色。皮肤不会清掉它，和工作区页面底色一致，启动过程不换色。
+            document.documentElement.style.setProperty("--boot-background", theme === "dark" ? "#0b0b0d" : "#ebebee");
         </script>
     </head>
     <body class="bg-background text-foreground antialiased">

@@ -1,0 +1,18 @@
+/* AntD 抽屉只给了时长（--motion-panel），曲线落在默认的 ease 上。只作用于 AppDrawer：
+   滑入和遮罩出现用进入曲线，第一帧就有反应；离开快一档（--motion-state），滑出用 --ease-in。 */
+.app-drawer-root [class*="-panel-motion-"],
+.app-drawer-root [class*="-mask-motion"] {
+    transition-timing-function: var(--ease-out) !important;
+}
+
+.app-drawer-root [class*="-panel-motion-"][class*="-leave"],
+.app-drawer-root [class*="-mask-motion"][class*="-leave"] {
+    transition-duration: var(--motion-state) !important;
+}
+
+.app-drawer-root [class*="-panel-motion-"][class*="-leave"] {
+    transition-timing-function: var(--ease-in) !important;
+}
+
+/* 面板外的一层交互开关：只负责关闭后设 inert，不生成布局盒子。 */
+.app-drawer-interaction { display: contents; }

@@ -3,15 +3,18 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "re
 import { Focus, Grid3X3, LayoutTemplate, Link2, Map } from "lucide-react";
 
 import { FloatingDock, type FloatingDockEntry } from "@/components/ui/aceternity/floating-dock";
-import { aceternityMotion } from "@/lib/aceternity-motion";
+import { motionPreset } from "@/lib/motion-tokens";
 import { canvasDockStyle } from "@/lib/canvas/canvas-aceternity-style";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { subscribeCanvasViewportPreview } from "@/lib/canvas/canvas-live-viewport";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
+import { PresenceInert } from "@/components/ui/base/presence-inert";
 
 type CanvasZoomControlsProps = {
     scale: number;
     onScaleChange: (scale: number) => void;
+    /** 菜单里的「放大 / 缩小」：和 ⌘+ / ⌘− 走同一个乘法步进。 */
+    onZoomStep?: (direction: "in" | "out") => void;
     onFitContent: () => void;
     onAutoArrange?: () => void;
     snapToGrid: boolean;
@@ -27,10 +30,9 @@ type CanvasZoomControlsProps = {
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 0.1;
-const ZOOM_MENU_HALF_WIDTH = 92;
 const QUICK_ZOOM_LEVELS = [0.5, 1, 8] as const;
 
-export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoArrange, snapToGrid, onSnapToGridChange, showConnections, onToggleConnections, isMiniMapOpen, onToggleMiniMap, containerRef, libtvChrome = false }: CanvasZoomControlsProps) {
+export function CanvasZoomControls({ scale, onScaleChange, onZoomStep, onFitContent, onAutoArrange, snapToGrid, onSnapToGridChange, showConnections, onToggleConnections, isMiniMapOpen, onToggleMiniMap, containerRef, libtvChrome = false }: CanvasZoomControlsProps) {
     const theme = canvasThemes[useActiveTheme()];
     const rootRef = useRef<HTMLDivElement>(null);
     const liveScaleRef = useRef(scale);
@@ -54,7 +56,10 @@ export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoA
             if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setPrecisionOpen(false);
         };
         const closeOnEscape = (event: KeyboardEvent) => {
-            if (event.key === "Escape") setPrecisionOpen(false);
+            if (event.key !== "Escape") return;
+            setPrecisionOpen(false);
+            // 键盘关掉菜单后把焦点还给入口按钮，不落到页面上。
+            rootRef.current?.querySelector<HTMLButtonElement>('button[aria-label="缩放画布"]')?.focus({ preventScroll: true });
         };
         document.addEventListener("pointerdown", close, true);
         document.addEventListener("keydown", closeOnEscape);
@@ -102,10 +107,16 @@ export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoA
         if (dockLabelRef.current) dockLabelRef.current.textContent = percent;
     }
 
+    // 百分比标签由镜头每一帧的预览更新，跟着缩放一路滚过去；这里不先把它改成目标值。
     function commitScale(nextScale: number) {
         const clampedScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextScale));
-        updateScaleDisplay(clampedScale);
         onScaleChange(clampedScale);
+        return clampedScale;
+    }
+
+    function stepScale(direction: "in" | "out") {
+        if (onZoomStep) onZoomStep(direction);
+        else commitScale(liveScaleRef.current + (direction === "in" ? ZOOM_STEP : -ZOOM_STEP));
     }
 
     function commitInputScale() {
@@ -116,8 +127,7 @@ export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoA
             input.value = String(Math.round(liveScaleRef.current * 100));
             return;
         }
-        commitScale(nextPercent / 100);
-        input.value = String(Math.round(liveScaleRef.current * 100));
+        input.value = String(Math.round(commitScale(nextPercent / 100) * 100));
     }
 
     function runMenuAction(action: () => void) {
@@ -147,64 +157,63 @@ export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoA
         <div ref={rootRef} data-canvas-no-zoom className={`relative z-[var(--z-toolbar)]${libtvChrome ? " canvas-libtv-compat-zoom" : ""}`} onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()}>
             <AnimatePresence>
                 {precisionOpen ? (
-                    <motion.div
-                        initial={{ opacity: 0, y: 14, scale: 0.92 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 9, scale: 0.96 }}
-                        transition={aceternityMotion.spring.panel}
-                        role="dialog"
-                        aria-label="缩放画布"
-                        className="canvas-zoom-menu aceternity-floating-panel absolute bottom-[var(--canvas-dock-popover-offset)] left-0 overflow-hidden border backdrop-blur-2xl"
-                        style={{ left: precisionAnchorX ?? undefined, x: precisionAnchorX === null ? 0 : -ZOOM_MENU_HALF_WIDTH, background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.node.text, boxShadow: `0 28px 80px ${theme.spatial.shadow}` }}
-                    >
-                        <label className="canvas-zoom-menu-input" style={{ background: theme.spatial.surface }}>
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                inputMode="decimal"
-                                defaultValue={Math.round(scale * 100)}
-                                aria-label="输入画布缩放百分比"
-                                autoComplete="off"
-                                spellCheck={false}
-                                onFocus={(event) => event.currentTarget.select()}
-                                onBlur={commitInputScale}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Enter") {
-                                        event.preventDefault();
-                                        commitInputScale();
-                                        setPrecisionOpen(false);
-                                    } else if (event.key === "Escape") {
-                                        event.preventDefault();
-                                        inputRef.current!.value = String(Math.round(liveScaleRef.current * 100));
-                                        setPrecisionOpen(false);
-                                    }
-                                }}
-                            />
-                            <span aria-hidden>%</span>
-                        </label>
-
-                        <div className="canvas-zoom-menu-actions">
-                            <button type="button" onClick={() => runMenuAction(() => commitScale(liveScaleRef.current + ZOOM_STEP))}>
-                                <span>放大</span><span className="canvas-zoom-shortcut" aria-hidden><kbd>⌘</kbd><span>＋</span></span>
-                            </button>
-                            <button type="button" onClick={() => runMenuAction(() => commitScale(liveScaleRef.current - ZOOM_STEP))}>
-                                <span>缩小</span><span className="canvas-zoom-shortcut" aria-hidden><kbd>⌘</kbd><span>−</span></span>
-                            </button>
-                            <button type="button" onClick={() => runMenuAction(onFitContent)}>
-                                <span>适合屏幕</span><span className="canvas-zoom-shortcut" aria-hidden><kbd>⌘</kbd><span>0</span></span>
-                            </button>
-                        </div>
-
-                        <div className="canvas-zoom-menu-divider" />
-
-                        <div className="canvas-zoom-menu-presets">
-                            {QUICK_ZOOM_LEVELS.map((level) => (
-                                <button key={level} type="button" onClick={() => runMenuAction(() => commitScale(level))}>
-                                    缩放至{Math.round(level * 100)}%
+                    <PresenceInert key="canvas-zoom-menu">
+                        <motion.div
+                            {...motionPreset.popover("above")}
+                            role="dialog"
+                            aria-label="缩放画布"
+                            className="canvas-zoom-menu aceternity-floating-panel absolute bottom-[var(--canvas-dock-popover-offset)] left-0 overflow-hidden border backdrop-blur-2xl"
+                            style={{ left: precisionAnchorX ?? undefined, translate: precisionAnchorX === null ? undefined : "-50%", transformOrigin: precisionAnchorX === null ? "bottom right" : "bottom center", background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.node.text, boxShadow: `0 28px 80px ${theme.spatial.shadow}` }}
+                        >
+                            <label className="canvas-zoom-menu-input" style={{ background: theme.spatial.surface }}>
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    inputMode="decimal"
+                                    defaultValue={Math.round(scale * 100)}
+                                    aria-label="输入画布缩放百分比"
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    onFocus={(event) => event.currentTarget.select()}
+                                    onBlur={commitInputScale}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter") {
+                                            event.preventDefault();
+                                            commitInputScale();
+                                            setPrecisionOpen(false);
+                                        } else if (event.key === "Escape") {
+                                            event.preventDefault();
+                                            inputRef.current!.value = String(Math.round(liveScaleRef.current * 100));
+                                            setPrecisionOpen(false);
+                                        }
+                                    }}
+                                />
+                                <span aria-hidden>%</span>
+                            </label>
+    
+                            <div className="canvas-zoom-menu-actions">
+                                <button type="button" onClick={() => runMenuAction(() => stepScale("in"))}>
+                                    <span>放大</span><span className="canvas-zoom-shortcut" aria-hidden><kbd>⌘</kbd><span>＋</span></span>
                                 </button>
-                            ))}
-                        </div>
-                    </motion.div>
+                                <button type="button" onClick={() => runMenuAction(() => stepScale("out"))}>
+                                    <span>缩小</span><span className="canvas-zoom-shortcut" aria-hidden><kbd>⌘</kbd><span>−</span></span>
+                                </button>
+                                <button type="button" onClick={() => runMenuAction(onFitContent)}>
+                                    <span>适合屏幕</span><span className="canvas-zoom-shortcut" aria-hidden><kbd>⌘</kbd><span>0</span></span>
+                                </button>
+                            </div>
+    
+                            <div className="canvas-zoom-menu-divider" />
+    
+                            <div className="canvas-zoom-menu-presets">
+                                {QUICK_ZOOM_LEVELS.map((level) => (
+                                    <button key={level} type="button" onClick={() => runMenuAction(() => commitScale(level))}>
+                                        缩放至{Math.round(level * 100)}%
+                                    </button>
+                                ))}
+                            </div>
+                        </motion.div>
+                    </PresenceInert>
                 ) : null}
             </AnimatePresence>
 
