@@ -1,9 +1,10 @@
-# syntax=docker/dockerfile:1.7
 # 团队服务器单镜像：Go 网关与工作区内核、Node 助手宿主、ffmpeg、官方插件与前端静态文件。
 # 构建上下文是仓库根目录：docker build -f deploy/teamserver/Dockerfile .
 
 # 下载源默认用中国大陆的镜像，都可以在 .env 里改（见 .env.example）：
 #   IMAGE_REGISTRY 基础镜像仓库；NPM_REGISTRY 前端与助手依赖；APT_MIRROR 系统软件包；GOPROXY Go 依赖。
+# 开头故意不写 # syntax= 行：它让构建先从 Docker Hub 拉 Dockerfile 解析器镜像，这一步不经过 IMAGE_REGISTRY，
+# 服务器拉不到时第一步就失败。本文件只用到 RUN --mount 缓存挂载，Docker 自带的解析器已经支持。
 ARG IMAGE_REGISTRY=docker.io
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ARG APT_MIRROR=mirrors.aliyun.com
