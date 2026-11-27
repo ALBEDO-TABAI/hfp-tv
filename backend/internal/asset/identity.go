@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"infinite-canvas/backend/internal/kernel"
+	"infinite-canvas/backend/internal/mediatools"
 )
 
 func NormalizedUploadKey(values []string) *string {
@@ -35,6 +36,17 @@ func EnsureUploadIdentity(values []string) []string {
 
 func DetectUploadedMimeType(file io.ReadSeeker, fileName string, declared string) string {
 	declared = strings.TrimSpace(strings.Split(declared, ";")[0])
+	var head []byte
+	if file != nil {
+		buffer := make([]byte, 512)
+		read, _ := file.Read(buffer)
+		_, _ = file.Seek(0, io.SeekStart)
+		head = buffer[:read]
+	}
+	// Browsers label a file by its extension; a JPEG saved as .png is a JPEG.
+	if sniffed := mediatools.ContentImageMIMEType(declared, head); sniffed != "" {
+		return sniffed
+	}
 	if declared != "" && declared != "application/octet-stream" {
 		return declared
 	}
@@ -44,10 +56,7 @@ func DetectUploadedMimeType(file io.ReadSeeker, fileName string, declared string
 		}
 		return "application/octet-stream"
 	}
-	buffer := make([]byte, 512)
-	read, _ := file.Read(buffer)
-	_, _ = file.Seek(0, io.SeekStart)
-	if detected := http.DetectContentType(buffer[:read]); detected != "" && detected != "application/octet-stream" {
+	if detected := http.DetectContentType(head); detected != "" && detected != "application/octet-stream" {
 		return strings.TrimSpace(strings.Split(detected, ";")[0])
 	}
 	if fromExtension := mime.TypeByExtension(filepath.Ext(fileName)); fromExtension != "" {

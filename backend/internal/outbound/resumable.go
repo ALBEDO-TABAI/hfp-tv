@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"infinite-canvas/backend/internal/mediatools"
 )
 
 // ErrResourceTooLarge marks a download that exceeded the caller's hard byte cap.
@@ -353,7 +355,10 @@ func downloadResumableAttempt(ctx context.Context, parsed *url.URL, opts Resumab
 	}
 	removeResumablePartial(opts.PartialPath)
 	mimeType := normalizeResumableMimeType(response.Header.Get("Content-Type"))
-	if mimeType == "" || mimeType == "application/octet-stream" {
+	// Storage often labels by file extension; an image is named by its bytes.
+	if sniffed := mediatools.ContentImageMIMEType(mimeType, data); sniffed != "" {
+		mimeType = sniffed
+	} else if mimeType == "" || mimeType == "application/octet-stream" {
 		mimeType = http.DetectContentType(data)
 	}
 	return ResumableResult{

@@ -129,6 +129,20 @@ func TestDownloadResumableResumesAfterConnectionCut(t *testing.T) {
 	}
 }
 
+// Storage that labels by file extension serves a JPEG named .png as image/png.
+func TestDownloadResumableNamesImagesByContent(t *testing.T) {
+	allowLoopback(t)
+	jpeg := []byte("\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeTestArtifact(w, jpeg, 0)
+	}))
+	defer server.Close()
+	result, err := DownloadResumable(context.Background(), server.URL+"/out.png", ResumableOptions{PartialPath: filepath.Join(t.TempDir(), "out.part"), MaxBytes: 1 << 20})
+	if err != nil || result.MimeType != "image/jpeg" || !bytes.Equal(result.Data, jpeg) {
+		t.Fatalf("DownloadResumable() = %q %d err=%v", result.MimeType, len(result.Data), err)
+	}
+}
+
 func TestDownloadResumableRestartsWhenServerIgnoresRange(t *testing.T) {
 	allowLoopback(t)
 	payload := resumableTestPayload(24000)

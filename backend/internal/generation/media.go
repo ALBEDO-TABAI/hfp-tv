@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"infinite-canvas/backend/internal/mediatools"
 )
 
 func HydrateMedia(ctx context.Context, userID string, input *Input, policy MediaHydrationPolicy) error {
@@ -167,7 +169,13 @@ func MediaBytes(media Media) ([]byte, string, error) {
 	return raw, NormalizedMediaMIMEType(defaultString(mimeType, media.Type), raw), nil
 }
 
+// NormalizedMediaMIMEType is the type to declare for media bytes. Common image
+// formats are named by their content: an image label is often wrong (a
+// b64_json result is assumed to be PNG, CDNs label by file extension).
 func NormalizedMediaMIMEType(declared string, data []byte) string {
+	if sniffed := mediatools.ContentImageMIMEType(declared, data); sniffed != "" {
+		return sniffed
+	}
 	declared = strings.TrimSpace(strings.Split(declared, ";")[0])
 	if declared != "" && declared != "application/octet-stream" {
 		return declared

@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -302,6 +304,50 @@ func TestCompanyImageRelayActsAsReferenceStorage(t *testing.T) {
 	}
 	if calls.Load() != 1 {
 		t.Fatalf("a still-valid link was uploaded again: %d calls", calls.Load())
+	}
+}
+
+// The service refuses an image whose declared type differs from its signature
+// ("图片内容与 Content-Type 不一致"). Images stored before uploads and results
+// were sniffed may still carry a wrong label, such as a JPEG recorded as PNG.
+func TestReferenceServiceIsToldWhatTheImageBytesAre(t *testing.T) {
+	var encoded bytes.Buffer
+	if err := jpeg.Encode(&encoded, image.NewRGBA(image.Rect(0, 0, 1, 1)), nil); err != nil {
+		t.Fatal(err)
+	}
+	photo := encoded.Bytes()
+	var calls atomic.Int32
+	var declared atomic.Value
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		declared.Store(r.Header.Get("Content-Type"))
+		_, _ = w.Write([]byte(`{"url":"https://cdn.example.com/hfp-reference/a.jpg","expiresAt":"` + time.Now().Add(6*time.Hour).UTC().Format(time.RFC3339) + `"}`))
+	}))
+	defer service.Close()
+	s, _, _, _ := creationTestService(t)
+	mislabelled := func(name string, data []byte) string {
+		resource, err := s.UploadLocalResourceFile("user", name, int64(len(data)), "image", 1, 1, 0, bytes.NewReader(data))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resource.MimeType = "image/png"
+		if err := s.repo.SaveResource(resource); err != nil {
+			t.Fatal(err)
+		}
+		return resource.ID
+	}
+	endpoint := service.URL + "/v1/reference-images"
+	if _, err := s.referenceServicePublicURL(context.Background(), "user", mislabelled("photo.png", photo), endpoint, "sk-member-relay"); err != nil {
+		t.Fatal(err)
+	}
+	if got := declared.Load(); got != "image/jpeg" {
+		t.Fatalf("declared type = %v, want image/jpeg", got)
+	}
+	// Formats the service cannot take are refused here, with what it accepts.
+	gif := []byte("GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;")
+	_, err := s.referenceServicePublicURL(context.Background(), "user", mislabelled("anim.png", gif), endpoint, "sk-member-relay")
+	if err == nil || !strings.Contains(err.Error(), "只接受 PNG、JPEG 或 WebP") || calls.Load() != 1 {
+		t.Fatalf("gif = %v after %d calls", err, calls.Load())
 	}
 }
 

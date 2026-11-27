@@ -359,6 +359,18 @@ func TestDecodeInlineDataURLRejectsMalformed(t *testing.T) {
 	}
 }
 
+// b64_json results are labelled PNG whatever the provider produced.
+func TestDecodeInlineDataURLNamesImagesByContent(t *testing.T) {
+	jpeg := []byte("\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01")
+	mime, data, err := DecodeInlineDataURL("data:image/png;base64," + base64.StdEncoding.EncodeToString(jpeg))
+	if err != nil || mime != "image/jpeg" || string(data) != string(jpeg) {
+		t.Fatalf("jpeg labelled png = %q %d err=%v", mime, len(data), err)
+	}
+	if mime, _, err := DecodeInlineDataURL("data:video/mp4;base64," + base64.StdEncoding.EncodeToString(jpeg)); err != nil || mime != "video/mp4" {
+		t.Fatalf("video label = %q err=%v", mime, err)
+	}
+}
+
 type countingInlineStore struct {
 	next      InlineStore
 	upstreams atomicInt

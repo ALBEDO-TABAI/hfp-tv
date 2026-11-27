@@ -16,6 +16,7 @@ import (
 
 	"infinite-canvas/backend/internal/asset"
 	"infinite-canvas/backend/internal/assets"
+	"infinite-canvas/backend/internal/mediatools"
 	"infinite-canvas/backend/internal/model"
 )
 
@@ -238,6 +239,11 @@ func DecodeInlineDataURL(value string) (string, []byte, error) {
 	data, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", nil, fmt.Errorf("%w：base64 解码失败：%v", ErrInvalidGeneratedDataURL, err)
+	}
+	// Image results are labelled by the provider adapter (b64_json is always
+	// called PNG); the resource records what the bytes are.
+	if sniffed := mediatools.ContentImageMIMEType(mimeType, data); sniffed != "" {
+		mimeType = sniffed
 	}
 	return mimeType, data, nil
 }

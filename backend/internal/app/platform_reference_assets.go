@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"infinite-canvas/backend/internal/generation"
+	"infinite-canvas/backend/internal/mediatools"
 	"infinite-canvas/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -289,6 +290,9 @@ func (s *Service) referenceServicePublicURL(ctx context.Context, userID, resourc
 }
 
 // readReferenceServiceImage reads an owned, ready image the service accepts.
+// The type sent is what the bytes are, because the service checks it against
+// the signature; the recorded type of an older resource may be a wrong label
+// (a JPEG recorded as image/png).
 func (s *Service) readReferenceServiceImage(userID, resourceID string) (string, []byte, error) {
 	resource, body, err := s.OpenResource(userID, resourceID)
 	if err != nil {
@@ -298,16 +302,16 @@ func (s *Service) readReferenceServiceImage(userID, resourceID string) (string, 
 	if resource.Status != model.ResourceStatusReady {
 		return "", nil, errors.New("参考图尚未上传完成")
 	}
-	contentType := strings.ToLower(strings.TrimSpace(strings.Split(resource.MimeType, ";")[0]))
-	if !referenceServiceImageTypes[contentType] {
-		return "", nil, errors.New("参考图服务只接受 PNG、JPEG 或 WebP 图片")
-	}
 	data, err := io.ReadAll(io.LimitReader(body, referenceServiceMaxBytes))
 	if err != nil {
 		return "", nil, fmt.Errorf("读取参考图失败：%w", err)
 	}
 	if len(data) >= referenceServiceMaxBytes {
 		return "", nil, errors.New("参考图必须小于 30MB")
+	}
+	contentType := mediatools.ContentImageMIMEType(resource.MimeType, data)
+	if !referenceServiceImageTypes[contentType] {
+		return "", nil, errors.New("参考图服务只接受 PNG、JPEG 或 WebP 图片")
 	}
 	return contentType, data, nil
 }
